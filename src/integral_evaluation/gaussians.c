@@ -9,17 +9,18 @@ double cartesian_gaussian(unsigned int ii, double A_x, double a, double x){
     return pow(x_a, ii) * exp(-a * pow(x_a, 2)); 
 } 
 
-// int main(){
+double gaussian_overlap_distribution(unsigned int ii, double A_x, double a, unsigned int jj, double B_x, double b, double x){
 
-//     double a = 0.5;
-//     double A_x = 0.0;
-//     double x = 1.3;
-//     uint ii = 1;
+    // gaussian overlap distribution Omega_{i,j}
 
-//     double value = cartesian_gaussian(ii, A_x, a, x);
+    double p = a+b;
+    double mu = a*b/p;
+    double P_x = (a*A_x  + b * B_x) / p;
+    double X_ab = A_x - B_x;
+    double x_a = (x-A_x);
+    double x_b = (x-B_x);
+    double x_p = (x-P_x);
 
-//     printf("i = %i, x = %f : %f\n", ii, x, value);
+    return exp(-mu * pow(X_ab, 2)) * pow(x_a, ii) *  pow(x_b, jj) * exp(-p * pow(x_p, 2));
+}
 
-
-//     return 0;
-// }
