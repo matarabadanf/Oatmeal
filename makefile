@@ -27,7 +27,7 @@ TEST_EXES = $(TEST_OBJ:.o=.exe)
 # Add run_tests explicitly
 ALL_TEST_EXES = $(TEST_EXES) tests/run_tests.exe
 
-tests: $(ALL_TEST_EXES)
+tests: $(ALL_TEST_EXES) all
 
 # Compile all .c files into .o files
 %.o: %.c

@@ -28,10 +28,13 @@ int main(void){
 
     // Gaussian overlap 
 
-    double a_1= 0.5;
+
     double A_x_1 = -2.0;
-    double b_1 = 0.2;
     double B_x_1 = 1.3;
+
+    double a_1= 0.5;
+    double b_1 = 0.2;
+
 
     // combining i with j it is 01 12 20 22
     unsigned int ii_1[4] = {0, 1, 2, 2};
@@ -50,6 +53,26 @@ int main(void){
             printf("\n\n!!! FAILED TEST cartesian_gaussian_test at gaussian_overlap\n\n");
             return 1;
         }
+    }
+
+
+    double OS_reference[36] = {0.44708262,  -1.0538376 ,   2.80339051,  -8.1134742 ,
+        25.13188312, -82.42079362,   0.42153504,  -0.67427358,
+         1.13771447,  -1.64258173,   0.51442066,  12.04569143,
+         0.71679205,  -1.08738835,   2.11187603,  -4.90609904,
+        13.74327963, -45.67741257,   1.27802542,  -1.47650553,
+         2.06309186,  -2.44684721,  -0.32458981,  23.22399742,
+         2.74097837,  -2.80937637,   4.36135593,  -8.39918562,
+        22.15285105, -77.14250727,   6.23585224,  -4.90958611,
+         5.99328894,  -5.56446149,  -4.03809881,  72.73723953}; //72.73723953
+
+    double *OS_calc = Overlap_OS_matrix(A_x_1, B_x_1, a_1, b_1, 5, 5);
+
+    for (unsigned int i = 0; i < 36; i++){
+         if (fabs( OS_reference[i] - OS_calc[i]) > 1e-5){
+             printf("\n\n!!! FAILED TEST cartesian_gaussian_test at Overlap integral\n\n");
+            return 1;
+         }
     }
 
     return 0;
