@@ -5,7 +5,7 @@
 
 int main(void){
 
-    // Gaussian definition
+    ///////////////// Gaussian definition /////////////////////
 
     double        a[6] = {0.5,  0.2,  0.4, 0.7, 1.4,  2.20};
     double      A_x[6] = {0.0, -1.2,  2.4, 1.7, 0.6,  1.45};
@@ -26,9 +26,7 @@ int main(void){
         }
     }
 
-    // Gaussian overlap 
-
-
+    ///////////////// Gaussian overlap /////////////////////
     double A_x_1 = -2.0;
     double B_x_1 = 1.3;
 
@@ -56,6 +54,7 @@ int main(void){
     }
 
 
+    ///////////////// Obara-saika overlap integral /////////////////////
     double OS_reference[36] = {0.44708262,  -1.0538376 ,   2.80339051,  -8.1134742 ,
         25.13188312, -82.42079362,   0.42153504,  -0.67427358,
          1.13771447,  -1.64258173,   0.51442066,  12.04569143,
@@ -70,11 +69,14 @@ int main(void){
 
     for (unsigned int i = 0; i < 36; i++){
          if (fabs( OS_reference[i] - OS_calc[i]) > 1e-5){
-             printf("\n\n!!! FAILED TEST cartesian_gaussian_test at Overlap integral\n\n");
+            printf("\n\n!!! FAILED TEST cartesian_gaussian_test at Overlap integral\n\n");
             return 1;
          }
     }
 
+    free(OS_calc);
+
+    ///////////////// Obara-saika kinetic integral /////////////////////
     double kinetic_OS_reference[36] = {-1.34854717e-01,  1.67753741e-02,  3.45757237e-01, -1.60368758e+00,
         5.69430175e+00, -1.83716905e+01, -6.71014963e-03, -2.73157611e-01,
         6.75025779e-01, -1.24044899e+00,  9.33925902e-01,  6.45653844e+00,
@@ -89,10 +91,57 @@ int main(void){
 
     for (unsigned int i = 0; i < 36; i++){
          if (fabs( kinetic_OS_reference[i] - kinetic_OS_calc[i]) > 1e-5){
-             printf("\n\n!!! FAILED TEST cartesian_gaussian_test at Kinetic integral\n\n");
+            printf("\n\n!!! FAILED TEST cartesian_gaussian_test at Kinetic integral\n\n");
             return 1;
          }
     }
+
+    free(kinetic_OS_calc);
+
+    /////////////////// Hermite definition /////////////////////
+
+    double       x_2[6] = {1, 1, 1, 1, 1, 1};
+    unsigned int   t[6] = {0, 1, 2, 3, 4, 5};
+    double P_x = 0;
+    double p = 0.7;
+
+    double hermite_reference[6] = {0.4965853037914095, 0.6952194253079733, 0.2780877701231893, -1.55729151268986, -3.348176752283199, 4.033385017866738}; 
+
+    for (unsigned int i = 0; i < 6; i++) {
+        double value = Hermite_gaussian(x_2[i], p, P_x, t[i]);
+
+        // printf("Calculated = %f, reference = %f, %f \n", value, reverence_overlap_distributions[i], fabs(value - reverence_overlap_distributions[i])); 
+
+        if (fabs(value - hermite_reference[i]) > 1e-5){
+            printf("\n\n!!! FAILED TEST cartesian_gaussian_test at hermite definition\n\n");
+            return 1;
+        }
+    }
+
+    ///////////////// Hermite coefficients /////////////////////
+
+    double A_x_2 = -2;
+    double B_x_2 = 1;
+    double a_2 = 0.5;
+    double b_2 = 0.2;
+    double x_3 = -0.5; 
+
+    double ii_2[6] = {0,1,2,3,4,5};
+    double jj_2[6] = {0,3,4,2,1,4};
+
+    double cartesian_from_hermite_reference[6] = {0.20700755268115256, -1.0479757354483343, 2.357945404758755, 1.5719636031725015, -1.5719636031725037, 7.958065741060752};
+
+    for (unsigned int i = 0; i < 6; i++) {
+        double value = cartesian_from_hermite(x_3, ii_2[i], jj_2[i], A_x_2, B_x_2, a_2, b_2);
+
+        // printf("Calculated = %f, reference = %f, %f \n", value, reverence_overlap_distributions[i], fabs(value - reverence_overlap_distributions[i])); 
+
+        if (fabs(value - cartesian_from_hermite_reference[i]) > 1e-5){
+            printf("\n\n!!! FAILED TEST cartesian_gaussian_test at hermite to cartesian\n\n");
+            return 1;
+        }
+    }
+
 
     return 0;
 }

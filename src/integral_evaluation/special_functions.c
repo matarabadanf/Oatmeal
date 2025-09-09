@@ -31,3 +31,7 @@ double boys_hypergeom(unsigned int n, double x, unsigned int k){
     double b = n+1.5;
     return kummer_confluent_series(a, b, -x, k) / (2*n+1);
 }
+
+double binomial(unsigned int n, unsigned int m){
+    return tgamma(n+1) / (tgamma(m+1) * tgamma(n-m+1));
+}

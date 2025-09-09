@@ -2,6 +2,7 @@
 #include <math.h>
 #include <stdlib.h>
 #include "gaussians.h"
+#include "special_functions.h"
 
 double cartesian_gaussian(unsigned int ii, double A_x, double a, double x){
     double x_a = (x-A_x);
@@ -159,4 +160,65 @@ double Kinetic_OS(double Ax, double Bx, double a, double b, unsigned int ii, uns
     free(kinetic_matrix);
 
     return result;
+}
+
+double Hermite_gaussian(double x, double p, double P_x, int t) {
+    if (t == 0) {
+        return exp(-p * pow(x - P_x, 2));
+    } 
+    else if (t < 0) {
+        return 0.0;
+    } 
+    else {
+        return 2.0 * p * ((x - P_x) * Hermite_gaussian(x, p, P_x, t - 1) - (t - 1) * Hermite_gaussian(x, p, P_x, t - 2));
+    }
+}
+
+double Hermite_coefficient(int i, int j, int t, double Ax, double Bx, double a, double b){
+    // Hermite coefficient E(i, j, t, Ax, Bx, a, b)
+    // Compute parameters
+
+    double X_ab = Bx - Ax;
+    double p = a + b;
+    double mu = (a * b) / p;
+    double X_pa = b / p * X_ab;
+    double X_pb = -a / p * X_ab;
+
+    // Edge cases
+    if (i < 0 || j < 0 || t < 0 || t > (i + j)) {
+        return 0.0;
+    } 
+    else if (i == 0 && j == 0 && t == 0) {
+        return exp(-mu * X_ab * X_ab);
+    }
+
+    // Recursion
+    if (t > 0) {
+        return ((i * Hermite_coefficient(i - 1, j, t - 1, Ax, Bx, a, b)) +
+                (j * Hermite_coefficient(i, j - 1, t - 1, Ax, Bx, a, b))) / (2.0 * p * t);
+    }
+    else if (t == 0 && i > 0) {
+        return X_pa * Hermite_coefficient(i - 1, j, t, Ax, Bx, a, b) +
+               Hermite_coefficient(i - 1, j, 1, Ax, Bx, a, b);
+    } 
+    else if (t == 0 && j > 0) {
+        return X_pb * Hermite_coefficient(i, j - 1, t, Ax, Bx, a, b) +
+               Hermite_coefficient(i, j - 1, 1, Ax, Bx, a, b);
+    }
+
+    return 0;
+
+}
+
+double cartesian_from_hermite(double x, int i, int j, double Ax, double Bx, double a, double b) {
+    // Calculates the value of the overlap using the Hermite summation
+    double total = 0.0;
+    double p = a + b;
+    double Px = (a * Ax + b * Bx) / p;
+
+    for (int t = 0; t <= i + j; t++) {
+        total += Hermite_coefficient(i, j, t, Ax, Bx, a, b) * Hermite_gaussian(x, p, Px, t);
+    }
+
+    return total;
 }

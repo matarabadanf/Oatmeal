@@ -3,7 +3,7 @@
 #include <stdlib.h>
 #include "gaussians.h"
 
-int main(){
+int main(void){
     double a = 0.5;
     double A_x = 0.0;
     double x = 1.3;
