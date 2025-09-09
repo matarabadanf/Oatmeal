@@ -38,8 +38,8 @@ tests/run_tests.exe: tests/run_tests.o
 	$(CC) $< -o $@ $(LDFLAGS)
 
 # All other tests link with OBJ
-tests/%.exe: tests/%.o $(OBJ)
-	$(CC) $^ -o $@ $(LDFLAGS)
+tests/%.exe: tests/%.o
+	$(CC) $< $(filter-out src/program.o,$(OBJ)) -o $@ $(LDFLAGS)
 
 
 #################### Clean #######################
