@@ -103,7 +103,6 @@ double *kinetic_OS_matrix(double Ax, double Bx, double a, double b, unsigned int
 
 
     double p = a + b;
-    double mu = a * b / p;
     double X_ab = Bx - Ax;
     double X_pa = b / p * X_ab;
     double X_pb = -a / p * X_ab;
@@ -143,8 +142,7 @@ double *kinetic_OS_matrix(double Ax, double Bx, double a, double b, unsigned int
             double term3 = b/p * 2 * a * MATRIX_VAL(i, j, max_dim, S); 
             double term4 = (i >= 2) ?  - b/p * (i-1) * MATRIX_VAL(i-2, j, max_dim, S) : 0; 
 
-
-            T[i * max_dim + j] = term1 + term2 + term2_2 + term3 + term4;
+            MATRIX_VAL(i, j, max_dim, T) = term1 + term2 + term2_2 + term3 + term4;
         }
     }
 
