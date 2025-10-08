@@ -1,0 +1,1356 @@
+{
+  "cells": [
+    {
+      "cell_type": "markdown",
+      "id": "e2a79241-76bf-4a64-9da7-ec4cd2cbe32f",
+      "metadata": {
+        "id": "e2a79241-76bf-4a64-9da7-ec4cd2cbe32f"
+      },
+      "source": [
+        "# 3D implementation\n",
+        "After the previously defined _simple_ integral evaluation schemes, it is possible to apply them to 3D cartesian Gaussians. Considering that any 3D primitive cartesian gaussian can be separated in the components:\n",
+        "\n",
+        "$$\n",
+        "G_{ijk} = x_A^iy_A^jz_A^k \\exp (-ar^2) = G_i(x, a, A_x)G_j(y, a, A_y)G_k(z, a, A_z)\n",
+        "$$\n",
+        "\n",
+        "Where:\n",
+        "\n",
+        "$$\n",
+        "G_i(x, a, A_x) =  x_A^i \\exp (-ax_A^2)\n",
+        "$$\n",
+        "\n",
+        "Then all the operations such as differenciation and integration can be performed in each dimension and the result is the product. Considering the normalization:\n",
+        "\n",
+        "$$\n",
+        "G_i^{norm}(x, a, A_x) =  \\frac{1}{\\sqrt{N_{A,i}}}x_A^i \\exp (-ax_A^2)\n",
+        "$$\n",
+        "\n",
+        "And the 3D normalized primitive:\n",
+        "\n",
+        "$$\n",
+        "G_{ijk} = \\frac{1}{\\sqrt{N_{A,i}N_{A,j}N_{A,k}}} G_i(x, a, A_x)G_j(y, a, A_y)G_k(z, a, A_z)\n",
+        "$$"
+      ]
+    },
+    {
+      "cell_type": "markdown",
+      "id": "30c88942-7061-445b-bd7f-3b477e011206",
+      "metadata": {
+        "id": "30c88942-7061-445b-bd7f-3b477e011206"
+      },
+      "source": [
+        "## Overlap integrals\n",
+        "The Overlap integrals between two primitive Cartesian Gaussians is:\n",
+        "\n",
+        "$$\n",
+        "S_{ab} = S_{ij}S_{kl}S_{mn}\n",
+        "$$\n",
+        "\n",
+        "Where each component can be calculated via Obara-Saika recursion. Normalization in 3D requires that $S_{ab} = 1$. Considering the definition of the overlap integral, the simplest way to normalize is to normalize each component. This is the approach that was taken in this case. However, it must be noted that there might be other normalization schemes.\n",
+        "\n",
+        "The normalized overlap between two unnormalized primitive cartesian gaussians can be defined as:\n",
+        "\n",
+        "$$\n",
+        "S_{ab}^{norm} = \\frac{1}{\\sqrt{S_{ab}}}  \\frac{1}{\\sqrt{S_{ab}}}  S_{ij}S_{kl}S_{mn}\n",
+        "$$\n",
+        "\n",
+        "We will use the previously defined Obara-Saika functions"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "execution_count": 1,
+      "id": "53e96c2f-1fc8-41e4-ac26-f63960b7519e",
+      "metadata": {
+        "id": "53e96c2f-1fc8-41e4-ac26-f63960b7519e"
+      },
+      "outputs": [],
+      "source": [
+        "import numpy as np\n",
+        "import scipy\n",
+        "\n",
+        "def obara_saika_bottom_up(Ax, Bx, a, b, i, j, rd=0, verbose=False):\n",
+        "\n",
+        "    max_dim = max(i,j)\n",
+        "\n",
+        "    if i == j:\n",
+        "        max_dim += 1\n",
+        "\n",
+        "    angular_momentum_matrix = np.zeros([max_dim, max_dim])\n",
+        "\n",
+        "    X_ab = (Bx-Ax)\n",
+        "    p = a + b\n",
+        "    X_pa = b/p * X_ab\n",
+        "    X_pb = -a/p * X_ab\n",
+        "\n",
+        "\n",
+        "    angular_momentum_matrix[0,0] =  (np.pi/p)**0.5 * np.exp(-(a * b)/p * X_ab**2)\n",
+        "\n",
+        "    #fill the i\n",
+        "\n",
+        "    for i in range(1, max_dim):\n",
+        "        angular_momentum_matrix[i,0] =  X_pa * angular_momentum_matrix[i-1,0] +  1/(2*p)*((i-1) * angular_momentum_matrix[i-2,0])\n",
+        "\n",
+        "    #fill the j\n",
+        "\n",
+        "    for j in range(1, max_dim):\n",
+        "        angular_momentum_matrix[0,j] =  X_pb * angular_momentum_matrix[0,j-1] +  1/(2*p)*((j-1) * angular_momentum_matrix[0,j-2])\n",
+        "\n",
+        "    for total in range(1, max_dim):\n",
+        "        for i in range(total, max_dim):\n",
+        "            angular_momentum_matrix[i,total] =  X_pa * angular_momentum_matrix[i-1,total] +  1/(2*p)*((i-1) * angular_momentum_matrix[i-2,total] + (total) * angular_momentum_matrix[i-1,total-1])\n",
+        "        for j in range(total, max_dim):\n",
+        "            angular_momentum_matrix[total,j] =  X_pb * angular_momentum_matrix[total, j-1] +  1/(2*p)*((total) * angular_momentum_matrix[total-1,j-1] +(j-1) * angular_momentum_matrix[total,j-2])\n",
+        "\n",
+        "    return angular_momentum_matrix\n",
+        "\n"
+      ]
+    },
+    {
+      "cell_type": "markdown",
+      "id": "c3079c94-3499-451d-8b92-f706f7e2c9e5",
+      "metadata": {
+        "id": "c3079c94-3499-451d-8b92-f706f7e2c9e5"
+      },
+      "source": [
+        "With it we can now define the 3D functions for overlap and to calculate normalization constants:"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "execution_count": 2,
+      "id": "d0e57471-0ce1-4924-ae13-be767cb745aa",
+      "metadata": {
+        "id": "d0e57471-0ce1-4924-ae13-be767cb745aa"
+      },
+      "outputs": [],
+      "source": [
+        "def S_1D(Ax, Bx, a, b, i, j, rd=0, verbose=False):\n",
+        "    return obara_saika_bottom_up(Ax, Bx, a, b, i, j, rd=0, verbose=False)[i][j]\n",
+        "\n",
+        "def S_3D(R_a: np.ndarray, R_b: np.ndarray, alpha, beta, a, b, c, d, e, f, rd=0, verbose=False):\n",
+        "    S_ab = S_1D(R_a[0], R_b[0], alpha, beta, a, b)\n",
+        "    S_cd = S_1D(R_a[1], R_b[1], alpha, beta, c, d)\n",
+        "    S_ef = S_1D(R_a[1], R_b[1], alpha, beta, e, f)\n",
+        "    return S_ab * S_cd * S_ef\n",
+        "\n",
+        "def N_const(alpha, a, b, c):\n",
+        "    S_3d = S_3D([0,0,0], [0,0,0], alpha, alpha, a, b, c, a, b, c)\n",
+        "    return 1.0 / np.sqrt(S_3d)"
+      ]
+    },
+    {
+      "cell_type": "markdown",
+      "id": "0a7185c3-749b-4a10-bc14-9b70e08f8462",
+      "metadata": {
+        "id": "0a7185c3-749b-4a10-bc14-9b70e08f8462"
+      },
+      "source": [
+        "And do it in an ever more clear way using a dataclass and refactoring the functions:"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "execution_count": 3,
+      "id": "e26d58a6-f304-4175-a93b-5512e20f3b95",
+      "metadata": {
+        "colab": {
+          "base_uri": "https://localhost:8080/"
+        },
+        "id": "e26d58a6-f304-4175-a93b-5512e20f3b95",
+        "outputId": "45457410-82c4-4ffd-f1bf-d16e557c71cd"
+      },
+      "outputs": [
+        {
+          "output_type": "execute_result",
+          "data": {
+            "text/plain": [
+              "np.float64(1.0000000000000002)"
+            ]
+          },
+          "metadata": {},
+          "execution_count": 3
+        }
+      ],
+      "source": [
+        "from dataclasses import dataclass\n",
+        "\n",
+        "@dataclass\n",
+        "class Primitive:\n",
+        "    R: np.ndarray # of len 3\n",
+        "    exp: float\n",
+        "    quantum_numbers: np.ndarray # of len 3\n",
+        "    normalization_constant: float\n",
+        "\n",
+        "basis_1 = Primitive([0,0,0], 0.5, [0,0,0], 1)\n",
+        "basis_2 = Primitive([0,0,0], 0.5, [0,0,0], 1)\n",
+        "\n",
+        "def S_3D_components(basis_1: Primitive, basis_2: Primitive, rd=0, verbose=False):\n",
+        "    R_a = basis_1.R\n",
+        "    R_b = basis_2.R\n",
+        "\n",
+        "    alpha = basis_1.exp\n",
+        "    beta = basis_2.exp\n",
+        "\n",
+        "    a, c, e = basis_1.quantum_numbers\n",
+        "    b, d, f = basis_2.quantum_numbers\n",
+        "\n",
+        "    S_ab = S_1D(R_a[0], R_b[0], alpha, beta, a, b)\n",
+        "    S_cd = S_1D(R_a[1], R_b[1], alpha, beta, c, d)\n",
+        "    S_ef = S_1D(R_a[2], R_b[2], alpha, beta, e, f)\n",
+        "\n",
+        "    return([S_ab, S_cd, S_ef])\n",
+        "\n",
+        "def S_3D(basis_1: Primitive, basis_2: Primitive, rd=0, verbose=False):\n",
+        "\n",
+        "    S_ab, S_cd, S_ef =  S_3D_components(basis_1, basis_2)\n",
+        "    return S_ab * S_cd * S_ef\n",
+        "\n",
+        "def N_const(basis: Primitive):\n",
+        "\n",
+        "    S_3d = S_3D(basis, basis)\n",
+        "    return 1.0 / np.sqrt(S_3d)\n",
+        "\n",
+        "basis_1.normalization_constant = N_const(basis_1)\n",
+        "basis_1.normalization_constant**2 * S_3D(basis_1, basis_1)"
+      ]
+    },
+    {
+      "cell_type": "markdown",
+      "id": "f5dc465d-f289-400f-8289-ec19aa073510",
+      "metadata": {
+        "id": "f5dc465d-f289-400f-8289-ec19aa073510"
+      },
+      "source": [
+        "## Kinetic energy integrals\n",
+        "In the same way as overlap, the kinetic energy integral between two Gaussians is:\n",
+        "\n",
+        "$$\n",
+        "T_{ab} = T_{ij} S_{kl} S_{mn} + S_{ij} T_{kl} S_{mn} + S_{ij} S_{kl} T_{mn}\n",
+        "$$\n",
+        "\n",
+        "We use Obara-Saika for one dimension as before:"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "execution_count": 4,
+      "id": "9e6dcb3b-8b11-4c54-aab8-812ce151f35e",
+      "metadata": {
+        "id": "9e6dcb3b-8b11-4c54-aab8-812ce151f35e"
+      },
+      "outputs": [],
+      "source": [
+        "def kinetic_energy_integrals(Ax, Bx, a, b, ii, jj, rd=0, verbose=False):\n",
+        "\n",
+        "    X_ab = (Bx-Ax)\n",
+        "    p = a + b\n",
+        "    X_pa = b/p * X_ab\n",
+        "    X_pb = -a/p * X_ab\n",
+        "\n",
+        "    max_dim = max(ii+1, jj+1)\n",
+        "    kinetic_energy = np.zeros([max_dim, max_dim])\n",
+        "\n",
+        "    # we ask for one extra order of angular momentum due to the overlap term S_{i+1,j} and S_{i, j+1}\n",
+        "    recurrence_integrals = obara_saika_bottom_up(Ax, Bx, a, b, max_dim, max_dim, rd=0, verbose=False)\n",
+        "\n",
+        "    #fill the T_00 case\n",
+        "    kinetic_energy[0,0] = (a -2 * a **2 *(X_pa ** 2 + 1/(2*p))) * recurrence_integrals[0,0]\n",
+        "\n",
+        "    if ii == jj == 0:\n",
+        "        return kinetic_energy[0,0]\n",
+        "\n",
+        "    # edge case for first row and column\n",
+        "    for i in range(0, max_dim-1):\n",
+        "        f_term = X_pa * kinetic_energy[i,0]\n",
+        "        s_term =  1/(2*p)*(i * kinetic_energy[i-1,0])\n",
+        "\n",
+        "        t_term_1 =  b/p * (2*a * recurrence_integrals[i+1,0])\n",
+        "        t_term_2 =  b/p * (- i * recurrence_integrals[i-1,0])\n",
+        "        t_term = t_term_1 + t_term_2\n",
+        "\n",
+        "        kinetic_energy[i+1,0] = f_term + s_term + t_term\n",
+        "\n",
+        "    for j in range(0, max_dim-1):\n",
+        "\n",
+        "        f_term = X_pb * kinetic_energy[0, j]\n",
+        "        s_term =  1/(2*p)*(j * kinetic_energy[0, j-1])\n",
+        "\n",
+        "        t_term_1 =  a/p * (2 * b * recurrence_integrals[0, j+1])\n",
+        "        t_term_2 =  a/p * (- j *recurrence_integrals[0, j-1])\n",
+        "        t_term = t_term_1 + t_term_2\n",
+        "\n",
+        "        kinetic_energy[0,j+1] = f_term + s_term + t_term\n",
+        "\n",
+        "    # Iteration over the rows and columns\n",
+        "    for total in range(0, max_dim-1):\n",
+        "        j = total\n",
+        "        for i in range(0, max_dim-1):\n",
+        "            f_term = X_pa * kinetic_energy[i,j]\n",
+        "            s_term =  1/(2*p)*(i * kinetic_energy[i-1,j] + j * kinetic_energy[i, j-1])\n",
+        "\n",
+        "            t_term_1 =  b/p * (2 * a * recurrence_integrals[i+1,j])\n",
+        "            t_term_2 =  b/p * (- i * recurrence_integrals[i-1,j])\n",
+        "            t_term = t_term_1 + t_term_2\n",
+        "\n",
+        "            kinetic_energy[i+1, j] = f_term + s_term + t_term\n",
+        "\n",
+        "        i = total\n",
+        "        for j in range(0, max_dim-1):\n",
+        "            f_term = X_pb * kinetic_energy[i, j]\n",
+        "            s_term =  1/(2*p)*(i*kinetic_energy[i-1, j] + j * kinetic_energy[i, j-1])\n",
+        "\n",
+        "            t_term_1 =  a/p * (2 * b * recurrence_integrals[i, j+1])\n",
+        "            t_term_2 =  a/p * (- j * recurrence_integrals[i, j-1])\n",
+        "            t_term = t_term_1 + t_term_2\n",
+        "\n",
+        "            kinetic_energy[i,j+1] = f_term + s_term + t_term\n",
+        "\n",
+        "\n",
+        "    if ii == jj and ii == max_dim-1:\n",
+        "        # last case\n",
+        "        i = max_dim -1\n",
+        "        j = max_dim -1\n",
+        "\n",
+        "        f_term = X_pa * kinetic_energy[i-1,j]\n",
+        "        s_term =  1/(2*p)*((i-1) * kinetic_energy[i-2,j] + j * kinetic_energy[i-1, j-1])\n",
+        "\n",
+        "        t_term_1 =  b/p * (2 * a * recurrence_integrals[i,j])\n",
+        "        t_term_2 =  b/p * (- (i-1) * recurrence_integrals[i-2,j])\n",
+        "        t_term = t_term_1 + t_term_2\n",
+        "\n",
+        "        kinetic_energy[max_dim-1, max_dim-1] =  f_term + s_term + t_term\n",
+        "\n",
+        "    return kinetic_energy[ii][jj], kinetic_energy"
+      ]
+    },
+    {
+      "cell_type": "markdown",
+      "id": "531747ff-15a4-4e4e-a51f-f831d76127f9",
+      "metadata": {
+        "id": "531747ff-15a4-4e4e-a51f-f831d76127f9"
+      },
+      "source": [
+        "And for 3 dimensions we use the previous formula:"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "execution_count": 5,
+      "id": "1740d643-db41-415f-90de-10986dc2825b",
+      "metadata": {
+        "colab": {
+          "base_uri": "https://localhost:8080/"
+        },
+        "id": "1740d643-db41-415f-90de-10986dc2825b",
+        "outputId": "41a53455-c00c-4026-c934-d609a2daba1d"
+      },
+      "outputs": [
+        {
+          "output_type": "execute_result",
+          "data": {
+            "text/plain": [
+              "np.float64(4.17624599762378)"
+            ]
+          },
+          "metadata": {},
+          "execution_count": 5
+        }
+      ],
+      "source": [
+        "def T_3D(basis_1: Primitive, basis_2: Primitive):\n",
+        "\n",
+        "    R_a = basis_1.R\n",
+        "    R_b = basis_2.R\n",
+        "\n",
+        "    alpha = basis_1.exp\n",
+        "    beta  = basis_2.exp\n",
+        "\n",
+        "    a, c, e = basis_1.quantum_numbers\n",
+        "    b, d, f = basis_2.quantum_numbers\n",
+        "\n",
+        "    S_ab, S_cd, S_ef = S_3D_components(basis_1, basis_2)\n",
+        "\n",
+        "    T_ab = kinetic_energy_integrals(R_a[0], R_b[0], alpha, beta, a, b, rd=0, verbose=False)\n",
+        "    T_cd = kinetic_energy_integrals(R_a[1], R_b[1], alpha, beta, c, d, rd=0, verbose=False)\n",
+        "    T_ef = kinetic_energy_integrals(R_a[2], R_b[2], alpha, beta, e, f, rd=0, verbose=False)\n",
+        "\n",
+        "    return ((T_ab * S_cd * S_ef) + (S_ab * T_cd * S_ef) +  (S_ab * S_cd * T_ef ))\n",
+        "\n",
+        "T_3D(basis_1, basis_2)"
+      ]
+    },
+    {
+      "cell_type": "markdown",
+      "id": "e8bd1a26-e009-4d05-bf14-e011339948cd",
+      "metadata": {
+        "id": "e8bd1a26-e009-4d05-bf14-e011339948cd"
+      },
+      "source": [
+        "# Contracted Basis sets\n",
+        "It is now time to test all the previous and see if the implementation was correct. To do so we have an example of a STO-3G calculation, in which for the $H$ atom presents the following:\n",
+        "\n",
+        "$$\n",
+        "\\alpha_i = [3.42525091, 0.62391373, 0.16885540]\n",
+        "$$\n",
+        "$$\n",
+        "d_i=      [0.15432897, 0.53532814, 0.44463454]\n",
+        "$$\n",
+        "\n",
+        "A contracted basis is defined as the linear combination:\n",
+        "\n",
+        "$$\n",
+        "\\mathrm{STO_{3G}}(x) = \\sum_i^3 c_i · e ^{-\\alpha_i(r-R_a)^2}\n",
+        "$$\n",
+        "\n",
+        "Where $c_i$ is the product of the contraction coefficients and the normalization constant (in 3D):\n",
+        "$$\n",
+        "c_i = d_i · N_\\mu\n",
+        "$$"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "execution_count": 6,
+      "id": "8c35daf6-8b4a-42d0-9d13-383bc170d5cd",
+      "metadata": {
+        "id": "8c35daf6-8b4a-42d0-9d13-383bc170d5cd"
+      },
+      "outputs": [],
+      "source": [
+        "# STO-3G data for H 1s\n",
+        "alphas = [3.42525091, 0.62391373, 0.16885540]\n",
+        "d =      [0.15432897, 0.53532814, 0.44463454]\n",
+        "\n",
+        "\n",
+        "basis_1 = Primitive(np.array([0., 0., 0.]), 3.42525091, [0,0,0], 1)\n",
+        "basis_2 = Primitive(np.array([0., 0., 0.]), 0.62391373, [0,0,0], 1)\n",
+        "basis_3 = Primitive(np.array([0., 0., 0.]), 0.16885540, [0,0,0], 1)\n",
+        "basis_4 = Primitive(np.array([1.4, 0., 0.]), 3.42525091, [0,0,0], 1)\n",
+        "basis_5 = Primitive(np.array([1.4, 0., 0.]), 0.62391373, [0,0,0], 1)\n",
+        "basis_6 = Primitive(np.array([1.4, 0., 0.]), 0.16885540, [0,0,0], 1)\n",
+        "\n",
+        "sto_3g_h1 = [basis_1, basis_2, basis_3]\n",
+        "sto_3g_h2 = [basis_4, basis_5, basis_6]\n",
+        "\n",
+        "normalization_constants = np.array([N_const(basis) for basis in sto_3g_h1])\n",
+        "\n",
+        "# Expansion coefficients\n",
+        "c_mu = [d[i] * normalization_constants[i] for i in range(3)]\n",
+        "c_nu = [d[i] * normalization_constants[i] for i in range(3)]"
+      ]
+    },
+    {
+      "cell_type": "markdown",
+      "id": "ddc24e47-ecb4-42f3-a544-85a1411db1a0",
+      "metadata": {
+        "id": "ddc24e47-ecb4-42f3-a544-85a1411db1a0"
+      },
+      "source": [
+        "Where we can build all uncontracted matrix elements with just the primitives:"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "execution_count": 7,
+      "id": "3076f261-5777-4188-bc0a-3a06e50a9a40",
+      "metadata": {
+        "colab": {
+          "base_uri": "https://localhost:8080/"
+        },
+        "id": "3076f261-5777-4188-bc0a-3a06e50a9a40",
+        "outputId": "acd5c72a-5662-49e8-ed6d-27f24c219fba"
+      },
+      "outputs": [
+        {
+          "output_type": "stream",
+          "name": "stdout",
+          "text": [
+            "[[1.08224356e-02 2.42897324e-01 5.96154110e-01]\n",
+            " [2.42897324e-01 2.16745434e+00 6.07975867e+00]\n",
+            " [5.96154110e-01 6.07975867e+00 2.40459022e+01]]\n"
+          ]
+        }
+      ],
+      "source": [
+        "def build_prim_matrices(basis_list_1, basis_list_2):\n",
+        "\n",
+        "    dim_1 = len(basis_list_1)\n",
+        "    dim_2 = len(basis_list_2)\n",
+        "\n",
+        "    S_prim_mat = np.zeros([dim_1, dim_2])\n",
+        "    T_prim_mat = np.zeros([dim_1, dim_2])\n",
+        "\n",
+        "    for i in range(dim_1):\n",
+        "        for j in range(dim_2):\n",
+        "            prim_i = basis_list_1[i]\n",
+        "            prim_j = basis_list_2[j]\n",
+        "\n",
+        "            S_ab, S_cd, S_ef = S_3D_components(prim_i, prim_j)\n",
+        "\n",
+        "            # get the 3D component\n",
+        "            S_prim_mat[i][j] = S_ab * S_cd * S_ef\n",
+        "            T_prim_mat[i][j] = T_3D(prim_i, prim_j)\n",
+        "    return S_prim_mat, T_prim_mat\n",
+        "\n",
+        "\n",
+        "# Primitive matrices\n",
+        "S_prim_mat, T_prim_mat = build_prim_matrices(sto_3g_h1, sto_3g_h2)\n",
+        "\n",
+        "print(S_prim_mat)"
+      ]
+    },
+    {
+      "cell_type": "markdown",
+      "id": "f4e9e092-d3cf-4385-a1b1-5ef4fec5cf93",
+      "metadata": {
+        "id": "f4e9e092-d3cf-4385-a1b1-5ef4fec5cf93"
+      },
+      "source": [
+        "In the case of a property, since there are two contracted basis, the matrix elements of the contracted basis in terms of the uncontracted matrix elements would be:\n",
+        "\n",
+        "$$\n",
+        "S_{\\mu\\nu} = \\sum_p^{p_{max}} \\sum_q^{q_{max}} c^*_{p \\mu} c_{q \\nu} S_{pq}\n",
+        "$$\n",
+        "\n",
+        "Where $c^*_{p \\mu}$ refers to the contraction coefficients of basis $\\mu$ and $c^*_{q \\nu}$ to the ones of basis $\\nu$ (where summation might not have the same dimension limit in both cases). Now we will try to get the matrix elements for two STO-3G basis separated 1.4 a.u:\n",
+        "\n",
+        "$$\n",
+        "\\mathbf{S}_{\\mu\\nu} =\n",
+        "    \\begin{pmatrix}\n",
+        "        1.0    & 0.6593\\\\\n",
+        "        0.6593 & 1.0\n",
+        "    \\end{pmatrix}\n",
+        "$$\n",
+        "$$\n",
+        "\\mathbf{T}_{\\mu\\nu} =\n",
+        "    \\begin{pmatrix}\n",
+        "        0.7600    & 0.2365\\\\\n",
+        "        0.2365 & 0.7600\n",
+        "    \\end{pmatrix}\n",
+        "$$"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "execution_count": 8,
+      "id": "9a643f37-6753-4bfd-9412-53e1d19db31e",
+      "metadata": {
+        "id": "9a643f37-6753-4bfd-9412-53e1d19db31e"
+      },
+      "outputs": [],
+      "source": [
+        "def contracted_matrix_element(uncontracted_matrix, c_mu, c_nu):\n",
+        "# Now looping over the size of the matrices:\n",
+        "    contr_prop = 0.0\n",
+        "\n",
+        "    max_p = len(c_mu)\n",
+        "    max_q = len(c_nu)\n",
+        "\n",
+        "    for p in range(max_p):\n",
+        "        for q in range(max_q):\n",
+        "            contr_prop += c_nu[p] * c_mu[q] * uncontracted_matrix[p][q]\n",
+        "\n",
+        "\n",
+        "    return contr_prop"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "execution_count": 9,
+      "id": "d28006d8-282f-459e-833c-1a0255fb95af",
+      "metadata": {
+        "id": "d28006d8-282f-459e-833c-1a0255fb95af"
+      },
+      "outputs": [],
+      "source": [
+        "# so lets try to generalize to generate the contracted matrix\n",
+        "def S_contracted(n_primitives, primitives, contraction_coefficients):\n",
+        "    size = len(n_primitives)\n",
+        "    contracted_matrix = np.zeros([size, size])\n",
+        "\n",
+        "    for mu in range(size):\n",
+        "        for nu in range(size):\n",
+        "            S_prim_mat, T_prim_mat = build_prim_matrices(primitives[mu], primitives[nu])\n",
+        "            contracted_matrix[mu][nu] = contracted_matrix_element(S_prim_mat, contraction_coefficients[mu], contraction_coefficients[nu])\n",
+        "\n",
+        "    return contracted_matrix\n",
+        "\n",
+        "def T_contracted(n_primitives, primitives, contraction_coefficients):\n",
+        "    size = len(n_primitives)\n",
+        "    contracted_matrix = np.zeros([size, size])\n",
+        "\n",
+        "    for mu in range(size):\n",
+        "        for nu in range(size):\n",
+        "            S_prim_mat, T_prim_mat = build_prim_matrices(primitives[mu], primitives[nu])\n",
+        "            contracted_matrix[mu][nu] = contracted_matrix_element(T_prim_mat, contraction_coefficients[mu], contraction_coefficients[nu])\n",
+        "\n",
+        "    return contracted_matrix"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "execution_count": 10,
+      "id": "98f363a2-5d12-4e7a-990e-b3f22f06aa5d",
+      "metadata": {
+        "colab": {
+          "base_uri": "https://localhost:8080/"
+        },
+        "id": "98f363a2-5d12-4e7a-990e-b3f22f06aa5d",
+        "outputId": "d799a0e3-de17-4dd6-a513-b02e003b95d7"
+      },
+      "outputs": [
+        {
+          "output_type": "execute_result",
+          "data": {
+            "text/plain": [
+              "array([[0.99999999, 0.6593182 ],\n",
+              "       [0.6593182 , 0.99999999]])"
+            ]
+          },
+          "metadata": {},
+          "execution_count": 10
+        }
+      ],
+      "source": [
+        "S_sto_3g = S_contracted([3,3], [sto_3g_h1, sto_3g_h2], [c_mu, c_nu])\n",
+        "S_sto_3g"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "execution_count": 11,
+      "id": "5ac05fd9-e603-4288-b149-31491dad3bfc",
+      "metadata": {
+        "colab": {
+          "base_uri": "https://localhost:8080/"
+        },
+        "id": "5ac05fd9-e603-4288-b149-31491dad3bfc",
+        "outputId": "43cb9de8-71c7-4e18-afe4-5fc797268d72"
+      },
+      "outputs": [
+        {
+          "output_type": "execute_result",
+          "data": {
+            "text/plain": [
+              "array([[0.76003188, 0.23645465],\n",
+              "       [0.23645465, 0.76003188]])"
+            ]
+          },
+          "metadata": {},
+          "execution_count": 11
+        }
+      ],
+      "source": [
+        "T_sto_3g = T_contracted([3,3], [sto_3g_h1, sto_3g_h2], [c_mu, c_nu])\n",
+        "T_sto_3g"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "execution_count": 11,
+      "id": "0cae6922-ccbd-4cca-a629-93c0f7dc1898",
+      "metadata": {
+        "id": "0cae6922-ccbd-4cca-a629-93c0f7dc1898"
+      },
+      "outputs": [],
+      "source": []
+    },
+    {
+      "cell_type": "markdown",
+      "source": [
+        "# 3D implementation of coulomb potential and ERIS\n",
+        "\n",
+        "In the following cell we are going to copy all we need to use the McMurchie-Davidson scheme implemented previously and then try to replicate the potential matrices of the same $H_2$ case.\n"
+      ],
+      "metadata": {
+        "id": "nuWmCOY0FYYA"
+      },
+      "id": "nuWmCOY0FYYA"
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "# Special function-related\n",
+        "\n",
+        "def pochhammer(a, k):\n",
+        "    return scipy.special.gamma(a+k) / scipy.special.gamma(a)\n",
+        "\n",
+        "def M(a, b, x, k):\n",
+        "    m = 0\n",
+        "    for i in range(0, k):\n",
+        "        a_k = pochhammer(a, i)\n",
+        "        b_k = pochhammer(b, i)\n",
+        "        k_factorial = scipy.special.gamma(i+1)\n",
+        "        # print(f\"series {i}: {a_k} {b_k} {k_factorial},  {a_k / (b_k * k_factorial)} \")\n",
+        "        m += a_k / (b_k * k_factorial) * x**i\n",
+        "\n",
+        "    return m\n",
+        "\n",
+        "def boys_hypergeom(n, x, k):\n",
+        "    a = n+0.5\n",
+        "    b = n+1.5\n",
+        "    return M(a, b, -x, k+10) / (2*n+1)"
+      ],
+      "metadata": {
+        "id": "GzlvsZA2Fz-c"
+      },
+      "id": "GzlvsZA2Fz-c",
+      "execution_count": 12,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "# Hermite integral-related\n",
+        "\n",
+        "def R_tuv_n(p, R_pc, t_max, u_max, v_max, k_hyper):\n",
+        "\n",
+        "    R_2= R_pc[0]**2 + R_pc[1]**2 +R_pc[2]**2\n",
+        "    X_pc, Y_pc, Z_pc = R_pc\n",
+        "\n",
+        "    # the dimensions of this object are [t_max+1, u_max+1 v_max+1, n_max+1]\n",
+        "    # where n_max = t+u+v\n",
+        "    # However, when later performing the summation i must do it up to n_max, not n_max+1\n",
+        "    # The direct summation works here because it is initialized in np-zeros, however, it is better to consider that later in the summation function\n",
+        "\n",
+        "    n_max =  t_max + u_max + v_max + 1\n",
+        "\n",
+        "    R_tuv_n_array = np.zeros([t_max+1, u_max+1, v_max+1, n_max])\n",
+        "\n",
+        "    for n in range(0, n_max-1):\n",
+        "        R_tuv_n_array[0,0,0,n] = (-2*p)**n * boys_hypergeom(n, p * R_2, k_hyper)\n",
+        "\n",
+        "\n",
+        "\n",
+        "    # now lets get into recursion\n",
+        "    for t in range(0, t_max):\n",
+        "        for n in range(n_max-1):\n",
+        "            component_1 = t * R_tuv_n_array[t-1,0,0,n+1] if t >= 1 else 0\n",
+        "            component_2 = X_pc * R_tuv_n_array[t,0,0,n+1]\n",
+        "            R_tuv_n_array[t+1,0,0,n] = component_1 + component_2\n",
+        "\n",
+        "\n",
+        "    for u in range(u_max):\n",
+        "        for t in range(0, t_max+1):\n",
+        "            for n in range(n_max-1):\n",
+        "                component_1 = u * R_tuv_n_array[t,u-1,0,n+1] if u >= 1 else 0\n",
+        "                component_2 = Y_pc * R_tuv_n_array[t,u,0,n+1]\n",
+        "                R_tuv_n_array[t,u+1,0,n] = component_1 + component_2\n",
+        "\n",
+        "    # return R_tuv_n_array\n",
+        "\n",
+        "    for v in range(v_max):\n",
+        "        for u in range(u_max+1):\n",
+        "            for t in range(0, t_max+1):\n",
+        "                for n in range(n_max-1):\n",
+        "                    component_1 = v * R_tuv_n_array[t,u,v-1,n+1] if v >= 1 else 0\n",
+        "                    component_2 = Z_pc * R_tuv_n_array[t,u,v,n+1]\n",
+        "                    R_tuv_n_array[t,u,v+1,n] = component_1 + component_2\n",
+        "    return R_tuv_n_array"
+      ],
+      "metadata": {
+        "id": "p_WY5ZwwGEXw"
+      },
+      "id": "p_WY5ZwwGEXw",
+      "execution_count": 13,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "# Hermite to cartesian -related\n",
+        "\n",
+        "def E(basis_1: Primitive, basis_2: Primitive, dim, t):\n",
+        "    # Calculates the Hermite coefficients of the expansion\n",
+        "\n",
+        "    Ax = basis_1.R[dim]\n",
+        "    Bx = basis_2.R[dim]\n",
+        "    a = basis_1.exp\n",
+        "    b = basis_2.exp\n",
+        "\n",
+        "    i = basis_1.quantum_numbers[dim]\n",
+        "    j = basis_2.quantum_numbers[dim]\n",
+        "\n",
+        "    max_dim = max(i+1,j+1)\n",
+        "\n",
+        "    X_ab = (Bx-Ax)\n",
+        "    p = a + b\n",
+        "    mu = (a*b)/p\n",
+        "    X_pa = b/p * X_ab\n",
+        "    X_pb = -a/p * X_ab\n",
+        "\n",
+        "    #edge cases:\n",
+        "    if i < 0 or j < 0 or t < 0 or t > (i + j):\n",
+        "        return 0\n",
+        "\n",
+        "    elif i==0 and j == 0 and t == 0:\n",
+        "        return np.exp(-mu*X_ab**2)\n",
+        "\n",
+        "    # recursions\n",
+        "    if t > 0:\n",
+        "        return (i * E(i-1, j, t-1, Ax, Bx, a, b) + j * E(i, j-1, t-1, Ax, Bx, a, b))/(2*p*t)\n",
+        "\n",
+        "    elif t == 0 and i > 0:\n",
+        "        return X_pa*E(i-1, j, t, Ax, Bx, a, b) + E(i-1, j, 1, Ax, Bx, a, b)\n",
+        "    elif t == 0 and j > 0:\n",
+        "        return X_pb*E(i, j-1, t, Ax, Bx, a, b) + E(i, j-1, 1, Ax, Bx, a, b)\n",
+        "\n",
+        "def E_ab(basis_1:Primitive, basis_2: Primitive, t, u, v):\n",
+        "\n",
+        "    return E(basis_1, basis_2, 0, t) * E(basis_1, basis_2, 1, u) * E(basis_1, basis_2, 2, v)"
+      ],
+      "metadata": {
+        "id": "YGV5eQEPGNyJ"
+      },
+      "id": "YGV5eQEPGNyJ",
+      "execution_count": 14,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "# Coulomb-integral related\n",
+        "def h_ab_Z(basis_1: Primitive, basis_2: Primitive, n_atoms:int, charge_atom:int, coord_atom:np.ndarray, k_hyper=80):\n",
+        "\n",
+        "    a = basis_1.exp\n",
+        "    b = basis_2.exp\n",
+        "\n",
+        "    r_A = basis_1.R\n",
+        "    r_B = basis_2.R\n",
+        "\n",
+        "    i, k, m = basis_1.quantum_numbers\n",
+        "    j, l, n = basis_2.quantum_numbers\n",
+        "\n",
+        "    t_max = i + j + 1\n",
+        "    u_max = k + l + 1\n",
+        "    v_max = m + n + 1\n",
+        "\n",
+        "    p = a+b\n",
+        "    r_P = (a * r_A + b * r_B)/p\n",
+        "\n",
+        "    h_ab_total = 0\n",
+        "\n",
+        "    r_PC = r_P - coord_atom\n",
+        "    R_tuv_n_array = R_tuv_n(p, r_PC, t_max, u_max, v_max, k_hyper)\n",
+        "    charge = charge_atom\n",
+        "\n",
+        "    for t in range(t_max):\n",
+        "        for u in range(u_max):\n",
+        "            for v in range(v_max):\n",
+        "\n",
+        "                coefficient = E_ab(basis_1, basis_2, t, u, v)\n",
+        "                hermite_integral = R_tuv_n_array[t, u, v, 0]\n",
+        "\n",
+        "                # print(f\"{t}, {u}, {v}, {K}: {coefficient} {charge} {hermite_integral}\")\n",
+        "                # print(f\"{coefficient} \")l\n",
+        "\n",
+        "                h_ab_total += coefficient * charge * hermite_integral\n",
+        "\n",
+        "    return (-1)**(t_max+u_max+v_max)*2 * np.pi / p * h_ab_total\n",
+        "\n",
+        "def g_abcd(basis_1, basis_2, basis_3, basis_4, k_hyper=80):\n",
+        "\n",
+        "    a = basis_1.exp\n",
+        "    b = basis_2.exp\n",
+        "    c = basis_3.exp\n",
+        "    d = basis_4.exp\n",
+        "\n",
+        "    r_A = basis_1.R\n",
+        "    r_B = basis_2.R\n",
+        "    r_C = basis_3.R\n",
+        "    r_D = basis_4.R\n",
+        "\n",
+        "    i, k, m = basis_1.quantum_numbers\n",
+        "    j, l, n = basis_2.quantum_numbers\n",
+        "    ii, kk, mm = basis_3.quantum_numbers\n",
+        "    jj, ll, nn = basis_4.quantum_numbers\n",
+        "\n",
+        "    t_max = i + j + 1\n",
+        "    u_max = k + l + 1\n",
+        "    v_max = m + n + 1\n",
+        "\n",
+        "    tau_max = ii + jj + 1\n",
+        "    nu_max = kk + ll + 1\n",
+        "    phi_max = mm + nn + 1\n",
+        "\n",
+        "\n",
+        "    p = a+b\n",
+        "    r_P = (a * r_A + b * r_B)/p\n",
+        "\n",
+        "    q = c+d\n",
+        "    r_Q = (c * r_C + d * r_D)/q\n",
+        "\n",
+        "    r_PQ = r_P - r_Q\n",
+        "\n",
+        "    alpha = p*q/(p+q)\n",
+        "\n",
+        "    Hermite_integral = R_tuv_n(alpha, r_PQ, t_max + tau_max, u_max + nu_max, v_max + phi_max, k_hyper)\n",
+        "\n",
+        "    g_abcd = 0\n",
+        "\n",
+        "    for t in range(t_max):\n",
+        "        for u in range(u_max):\n",
+        "            for v in range(v_max):\n",
+        "                for tau in range(tau_max):\n",
+        "                    for nu in range(nu_max):\n",
+        "                        for phi in range(phi_max):\n",
+        "                            coefficient_1 = E_ab(basis_1, basis_2, t, u, v)\n",
+        "                            coefficient_2 = E_ab(basis_3, basis_4, tau, nu, phi)\n",
+        "                            integral = Hermite_integral[t + tau, u + nu, v + phi, 0]\n",
+        "                            g_abcd += coefficient_1 * coefficient_2 * integral\n",
+        "\n",
+        "    return 2*np.power(np.pi,2.5)/(p*q*np.sqrt(p+q))* g_abcd\n"
+      ],
+      "metadata": {
+        "id": "B1QgvUeNGhyG"
+      },
+      "id": "B1QgvUeNGhyG",
+      "execution_count": 15,
+      "outputs": []
+    },
+    {
+      "cell_type": "markdown",
+      "source": [
+        "Now we are going to follow the previous procedure to try to get the nuclear atraction part of the core hamiltonian.\n",
+        "\n",
+        "$$\n",
+        "\\mathbf{V}_{\\mu\\nu}^{H_1} =\n",
+        "    \\begin{pmatrix}\n",
+        "        -1.2266 & -0.5974\\\\\n",
+        "        -0.5974 & -0.6538\n",
+        "    \\end{pmatrix}\n",
+        "$$\n",
+        "\n",
+        "$$\n",
+        "\\mathbf{V}_{\\mu\\nu}^{H_2} =\n",
+        "    \\begin{pmatrix}\n",
+        "        -0.6538 & -0.5974\\\\\n",
+        "        -0.5974 & -1.2266\n",
+        "    \\end{pmatrix}\n",
+        "$$\n",
+        "\n",
+        "Recall that the potential part of the core Hamiltonian of two primitives is calculated as:\n",
+        "\n",
+        "$$\n",
+        "h_{ab}^{NA} = -\\sum_K Z_K V_{ab}^{000} = - \\frac{2\\pi}{p}\\sum_{tuv}E_{tuv}^{ab} \\sum_K Z_K R_{t,u,v}(p, \\mathbf{R}_{PC_K})\n",
+        "$$\n",
+        "\n",
+        "We will start by calculating the uncontracted $\\mu\\mu$ potential energy matrix due to the first nuclei (located at the same position as $\\mu$):\n"
+      ],
+      "metadata": {
+        "id": "iVgqpAO_G0rw"
+      },
+      "id": "iVgqpAO_G0rw"
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "def V_uncontr_segment(basis_list_1, basis_list_2, Z_atom, pos_atom):\n",
+        "\n",
+        "    dim_1 = len(basis_list_1)\n",
+        "    dim_2 = len(basis_list_2)\n",
+        "\n",
+        "    V_prim_mat = np.zeros([dim_1, dim_2])\n",
+        "\n",
+        "    for i in range(dim_1):\n",
+        "        for j in range(dim_2):\n",
+        "                prim_i = basis_list_1[i]\n",
+        "                prim_j = basis_list_2[j]\n",
+        "\n",
+        "                V_ab = h_ab_Z(prim_i, prim_j, 1, Z_atom, pos_atom)\n",
+        "\n",
+        "                V_prim_mat[i][j] += V_ab\n",
+        "\n",
+        "    return V_prim_mat"
+      ],
+      "metadata": {
+        "id": "iuwW1BSqGzWp"
+      },
+      "id": "iuwW1BSqGzWp",
+      "execution_count": 16,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "# we start by checking the analytical solution of a general 1s\n",
+        "\n",
+        "basis_1 = Primitive(np.array([0, 0, 0]), 0.5, np.array([0, 0, 0]), 1)\n",
+        "V_uncontr_segment([basis_1], [basis_1], 1, np.array([0., 0., 0.])) # should be -1*np.pi/a = -6.283185307179586"
+      ],
+      "metadata": {
+        "colab": {
+          "base_uri": "https://localhost:8080/"
+        },
+        "id": "OOJFpbafMPQ2",
+        "outputId": "be8f8a0a-eb09-4c2e-8f4d-03f8df36536c"
+      },
+      "id": "OOJFpbafMPQ2",
+      "execution_count": 17,
+      "outputs": [
+        {
+          "output_type": "execute_result",
+          "data": {
+            "text/plain": [
+              "array([[-6.28318531]])"
+            ]
+          },
+          "metadata": {},
+          "execution_count": 17
+        }
+      ]
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "# now for the three primitives:\n",
+        "pot = V_uncontr_segment(sto_3g_h1, sto_3g_h1, 1, np.array([0, 0., 0.]))\n",
+        "pot"
+      ],
+      "metadata": {
+        "colab": {
+          "base_uri": "https://localhost:8080/"
+        },
+        "id": "Yh1OAjIfNYwy",
+        "outputId": "45f8dc68-9dc3-4585-a79c-08bc90c6f4e3"
+      },
+      "id": "Yh1OAjIfNYwy",
+      "execution_count": 18,
+      "outputs": [
+        {
+          "output_type": "execute_result",
+          "data": {
+            "text/plain": [
+              "array([[ -0.91718614,  -1.55172384,  -1.74819128],\n",
+              "       [ -1.55172384,  -5.03529976,  -7.92561803],\n",
+              "       [ -1.74819128,  -7.92561803, -18.60522467]])"
+            ]
+          },
+          "metadata": {},
+          "execution_count": 18
+        }
+      ]
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "def V_contracted(contracted_list, contraction_coefficient_list, charge_atom_list, coord_atoms_list:np.ndarray):\n",
+        "\n",
+        "    size = len(contracted_list)\n",
+        "    n_atoms = len(charge_atom_list)\n",
+        "\n",
+        "    contracted_matrix = np.zeros([size, size])\n",
+        "\n",
+        "\n",
+        "\n",
+        "    for i in range(size):\n",
+        "        for j in range(size):\n",
+        "            for K in range(n_atoms):\n",
+        "                contracted_i = contracted_list[i]\n",
+        "                contracted_j = contracted_list[j]\n",
+        "\n",
+        "                atom_charge = charge_atom_list[K]\n",
+        "                atom_coord = coord_atoms_list[K]\n",
+        "\n",
+        "                uncontracted_segment = V_uncontr_segment(contracted_i, contracted_j, atom_charge, atom_coord)\n",
+        "\n",
+        "                contracted_matrix[i][j] += contracted_matrix_element(uncontracted_segment, contraction_coefficient_list[i], contraction_coefficient_list[j])\n",
+        "\n",
+        "    return contracted_matrix\n"
+      ],
+      "metadata": {
+        "id": "7QyrIUwfPXSG"
+      },
+      "id": "7QyrIUwfPXSG",
+      "execution_count": 19,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "V_1_sto3g = V_contracted([sto_3g_h1, sto_3g_h2], [c_mu, c_nu], [1], [np.array([0., 0., 0])])\n",
+        "V_1_sto3g"
+      ],
+      "metadata": {
+        "colab": {
+          "base_uri": "https://localhost:8080/"
+        },
+        "id": "QpVQBeGVQe0v",
+        "outputId": "80cb2bf1-09f0-4f36-eb69-ccce39872f60"
+      },
+      "id": "QpVQBeGVQe0v",
+      "execution_count": 20,
+      "outputs": [
+        {
+          "output_type": "execute_result",
+          "data": {
+            "text/plain": [
+              "array([[-1.22661372, -0.5974173 ],\n",
+              "       [-0.5974173 , -0.65382715]])"
+            ]
+          },
+          "metadata": {},
+          "execution_count": 20
+        }
+      ]
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "V_2_sto3g = V_contracted([sto_3g_h1, sto_3g_h2], [c_mu, c_nu], [1], [np.array([1.4, 0., 0.])])\n",
+        "V_2_sto3g"
+      ],
+      "metadata": {
+        "colab": {
+          "base_uri": "https://localhost:8080/"
+        },
+        "id": "jbkrjE88nnah",
+        "outputId": "6dd8aab1-58a7-407e-da65-b06700a4dda1"
+      },
+      "id": "jbkrjE88nnah",
+      "execution_count": 21,
+      "outputs": [
+        {
+          "output_type": "execute_result",
+          "data": {
+            "text/plain": [
+              "array([[-0.65382715, -0.5974173 ],\n",
+              "       [-0.5974173 , -1.22661372]])"
+            ]
+          },
+          "metadata": {},
+          "execution_count": 21
+        }
+      ]
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "H_core_sto3g = T_sto_3g + V_1_sto3g + V_2_sto3g\n",
+        "H_core_sto3g"
+      ],
+      "metadata": {
+        "colab": {
+          "base_uri": "https://localhost:8080/"
+        },
+        "id": "FXmHzMRIpdP1",
+        "outputId": "cf5c6c2f-53c1-4c43-85cf-2b8465227ef7"
+      },
+      "id": "FXmHzMRIpdP1",
+      "execution_count": 22,
+      "outputs": [
+        {
+          "output_type": "execute_result",
+          "data": {
+            "text/plain": [
+              "array([[-1.120409  , -0.95837996],\n",
+              "       [-0.95837996, -1.120409  ]])"
+            ]
+          },
+          "metadata": {},
+          "execution_count": 22
+        }
+      ]
+    },
+    {
+      "cell_type": "markdown",
+      "source": [
+        "Which matches the definition of the STO-3G core Hamiltionian for two hydrogen atoms separated 1.4 a.u.\n",
+        "\n",
+        "# Contracted two electron integrals\n",
+        "\n",
+        "We are going to apply the same philosopy for now in a naive manner: Build the uncontracted tensor and then contract.\n",
+        "\n",
+        "$$\n",
+        "g_{\\mu\\nu\\lambda\\sigma} = \\sum_p^{p_{max}} \\sum_q^{q_{max}}\\sum_r^{r_{max}} \\sum_s^{s_{max}} c^*_{p \\mu} c_{q \\nu} c^*_{r \\lambda} c_{s \\sigma} (pq|rs)\n",
+        "$$\n",
+        "\n",
+        "Should be it right?"
+      ],
+      "metadata": {
+        "id": "pjwUBDiMqKjR"
+      },
+      "id": "pjwUBDiMqKjR"
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "def g_contracted(basis_list_1, basis_list_2, basis_list_3, basis_list_4, cont_coeff_list):\n",
+        "    p_max = len(basis_list_1)\n",
+        "    q_max = len(basis_list_2)\n",
+        "    r_max = len(basis_list_3)\n",
+        "    s_max = len(basis_list_4)\n",
+        "\n",
+        "    g_final = 0\n",
+        "\n",
+        "    for p in range(p_max):\n",
+        "        for q in range(q_max):\n",
+        "            for r in range(r_max):\n",
+        "                for s in range(s_max):\n",
+        "                    c_pmu = cont_coeff_list[0][p]\n",
+        "                    c_qnu = cont_coeff_list[1][q]\n",
+        "                    c_rlambda = cont_coeff_list[2][r]\n",
+        "                    c_ssigma = cont_coeff_list[3][s]\n",
+        "\n",
+        "                    prim_i = basis_list_1[p]\n",
+        "                    prim_j = basis_list_2[q]\n",
+        "                    prim_k = basis_list_3[r]\n",
+        "                    prim_l = basis_list_4[s]\n",
+        "\n",
+        "                    g_final += c_pmu * c_qnu * c_rlambda * c_ssigma * g_abcd(prim_i, prim_j, prim_k, prim_l)\n",
+        "    return g_final"
+      ],
+      "metadata": {
+        "id": "27au8N26rvH6"
+      },
+      "id": "27au8N26rvH6",
+      "execution_count": 23,
+      "outputs": []
+    },
+    {
+      "cell_type": "markdown",
+      "source": [
+        "And in the book it is possible to see that there are 4 unique two electron integrals due to symmetry:\n",
+        "\n",
+        "$$\n",
+        "(11|11) = 0.7746 \\,a.u\n",
+        "$$\n",
+        "$$\n",
+        "(11|22) = 0.5697 \\,a.u\n",
+        "$$\n",
+        "$$\n",
+        "(21|11) = 0.4441 \\,a.u\n",
+        "$$\n",
+        "$$\n",
+        "(21|21) = 0.2970 \\,a.u\n",
+        "$$"
+      ],
+      "metadata": {
+        "id": "8byBwL2kvr6U"
+      },
+      "id": "8byBwL2kvr6U"
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "print(f'(11|11) = {g_contracted(sto_3g_h1, sto_3g_h1, sto_3g_h1, sto_3g_h1, [c_mu, c_mu, c_mu, c_mu]):.4f}')"
+      ],
+      "metadata": {
+        "id": "M0hjhl-ov78S",
+        "outputId": "e4a345e4-c2e0-4b87-d5e9-0c29f566ead9",
+        "colab": {
+          "base_uri": "https://localhost:8080/"
+        }
+      },
+      "id": "M0hjhl-ov78S",
+      "execution_count": 24,
+      "outputs": [
+        {
+          "output_type": "stream",
+          "name": "stdout",
+          "text": [
+            "(11|11) = 0.7746\n"
+          ]
+        }
+      ]
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "print(f'(11|22) = {g_contracted(sto_3g_h1, sto_3g_h1, sto_3g_h2, sto_3g_h2, [c_mu, c_mu, c_nu, c_nu]):.4f}')"
+      ],
+      "metadata": {
+        "id": "0JhdsC-YvUN3",
+        "outputId": "51c56745-8ceb-4c1a-ae24-8e5dd68556f5",
+        "colab": {
+          "base_uri": "https://localhost:8080/"
+        }
+      },
+      "id": "0JhdsC-YvUN3",
+      "execution_count": 25,
+      "outputs": [
+        {
+          "output_type": "stream",
+          "name": "stdout",
+          "text": [
+            "(11|22) = 0.5697\n"
+          ]
+        }
+      ]
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "print(f'(21|11) = {g_contracted(sto_3g_h2, sto_3g_h1, sto_3g_h1, sto_3g_h1, [c_nu, c_mu, c_mu, c_mu]):.4f}')"
+      ],
+      "metadata": {
+        "id": "Jzn8XF52veUi",
+        "outputId": "1e1fe6e3-70c3-4f0a-fee3-b3c4465d7680",
+        "colab": {
+          "base_uri": "https://localhost:8080/"
+        }
+      },
+      "id": "Jzn8XF52veUi",
+      "execution_count": 26,
+      "outputs": [
+        {
+          "output_type": "stream",
+          "name": "stdout",
+          "text": [
+            "(21|11) = 0.4441\n"
+          ]
+        }
+      ]
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "print(f'(21|21) = {g_contracted(sto_3g_h2, sto_3g_h1, sto_3g_h2, sto_3g_h1, [c_nu, c_mu, c_nu, c_mu]):.4f}')"
+      ],
+      "metadata": {
+        "id": "rc_NtsfgwJyY",
+        "outputId": "8f717788-c30a-4100-915a-9b1765365869",
+        "colab": {
+          "base_uri": "https://localhost:8080/"
+        }
+      },
+      "id": "rc_NtsfgwJyY",
+      "execution_count": 27,
+      "outputs": [
+        {
+          "output_type": "stream",
+          "name": "stdout",
+          "text": [
+            "(21|21) = 0.2970\n"
+          ]
+        }
+      ]
+    }
+  ],
+  "metadata": {
+    "kernelspec": {
+      "display_name": "Python 3 (ipykernel)",
+      "language": "python",
+      "name": "python3"
+    },
+    "language_info": {
+      "codemirror_mode": {
+        "name": "ipython",
+        "version": 3
+      },
+      "file_extension": ".py",
+      "mimetype": "text/x-python",
+      "name": "python",
+      "nbconvert_exporter": "python",
+      "pygments_lexer": "ipython3",
+      "version": "3.11.7"
+    },
+    "colab": {
+      "provenance": []
+    }
+  },
+  "nbformat": 4,
+  "nbformat_minor": 5
+}
