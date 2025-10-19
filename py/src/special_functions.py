@@ -12,7 +12,7 @@ def pochhammer(a: float, k: int) -> float:
     Implemented using only the Gamma Function due to portability with standard 
     libraries in other codes:
 
-    (a)_k = \Gamma(a+k) / \Gamma(a)
+    (a)_k = Gamma(a+k) / Gamma(a)
 
     Parameters
     ----------
@@ -26,7 +26,7 @@ def pochhammer(a: float, k: int) -> float:
     float
         The value of the Pochhammer symbol (a)_k.
     """
-    return np.float(scipy.special.gamma(a+k) / scipy.special.gamma(a))
+    return float(scipy.special.gamma(a+k) / scipy.special.gamma(a))
 
 def M(a: float, b: float, x: float, k: int) -> float:
     """
@@ -34,7 +34,7 @@ def M(a: float, b: float, x: float, k: int) -> float:
 
     Defined as:
 
-    M(a, b, x) = \sum_{k=0}^k (a)_k / (k! * (b)_k) * x^k
+    M(a, b, x) = sum_{k=0}^k (a)_k / (k! * (b)_k) * x^k
 
     Uses the Pochhammer symbol. Implemented using only the Gamma Function due
     to portability with standard libraries in other codes.
@@ -63,7 +63,7 @@ def M(a: float, b: float, x: float, k: int) -> float:
         # print(f"series {i}: {a_k} {b_k} {k_factorial},  {a_k / (b_k * k_factorial)} ")
         m += a_k / (b_k * k_factorial) * x**i
 
-    return np.float(m)
+    return float(m)
 
 def boys_hypergeom(n: int, x: float, k: int):
     """
