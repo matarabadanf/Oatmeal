@@ -99,7 +99,7 @@ def boys_hypergeom(n: int, x: float, k: int):
     return M(a, b, -x, k+10) / (2*n+1)
 
 def boys_upward_order_n(F_0: float, n: int, x: float) -> float:
-        """
+    """
     Upward recursion relation of the Boys function.
 
     Parameter
