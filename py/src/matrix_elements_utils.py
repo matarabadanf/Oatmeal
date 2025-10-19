@@ -4,6 +4,7 @@ from dataclasses import dataclass
 
 @dataclass
 class Primitive:
+    """Represents a primitive Cartesian Gaussian function."""
     R: np.ndarray # of len 3
     exp: float
     angular_momentum: int
@@ -11,13 +12,26 @@ class Primitive:
 
 @dataclass
 class Contracted:
+    """Represents a contracted Gaussian function."""
     n_primitives: int
     angular_momentum: int
     normalization_constants: list[float]
     primitives: list[Primitive]
     c_coeff: list[float]
 
-    def __init__(self, R: np.ndarray, exps: list[float], c_coeff: list[float], angular_momentum: int):
+    def __init__(self, R: np.ndarray, exps: list[float], c_coeff: list[float], angular_momentum: int) -> None:
+        """
+        Parameters
+        ----------
+        R : np.ndarray
+            Center of the basis function (length 3).
+        exps : List[float]
+            Gaussian exponents (a_i) for each primitive.
+        c_coeff : List[float]
+            Contraction coefficients (d_i) for each primitive.
+        angular_momentum : int
+            Total angular momentum l.
+        """
         self.n_primitives = len(exps)
         self.angular_momentum = angular_momentum
         self.c_coeff = c_coeff
