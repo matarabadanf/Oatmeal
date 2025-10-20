@@ -555,11 +555,11 @@ if __name__ == '__main__':
 
     # Test 1: self overlap 
     self_overlap = basis_1.normalization_constant ** 2 * S_3D(basis_1, np.array([0,0,0]), basis_1, np.array([0,0,0]))
-    assert(abs(self_overlap - 1) < 0.000001)
+    assert abs(self_overlap - 1) < 0.000001, f"Self overlap test failed: value is {self_overlap}, should be 1"
 
     # Test 2: different projection overlap 
     diff_l = basis_1.normalization_constant ** 2 * S_3D(basis_1, np.array([0,0,0]), basis_1, np.array([1,0,0]))
-    assert(diff_l == 0)
+    assert diff_l == 0, f"Different l overlap test failed: value is {diff_l}, should be 0"
 
     # New primitives for further tests:
     basis_1 = Primitive(np.array([0,0,0]), 0.5, 1, 1)
@@ -569,11 +569,11 @@ if __name__ == '__main__':
 
     # Test 3: Kinetic energy with different l:
     t_test = T_3D(basis_1, np.array([1,0,0]), basis_2, np.array([0,0,0]))
-    assert(abs(t_test-0) < 0.0000001)
+    assert abs(t_test-0) < 0.0000001, f"Kinetic energy different l test failed: value is {t_test}, should be 0"
 
     # Test 4: Kinetic energy with same l:
     t_test = T_3D(basis_1, np.array([1,0,0]), basis_2, np.array([1,0,0]))
-    assert(abs(t_test-3.4802049980198166) < 0.0000001)
+    assert abs(t_test-3.4802049980198166) < 0.0000001 , f"Kinetic energy same l test failed: value is {t_test}, should be 3.4802049980198166"
 
     # test contraction 
     alphas = [3.42525091, 0.62391373, 0.16885540]
