@@ -63,3 +63,4 @@ dkms.conf
 .conda
 .pytest_cache
 Oatmeal.egg-info
+.mypy_cache
