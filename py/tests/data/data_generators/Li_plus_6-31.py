@@ -13,10 +13,10 @@ eri = mol_Li.intor('int2e')
 # print(vnuc)
 # print(eri)
 
-np.savetxt('./data/kin_li_plus.dat', kin)
-np.savetxt('./data/vnuc_li_plus.dat', vnuc)
-np.savetxt('./data/S_li_plus.dat', overlap)
-np.save('./data/eri_li_plus.npy', eri) # cannot be savetxt, has to be np binary
+np.savetxt('../Li_plus_kin_6-31g.dat', kin)
+np.savetxt('../Li_plus_vnuc_6-31g.dat', vnuc)
+np.savetxt('../Li_plus_S_6-31g.dat', overlap)
+np.save('../Li_plus_eri_6-31g.npy', eri) # cannot be savetxt, has to be np binary
 
 rhf_li = scf.RHF(mol_Li)
 # rhf_li.init_guess = 'hcore'
@@ -28,4 +28,4 @@ e_elec = rhf_li.energy_elec()
 print(e_li, e_elec, rhf_li.cycles)
 # print(rhf_li.mo_coeff)
 
-np.save('./data/e_hf_li_plus', e_li)
+np.save('../Li_plus_e_hf_6-31g', e_li)
