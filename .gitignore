@@ -57,3 +57,7 @@ dkms.conf
 # vscode
 .vscode
 *checkpoint.ipynb
+
+# python 
+*__pycache__*
+.conda
