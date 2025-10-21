@@ -1,7 +1,7 @@
 import numpy as np
 from numpy.typing import NDArray
 
-def transformation_matrix(S_munu: np.ndarray) -> np.ndarray:
+def transformation_matrix(S_munu: np.ndarray, method='symmetric') -> np.ndarray:
     """
     Calculate The normalization transformation matrix X.
 
@@ -28,6 +28,7 @@ def transformation_matrix(S_munu: np.ndarray) -> np.ndarray:
     ------
     The operation S^{-1/2} @ S @ S^{-1/2} = Identity must always hold.
     """
+    assert method in ['canonical', 'symmetric'], "method must be either 'canonical' or 'symmetric'"
     dim = len(S_munu)
 
     # diagonalize U.T @ S @ U = s
@@ -35,15 +36,30 @@ def transformation_matrix(S_munu: np.ndarray) -> np.ndarray:
 
     s_root = np.zeros([dim, dim])
 
+    # print(s)
+
+    # idx = np.argsort(s)
+    # s = s[idx]
+    # U = U[:, idx]
+
+    # print(U)
+
     for index, eigenvalue in enumerate(s):
         s_root[index,index] = 1/np.sqrt(eigenvalue)
 
-    X = U @ s_root @ U.T
+    # sort eigenvalues (ascending) and reorder eigenvectors accordingly
 
-    transformed = X @ S_munu @ X    
+
+    if method == 'symmetric':
+        X = U @ s_root @ U.T
+    elif method == 'canonical':
+        X = U @ s_root
+
+    transformed = X.T @ S_munu @ X
 
     assert equiv_matrix(transformed, np.identity(len(S_munu))), "transformation matrix calculation failed"
-    print(X)
+
+    # print(X)
 
     return X
 
@@ -136,33 +152,29 @@ def scf(S, T, V, eri, n_electrons:int, max_iter=100, threshold=1E-6, p_guess='co
 
         e_values, C_prime = np.linalg.eigh(F_prime) # here is eigh because we are in the non-scaled case
 
-        # idx = e_values.argsort()
-        # e_values = e_values[idx]
-        # C_prime = C_prime[:, idx]
-
-        print(f'\n\nIteration {iter}')
-        print(e_values)
-        print(f'\nEigenvectors:')
-        print(C_prime)
+        # print(f'\n\nIteration {iter}')
+        # print(e_values)
+        # print(f'\nEigenvectors:')
+        # print(C_prime)
 
         C_munu = X @ C_prime
 
         # print(iter)
-        print(f'\nTransformed Eigenvectors:')
-        print(C_munu)
+        # print(f'\nTransformed Eigenvectors:')
+        # print(C_munu)
 
         P_old = np.copy(P_new)
         P_new = calc_p_matrix(C_munu, n_electrons=n_electrons)
 
-        print(f'\nNew Density Matrix:')
-        print(P_new)
+        # print(f'\nNew Density Matrix:')
+        # print(P_new)
 
         E_iter = E_0(P_new, H_core, F)
-        print(f"Eigenvalues at iter {iter}: {e_values}")
-        print(f"Energy: {E_iter}")
+        # print(f"Eigenvalues at iter {iter}: {e_values}")
+        # print(f"Energy: {E_iter}")
 
-    
-    return e_values, C_munu, P
+    E_RHF = E_iter
+    return E_RHF, e_values, C_munu, P
 
 
 
@@ -187,28 +199,23 @@ if __name__ == "__main__":
     """
 
 
-    S_sto3g_li = np.loadtxt('./data/s_li.dat')
-    T_sto3g_li = np.loadtxt('./data/kin_li.dat')
-    V_sto3g_li = np.loadtxt('./data/vnuc_li.dat')
-    eri_sto3g_li = np.load('./data/eri_li.npy')
+    S_sto3g_li    = np.loadtxt('./data/s_li_plus.dat')
+    T_sto3g_li    = np.loadtxt('./data/kin_li_plus.dat')
+    V_sto3g_li    = np.loadtxt('./data/vnuc_li_plus.dat')
+    eri_sto3g_li  = np.load('./data/eri_li_plus.npy')
+    E_hf_sto3g_li = np.load('./data/e_hf_li_plus.npy')
 
-    idn = np.identity(5)
+    idn = np.identity(len(S_sto3g_li))
 
     # test 1: successful transformation matrix
     X = transformation_matrix(S_sto3g_li)
-    transformed = X @ S_sto3g_li @ X      # sould be the identity    
+    transformed = X.T @ S_sto3g_li @ X      # sould be the identity    
     assert equiv_matrix(transformed, idn), "transformation matrix calculation failed"
 
     # test 2: SCF convergence for li in STO-3G
-    e_values, C_munu, P = scf(S_sto3g_li, T_sto3g_li, V_sto3g_li, eri_sto3g_li, n_electrons=2, max_iter=2, threshold=1E-14, p_guess='core')
+    E_hf, E_e_values, C_munu, P = scf(S_sto3g_li, T_sto3g_li, V_sto3g_li, eri_sto3g_li, n_electrons=2, max_iter=100, threshold=1E-14, p_guess='core')
 
-    # expected [-4.40795283 -0.93897155 -0.87757914 -0.87757914 -0.87757914]
-    # expected 
-    """
-    [[ 1.00548232 -0.2252598   0.          0.          0.        ]
-    [-0.02384599  1.03013011  0.          0.          0.        ]
-    [-0.         -0.          1.          0.          0.        ]
-    [-0.          0.          0.          1.          0.        ]
-    [-0.          0.          0.          0.          1.        ]]
-    """
+    assert abs(E_hf - E_hf_sto3g_li) < 1E-8, f"SCF energy does not match reference value {E_hf} != {E_hf_sto3g_li}"
+
+
     
