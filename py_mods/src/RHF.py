@@ -194,6 +194,36 @@ def E_0(P: NDArray[np.float64], H_core: NDArray[np.float64], F: NDArray[np.float
     
     return energy
 
+def V_NN(positions: NDArray[np.float64], charges: NDArray, units: Literal['Bohr', 'Angstrom'] = 'Bohr') -> float:
+    """
+    Calculate nuclear repulsion energy.
+
+    Parameters
+    ----------
+    positions : NDArray[np.float64] of dimension (n_atoms, 3)
+        Atomic positions.
+    charges : NDArray[np.int] of dimension (n_atoms,)
+        Atomic charges.
+
+    Returns
+    -------
+    V_NN : float
+        Nuclear repulsion energy.
+    """
+    if units == 'Angstrom':
+        positions /= 0.529177249
+        print(positions)
+
+    V_NN = 0.0
+    n_atoms = len(positions)
+
+    for i in range(n_atoms):
+        for j in range(i+1, n_atoms):
+            R_ij = np.linalg.norm(positions[i] - positions[j])
+            V_NN += (charges[i] * charges[j]) / R_ij
+    
+    return V_NN
+
 def RHF(
     S: NDArray[np.float64],
     T: NDArray[np.float64], 
@@ -332,61 +362,15 @@ def RHF(
 
 if __name__ == "__main__":
     """
-    S_sto3g_H2 = np.loadtxt('./data/s_H2.dat')
-    T_sto3g_H2 = np.loadtxt('./data/kin_H2.dat')
-    V_sto3g_H2 = np.loadtxt('./data/vnuc_H2.dat')
-    eri_sto3g_H2 = np.load('./data/eri_H2.npy')
+    S_sto3g_H2 = np.loadtxt('tests/data/s_H2.dat')
+    T_sto3g_H2 = np.loadtxt('tests/data/kin_H2.dat')
+    V_sto3g_H2 = np.loadtxt('tests/data/vnuc_H2.dat')
+    eri_sto3g_H2 = np.load('tests/data/eri_H2.npy')
 
-    idn = np.identity(2)
-
-    # test 1: successful transformation matrix
-    X = transformation_matrix(S_sto3g_H2)
-    transformed = X @ S_sto3g_H2 @ X      # sould be the identity    
-    assert equiv_matrix(transformed, idn), "transformation matrix calculation failed"
+    idn = np.identity(len(S_sto3g_H2))
 
     # test 2: SCF convergence for H2 in STO-3G
     e_values, C_munu, P = scf(S_sto3g_H2, T_sto3g_H2, V_sto3g_H2, eri_sto3g_H2, n_electrons=2, max_iter=100, threshold=1E-14, p_guess='core')
 
     print(e_values)
     """
-
-    # Li 6-31g test
-    S_sto3g_li    = np.loadtxt('../tests/data/Li_plus_S_6-31g.dat')
-    T_sto3g_li    = np.loadtxt('../tests/data/Li_plus_kin_6-31g.dat')
-    V_sto3g_li    = np.loadtxt('../tests/data/Li_plus_vnuc_6-31g.dat')
-    eri_sto3g_li  = np.load('../tests/data/Li_plus_eri_6-31g.npy')
-    E_hf_sto3g_li = np.load('../tests/data/Li_plus_e_hf_6-31g.npy')
-
-    idn = np.identity(len(S_sto3g_li))
-
-    # test 1: successful transformation matrix
-    X = transformation_matrix(S_sto3g_li)
-    transformed = X.T @ S_sto3g_li @ X      # sould be the identity    
-    assert equiv_matrix(transformed, idn), "transformation matrix calculation failed"
-
-    # test 2: SCF convergence for li in 6-31g
-    converged, E_hf, E_e_values, C_munu, P = RHF(S_sto3g_li, T_sto3g_li, V_sto3g_li, eri_sto3g_li, n_electrons=2, max_iter=100, threshold=1E-14, p_guess='core', verbose=True)
-    assert converged, "Calculation did not converge"
-    assert abs(E_hf - E_hf_sto3g_li) < 1E-8, f"SCF energy does not match reference value {E_hf} != {E_hf_sto3g_li}"
-
-    # Be ccpvdz test 
-    S_ccpvdz_Be    = np.loadtxt('../tests/data/Be_S_ccpvdz.dat')
-    T_ccpvdz_Be    = np.loadtxt('../tests/data/Be_kin_ccpvdz.dat')
-    V_ccpvdz_Be    = np.loadtxt('../tests/data/Be_vnuc_ccpvdz.dat')
-    eri_ccpvdz_Be  = np.load('../tests/data/Be_eri_ccpvdz.npy')
-    E_hf_ccpvdz_Be = np.load('../tests/data/Be_e_hf_ccpvdz.npy')
-
-    idn = np.identity(len(S_ccpvdz_Be))
-
-    # test 1: successful transformation matrix
-    X = transformation_matrix(S_ccpvdz_Be)
-    transformed = X.T @ S_ccpvdz_Be @ X      # sould be the identity    
-    assert equiv_matrix(transformed, idn), "transformation matrix calculation failed"
-
-    # test 2: SCF convergence for Be in ccpvdz
-    converged, E_hf, E_e_values, C_munu, P = RHF(S_ccpvdz_Be, T_ccpvdz_Be, V_ccpvdz_Be, eri_ccpvdz_Be, n_electrons=4, max_iter=100, threshold=1E-14, p_guess='core', verbose=True)
-    assert converged, "Calculation did not converge"
-    assert abs(E_hf - E_hf_ccpvdz_Be) < 1E-8, f"SCF energy does not match reference value {E_hf} != {E_hf_ccpvdz_Be}"
-
-
-    

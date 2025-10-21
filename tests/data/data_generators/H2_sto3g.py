@@ -1,7 +1,9 @@
 from pyscf import gto, scf
 import numpy as np
 
-mol_H2 = gto.M(atom = 'H 0 0 0; H 0 0 0.740848', spin=0)
+dist = 1.4 * 0.529177249
+
+mol_H2 = gto.M(atom = f'H 0 0 0; H 0 0 {dist}', spin=0)
 
 kin = mol_H2.intor('int1e_kin')
 vnuc = mol_H2.intor('int1e_nuc')
