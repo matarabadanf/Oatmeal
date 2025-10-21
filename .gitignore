@@ -61,3 +61,5 @@ dkms.conf
 # python 
 *__pycache__*
 .conda
+.pytest_cache
+Oatmeal.egg-info
