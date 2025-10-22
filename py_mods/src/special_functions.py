@@ -55,13 +55,13 @@ def M(a: float, b: float, x: float, k: int) -> float:
     float
         The value of the M(a, b, x) series computed with k terms.
     """
-    m = 0
+    m = 0.
     for i in range(0, k):
         a_k = pochhammer(a, i)
         b_k = pochhammer(b, i)
         k_factorial = scipy.special.gamma(i+1)
         # print(f"series {i}: {a_k} {b_k} {k_factorial},  {a_k / (b_k * k_factorial)} ")
-        m += a_k / (b_k * k_factorial) * x**i
+        m += a_k / (b_k * k_factorial) * x ** i
 
     return float(m)
 

@@ -2,7 +2,7 @@ import numpy as np
 from numpy.typing import NDArray
 from typing import Literal
 
-def transformation_matrix(S_munu: NDArray[np.float64], method: Literal['symmetric'] ='symmetric') -> NDArray[np.float64]:
+def transformation_matrix(S_munu: NDArray[np.float64], method: Literal['symmetric'] ='symmetric', verbose: bool = False) -> NDArray[np.float64]:
     """
     Calculate The normalization transformation matrix X.
 
@@ -20,6 +20,10 @@ def transformation_matrix(S_munu: NDArray[np.float64], method: Literal['symmetri
     ------
     S_munu : np.ndarray of dimension (n, n)
         Overlap matrix. 
+    method : Literal['canonical', 'symmetric']
+        Method to use for orthogonalization.ß
+    verbose : bool, optional
+        If True, prints iterations.
     
     Returns
     ------
@@ -36,6 +40,8 @@ def transformation_matrix(S_munu: NDArray[np.float64], method: Literal['symmetri
     # diagonalize U.T @ S @ U = s
     s, U = np.linalg.eigh(S_munu)
 
+    # print(s)
+
     s_root = np.zeros([dim, dim])
 
     # calculate s^{-0.5}
@@ -49,6 +55,12 @@ def transformation_matrix(S_munu: NDArray[np.float64], method: Literal['symmetri
     
     # transformation matrix test
     transformed = X.T @ S_munu @ X
+
+    np.savetxt(f'trans.dat', transformed)
+    
+    if verbose:
+        print(transformed)
+
     assert equiv_matrix(transformed, np.identity(len(S_munu))), "transformation matrix calculation failed"
 
     return X

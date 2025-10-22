@@ -80,6 +80,7 @@ def RHF(
     # Otain transformation matrix 
     dim = len(S)
     X = transformation_matrix(S)
+    # print(X)
 
     # Guess initial density matrix
     if p_guess == 'core':
@@ -95,6 +96,7 @@ def RHF(
 
     E_iter = 0.
     Delta_E = 0.
+    converged = False
 
     if verbose:
         print('-'*70)
@@ -137,7 +139,7 @@ def RHF(
             print(f'{iter:5}     {E_iter:25.16f}     {Delta_E:25.16f}')
 
     E_RHF = E_iter
-    return converged, E_RHF, e_values, C_munu, P
+    return converged, E_RHF, e_values, C_munu, P_new
 
 if __name__ == "__main__":
     pass 
