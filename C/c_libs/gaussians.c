@@ -25,7 +25,7 @@ double gaussian_overlap_distribution(unsigned int ii, double A_x, double a, unsi
     return exp(-mu * pow(X_ab, 2)) * pow(x_a, ii) *  pow(x_b, jj) * exp(-p * pow(x_p, 2));
 }
 
-double *Overlap_OS_matrix(double Ax, double Bx, double a, double b, unsigned int ii, unsigned int jj) {
+static double *Overlap_OS_matrix(double Ax, double Bx, double a, double b, unsigned int ii, unsigned int jj) {
 
     // builds the Obara-Saika recurrence matrix for overlap integrals. 
 
@@ -93,7 +93,8 @@ double Overlap_OS(double Ax, double Bx, double a, double b, unsigned int ii, uns
     return result;
 }
 
-double *kinetic_OS_matrix(double Ax, double Bx, double a, double b, unsigned int ii, unsigned int jj){
+
+static double *kinetic_OS_matrix(double Ax, double Bx, double a, double b, unsigned int ii, unsigned int jj){
 
 
     unsigned int max_dim = MAX(ii, jj) + 1;
