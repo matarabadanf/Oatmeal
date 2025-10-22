@@ -10,8 +10,9 @@ _gaussian_utils = ctypes.CDLL(str(lib_folder / f"libgaussians{ext}"))
 _gaussian_utils.cartesian_gaussian.argtypes = [ctypes.c_int, ctypes.c_double, ctypes.c_double, ctypes.c_double]
 _gaussian_utils.cartesian_gaussian.restype = ctypes.c_double
 
-def gaussian_from_c() -> float:
-    val = _gaussian_utils.cartesian_gaussian(1, 1., 1., 1.)
+def gaussian_from_c(ii: int, A_x: float, a: float, x: float) -> float:
+    val = _gaussian_utils.cartesian_gaussian(ii, A_x, a, x)
     return val
 
-print(gaussian_from_c())
+w = (gaussian_from_c(2, 0, 0.5, 1.7))
+print(w)
