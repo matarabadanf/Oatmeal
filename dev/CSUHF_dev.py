@@ -59,126 +59,6 @@ e_He = rhf_He.kernel()
 print(e_He)
 
 
-
-def calc_p_matrix_comp(C_matrix: NDArray[np.complex128], n_electrons: int) -> NDArray[np.complex128]:
-    """
-    Calculate density matrix from MO coefficients using: 
-
-    P_{mu, nu} = 2 * sum_{a}^{n_occ} C_{mu, a} * C_{nu, a}^*
-
-    Parameters
-    ----------
-    C_matrix : NDArray[np.float64] of dimension (n, n)
-        Overlap matrix.
-    n_electrons : int
-        Number of electrons.
-
-    Returns
-    -------
-    P : NDArray[np.float64] of dimension (n, n)
-        Density matrix.
-    
-    Notes
-    -------
-    n_occ is divided by 2 due to this being used for the RHF case.
-    """
-    dim = len(C_matrix)
-    P = np.zeros([dim, dim], dtype=np.complex128)
-
-    n_occ = int(n_electrons / 2) 
-
-    # print(n_occ)
-
-    for mu in range(0, dim):
-        for nu in range(0, dim):
-            for a in range(0, n_occ):
-                P[mu, nu] += 2 * C_matrix[mu, a] *  np.conj(C_matrix[nu, a]) # C_matrix[nu, a] # np.conj(C_matrix[nu, a])
-    
-    return P
-
-
-def calc_g_matrix_comp(P_matrix: NDArray[np.complex128], eri: NDArray[np.complex128]) -> NDArray[np.complex128]:
-    """
-    Calculate G matrix using: 
-
-    G_{mu, nu} = sum_{la, si} P_{la, si} * ( <mu nu|la si> - 0.5 * <mu la|nu si> )
-
-    Parameters
-    ----------
-    P_matrix : NDArray[np.float64] of dimension (n, n)
-        Density matrix.
-    eri : NDArray[np.float64] of dimension (n, n, n, n)
-        Electron repulsion integrals.
-
-    Returns
-    -------
-    g_mat : NDArray[np.float64] of dimension (n, n)
-        G matrix.
-
-    
-    Notes
-    ------
-    The system bust be a closed shell: n_electrons must be even. This is asserted.
-
-    Integrals must be passed and have the same dimensions. This is asserted.
-
-    Diagonalization algorithm used is np.linalg.eigh due to the matrix being symmetric.
-    
-    The algorithm steps are:
-        - Obtain transformation matrix X from S.
-        - Guess initial density matrix P.
-        - Build core Hamiltonian H_core = T + V.
-        - SCF loop:
-            - Build G matrix from P and eri.
-            - Build Fock matrix F = H_core + G.
-            - Obtain transformed Fock matrix F' = X.T @ F @ X.
-            - Diagonalize F' to obtain orbital energies and transformed MO coefficients.
-            - Obtain untransformed MO coefficients C = X @ C'.
-            - Build new density matrix P from C.
-            - Calculate RHF energy E_RHF.
-            - Check convergence.
-    """
-    dim = len(P_matrix)
-    g_mat = np.zeros([dim, dim], dtype=np.complex128)
-
-    for mu in range(0, dim):
-        for nu in range(0, dim):
-            for si in range(0,dim):
-                for la in range(0, dim):
-                    g_mat[mu, nu] += P_matrix[la, si] * (eri[mu, nu, la, si] - 0.5 * eri[mu, la, nu, si])
-
-    
-    return g_mat
-
-def E_0_comp(P: NDArray[np.complex128], H_core: NDArray[np.complex128], F: NDArray[np.complex128]) -> np.complex128:
-    """
-    Calculate Hartree-Fock energy using: 
-
-    E_0 = 0.5 * sum_{mu, nu} P_{mu, nu} * (H^core_{mu, nu} + F_{mu, nu})
-
-    Parameters
-    ----------
-    P : NDArray[np.float64] of dimension (n, n)
-        Overlap matrix.
-    H_core : NDArray[np.float64] of dimension (n, n)
-        Kinetic energy matrix.
-    F : NDArray[np.float64] of dimension (n, n)
-        Nuclear attraction matrix.
-
-    Returns
-    -------
-    energy: float
-        Hartree-Fock energy. 
-    """
-    energy = 0. + 0j
-    dim = len(P)
-
-    for mu in range(0, dim):
-        for nu in range(0, dim):
-            energy += 0.5 * P[mu, nu] * (H_core[mu, nu] + F[mu, nu])
-    
-    return energy
-
 def CS_RHF(
     S: NDArray[np.float64],
     T: NDArray[np.float64], 
@@ -315,11 +195,9 @@ def CS_RHF(
         # to explore tomorrow. We need to look at biorthogonal solutions. 
         # eigvals, C_R_prime, C_L_prime = scipy.linalg.eig(F, S, left=True, right=True)
 
-        # idx = eigvals.argsort()
-        # e_values = e_values[idx]
-        # C_R_prime = C_R_prime[:,idx]
-        # C_L_prime = C_L_prime[:,idx]
-        
+        idx = e_values.argsort()
+        e_values = e_values[idx]
+        C_prime = C_prime[:,idx]
 
         # print(e_values)
 
@@ -328,7 +206,7 @@ def CS_RHF(
 
         # Build new density matrix
         P_old = np.copy(P_new)
-        P_new = calc_p_matrix_comp(C_munu, n_electrons=n_electrons)
+        P_new = calc_p_matrix_comp(C_munu, C_munu, n_electrons=n_electrons)
 
         # Calculate HF energy
         E_old = E_iter
@@ -351,62 +229,15 @@ def CS_RHF(
     # print('Type of H_core is:', type(H_core[0][0]))
     # print('Type of F_prime is:', type(F_prime[0][0]))
 
-
-
     E_RHF = E_iter
 
     return converged, E_RHF, e_values, C_munu, P_new
 
-
-def theta_traj(overlap, kin, vnuc, eri, n_elec, theta_max, nsteps=10):
-    reals = []
-    ims = []
-    ths = []
-    for theta in np.linspace(0, theta_max, nsteps):
-        converged, E_elec, E_e_values, C_munu, P = CS_RHF(overlap, kin, vnuc, eri, 2, theta, max_iter=100, threshold=1E-12, p_guess='core', verbose=False)
-
-        if converged:
-            reals.append(E_elec.real)
-            ims.append(E_elec.imag)
-            ths.append(theta)
-            print(f'{theta:2.4f} {E_elec:18.12f}')
-
-    plt.plot(reals, ims, label='Theta trajectory')
-    plt.scatter(reals[0], ims[0], label='Theta = 0')
-    plt.xlabel('Re(E_scf)')
-    plt.scatter(reals[-1], ims[-1], label=f'Theta = {ths[-1]:6.4f}')
-    plt.ylabel('Im(E_scf)')
-    plt.axhline(y=0, color='k', linestyle='--', alpha=0.3)
-    plt.axvline(x=0, color='k', linestyle='--', alpha=0.3)
-    plt.xlabel('Re(E)')
-    plt.ylabel('Im(E)')
-    plt.legend()
-    plt.show()
-
-
-
-
 nelec = 2
-theta = 0.18
-theta_max = 0.5
-
-theta_traj(overlap, kin, vnuc, eri, nelec, theta_max)
+theta = 0.0
 
 converged, E_elec, E_e_values, C_munu, P = CS_RHF(overlap, kin, vnuc, eri, nelec, theta, max_iter=200, threshold=1E-12, p_guess='core', verbose=False)
 print(E_elec)
-print(E_e_values)
-
-plt.scatter(E_e_values.real, E_e_values.imag)
-plt.axhline(y=0, color='k', linestyle='--', alpha=0.3)
-plt.axvline(x=0, color='k', linestyle='--', alpha=0.3)
-x = np.linspace(0, 10, 100)
-y = -np.tan(2*theta) * x
-plt.plot(x, y, '--', label=f'2theta, theta = {theta}', alpha=0.3)
-plt.xlabel('Re(E)')
-plt.ylabel('Im(E)')
-plt.legend()
-plt.show()
 
 converged, E_elec, E_e_values, C_munu, P = RHF(overlap, kin, vnuc, eri, nelec, max_iter=200, threshold=1E-12, p_guess='core', verbose=False)
 print(E_elec)
-print(E_e_values)
