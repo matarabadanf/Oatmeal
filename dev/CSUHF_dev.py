@@ -8,56 +8,7 @@ from typing import Literal, Tuple
 import matplotlib.pyplot as plt 
 import scipy
 
-data_path = Path(__file__).parent / "data"
-
-# print(data_path)
-
-mol_He= gto.M(atom = 'He 0 0 0', spin=0, charge=0, basis='aug-cc-pvtz')
-mol_He.basis = {'He': gto.basis.parse(
-    '''He    S
-      2.340000E+02           0.000000E+00           2.587000E-03           0.000000E+00
-      3.516000E+01           0.000000E+00           1.953300E-02           0.000000E+00
-      7.989000E+00           0.000000E+00           9.099800E-02           0.000000E+00
-      2.212000E+00           0.000000E+00           2.720500E-01           0.000000E+00
-      6.669000E-01           1.000000E+00           4.780650E-01           0.000000E+00
-      2.089000E-01           0.000000E+00           3.077370E-01           1.000000E+00
-He    S
-      0.0513800              1.0000000
-He    P
-      3.044000E+00           1.000000E+00           0.000000E+00
-      7.580000E-01           0.000000E+00           1.000000E+00
-He    P
-      0.1993000              1.0000000
-He    D
-      1.965000E+00           1.0000000
-He    D
-      0.4592000              1.0000000
-    '''
-)}
-
-# mol_He.build()
-
-# print(mol_He.basis)
-
-
-kin = mol_He.intor('int1e_kin')
-vnuc = mol_He.intor('int1e_nuc')
-overlap = mol_He.intor('int1e_ovlp')
-eri = mol_He.intor('int2e')
-
-
-# np.savetxt(f'{data_path}/He_kin_ccpvdz.dat', kin)
-# np.savetxt(f'{data_path}/He_vnuc_ccpvdz.dat', vnuc)
-# np.savetxt(f'{data_path}/He_S_ccpvdz.dat', overlap)
-# np.save(f'{data_path}/He_eri_ccpvdz.npy', eri) # cannot He savetxt, has to He np binary
-
-rhf_He = scf.RHF(mol_He)
-e_He = rhf_He.kernel()
-
-# np.save('../He_e_hf_ccpvdz', e_He)
-
-print(e_He)
-
+from py_mods.src.basis_utils import even_temp_uncontr_str, even_tempered_demonstration
 
 def CS_RHF(
     S: NDArray[np.float64],
@@ -72,7 +23,7 @@ def CS_RHF(
     verbose: bool = False
 ) -> Tuple[bool, float, NDArray[np.complex128], NDArray[np.complex128], NDArray[np.complex128]]:
     """
-    Perform a RHF calculation.
+    Perform a Complex Scaled RHF calculation.
 
     Takes S, T, V and eri matrix elements and computes the RHF procedure. 
 
@@ -166,9 +117,9 @@ def CS_RHF(
     converged = False
 
     if verbose:
-        print('-'*70)
-        print('|   Iter   |           E_iter           |            Delta_e         |')
-        print('-'*70)
+        print('-'*95)
+        print('|   Iter   |               E_iter                  |                   Delta_e                |')
+        print('-'*95)
 
     # SCF loop
     for iter in range(max_iter):
@@ -187,20 +138,14 @@ def CS_RHF(
         # Obtain transformed Fock matrix 
         F_prime = X @ F @ X.T
 
-        # print(F_prime)
-
         # Diagonalize transformed Fock matrix to obtain energies and transformed MO coefficients
         e_values, C_prime = np.linalg.eig(F_prime) # here is eig because we are in the scaled case
-
-        # to explore tomorrow. We need to look at biorthogonal solutions. 
-        # eigvals, C_R_prime, C_L_prime = scipy.linalg.eig(F, S, left=True, right=True)
 
         idx = e_values.argsort()
         e_values = e_values[idx]
         C_prime = C_prime[:,idx]
 
-        # print(e_values)
-
+        # to explore tomorrow. We need to look at biorthogonal solutions. 
         R_prime = np.copy(C_prime)
         L_prime = np.linalg.inv(C_prime)
 
@@ -214,6 +159,7 @@ def CS_RHF(
             print("\nL'F'R' at first iteration:\n", LFR)
             print('\nEigenvalues at first iteration:\n', e_values)
 
+        # print(LFR)
         assert is_diagonal(LFR), "Matrix product L' @ F' @ R' is not diagonal" 
 
         # Obtain untransformed MO coefficients
@@ -229,7 +175,7 @@ def CS_RHF(
 
         # Build new density matrix
         P_old = np.copy(P_new)
-        P_new = calc_p_matrix_comp(L_munu.T, R_munu, n_electrons, iter) # TODO: why do i have to transpose here??
+        P_new = calc_p_matrix_comp(L_munu.T, R_munu, n_electrons) # TODO: why do i have to transpose here??
 
         # Calculate HF energy
         E_old = E_iter
@@ -239,29 +185,99 @@ def CS_RHF(
         if verbose:
             print(f'{iter:5}     {E_iter:25.16f}     {Delta_E:25.16f}')
 
-    # print('Type of P_old matrix is:', type(P_new[0][0]))
-    # print('Type of P_new matrix is:', type(P_new[0][0]))
-    # print('Type of E_iter is:', type(E_iter))
-    # print('Type of e_values is:', type(e_values[0]))
-    # print('Type of C_munu is:', type(C_munu[0][0]))
-    # print('Type of converged is:', type(converged))
-    # print('Type of X is:', type(X[0][0]))
-    # print('Type of T_scaled is:', type(T_scaled[0][0]))
-    # print('Type of V_scaled is:', type(V_scaled[0][0]))
-    # print('Type of eri_scaled is:', type(eri_scaled[0][0][0][0]))
-    # print('Type of H_core is:', type(H_core[0][0]))
-    # print('Type of F_prime is:', type(F_prime[0][0]))
-
     E_RHF = E_iter
 
     return converged, E_RHF, e_values, C_munu, P_new
 
-nelec = 2
-theta = .5
 
-converged, E_elec_comp, E_e_values, C_munu, P = CS_RHF(overlap, kin, vnuc, eri, nelec, theta, max_iter=100, threshold=1E-12, p_guess='core', verbose=False)
+def theta_traj(max_theta, n_points, overlap, kin, vnuc, eri, nelec, th, max_iter=100, threshold=1E-12, p_guess='core', verbose=False):
+    thetas = np.linspace(0, max_theta, n_points)
+    energies = []
+    for th in thetas:
+        converged, E_elec, E_e_values, C_munu, P = CS_RHF(overlap, kin, vnuc, eri, nelec, th, max_iter, threshold, p_guess, verbose=False)
+        if converged:
+            energies.append(E_elec)
+        if verbose and converged:
+            print(f'Converged point at theta = {th:6.4f} : E = {E_elec:12.8f}') 
+
+    return thetas, energies
+
+def plot_theta_traj(energies):
+    reals = [energy.real for energy in energies]
+    imags = [energy.imag for energy in energies]
+    plt.plot(reals, imags, marker='o')
+    plt.xlabel('Re(E)')
+    plt.ylabel('Im(E)')
+    plt.title('Complex Scaled RHF Energy vs Theta')
+    plt.ticklabel_format(style='sci', axis='both', scilimits=(0,0))
+    # plt.axhline(y=0, color='k', linestyle='-', alpha=0.3)
+    # plt.axvline(x=0, color='k', linestyle='-', alpha=0.3)
+    plt.grid(True, alpha=0.3)
+    plt.show()
+
+def plot_theta_orbital_energies(energies, theta):
+    reals = [energy.real for energy in energies]
+    imags = [energy.imag for energy in energies]
+    plt.scatter(reals, imags, marker='o')
+    plt.xlabel('Re(Orbital Energies)')
+    plt.ylabel('Im(Orbital Energies)')
+    plt.title(f'Complex Scaled RHF Orbital Energies at Theta={theta}')
+    plt.axhline(y=0, color='k', linestyle='-', alpha=0.3)
+    plt.axvline(x=0, color='k', linestyle='-', alpha=0.3)
+    plt.grid(True, alpha=0.3)
+    plt.show()
 
 
-converged, E_elec, E_e_values, C_munu, P = RHF(overlap, kin, vnuc, eri, nelec, max_iter=100, threshold=1E-12, p_guess='core', verbose=False)
-print('\n\n\n', E_elec_comp)
-print(E_elec)
+if __name__ == "__main__":
+
+    data_path = Path(__file__).parent / "data"
+
+    # print(data_path)
+
+    mol_He= gto.M(atom = 'He 0 0 0', spin=0, charge=0, basis='aug-cc-pvqz')
+
+    He_tempered_str = even_temp_uncontr_str('He', 'S', 7.668876968794860E-002, 1.9581497063588078, 29)
+    # print(He_tempered_str)
+    mol_He.basis = {'He': gto.basis.parse(He_tempered_str)}
+
+    mol_He.build()
+
+    # print(mol_He.basis)
+
+
+    kin = mol_He.intor('int1e_kin')
+    vnuc = mol_He.intor('int1e_nuc')
+    overlap = mol_He.intor('int1e_ovlp')
+    eri = mol_He.intor('int2e')
+
+
+    # np.savetxt(f'{data_path}/He_kin_ccpvdz.dat', kin)
+    # np.savetxt(f'{data_path}/He_vnuc_ccpvdz.dat', vnuc)
+    # np.savetxt(f'{data_path}/He_S_ccpvdz.dat', overlap)
+    # np.save(f'{data_path}/He_eri_ccpvdz.npy', eri) # cannot He savetxt, has to He np binary
+    
+
+    rhf_He = scf.RHF(mol_He)
+    e_He = rhf_He.kernel()
+
+    # np.save('../He_e_hf_ccpvdz', e_He)
+
+    # print(e_He)
+
+
+    nelec = 2
+    theta = 0.0
+
+    # even_tempered_demonstration(7.668876968794860E-002, 1.9581497063588078, 29)
+
+    converged, E_elec_comp, E_e_values, C_munu, P = CS_RHF(overlap, kin, vnuc, eri, nelec, theta, max_iter=500, threshold=1E-12, p_guess='core', verbose=True)
+    # plot_theta_orbital_energies(E_e_values, theta)
+
+    converged, E_elec, E_e_values, C_munu, P = RHF(overlap, kin, vnuc, eri, nelec, max_iter=100, threshold=1E-12, p_guess='core', verbose=False)
+    print('\n\n\nPyscf energy obtained')
+    print(' ',e_He)
+    print('Comparison between unscaled CSRHF and RHF routines\n', E_elec_comp)
+    print(' ',E_elec)
+
+    # traj_energies = theta_traj(0.5, 50, overlap, kin, vnuc, eri, nelec, theta, max_iter=100, threshold=1E-12, p_guess='core', verbose=False)
+    # plot_theta_traj(traj_energies[1]) 

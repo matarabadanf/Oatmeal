@@ -9,7 +9,7 @@ def even_tempered_exponents(alpha_1: float, epsilon:float, k: int) -> NDArray[np
     print(np.log(alpha_1), np.log(epsilon))
 
     for i in range(k):
-        exponents[i] = alpha_1 * epsilon ** (i-1)
+        exponents[i] = alpha_1 * epsilon ** (i)
 
     return exponents
 
@@ -30,7 +30,7 @@ def even_temp_uncontr_str(element: str, l_tag: str, alpha_1: float, epsilon:floa
 
     bas_str = ''
     tag = f'{element}      {l_tag}\n'
-    exponents = even_tempered_exponents(alpha_1, epsilon, k)
+    exponents = even_tempered_exponents(alpha_1, epsilon, k)[::-1]
 
     for exponent in exponents:
         bas_str += tag

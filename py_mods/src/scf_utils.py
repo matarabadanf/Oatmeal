@@ -2,7 +2,11 @@ import numpy as np
 from numpy.typing import NDArray
 from typing import Literal
 
-def transformation_matrix(S_munu: NDArray[np.float64], method: Literal['symmetric'] ='symmetric', verbose: bool = False) -> NDArray[np.float64]:
+def transformation_matrix(
+    S_munu: NDArray[np.float64], 
+    method: Literal['symmetric'] ='symmetric', 
+    verbose: bool = False
+) -> NDArray[np.float64]:
     """
     Calculate The normalization transformation matrix X.
 
@@ -65,7 +69,12 @@ def transformation_matrix(S_munu: NDArray[np.float64], method: Literal['symmetri
 
     return X
 
-def equiv_matrix(prev: NDArray[np.float64], curr: NDArray[np.float64], threshold=0.0000001) -> bool:
+
+def equiv_matrix(
+    prev: NDArray[np.float64], 
+    curr: NDArray[np.float64], 
+    threshold=0.0000001
+) -> bool:
     """
     Check equality between two arrays. Uses the max difference as metric. 
 
@@ -88,7 +97,11 @@ def equiv_matrix(prev: NDArray[np.float64], curr: NDArray[np.float64], threshold
 
     return max_diff < threshold
 
-def calc_g_matrix(P_matrix: NDArray[np.float64], eri: NDArray[np.float64]) -> NDArray[np.float64]:
+
+def calc_g_matrix(
+    P_matrix: NDArray[np.float64], 
+    eri: NDArray[np.float64]
+) -> NDArray[np.float64]:
     """
     Calculate G matrix using: 
 
@@ -105,43 +118,32 @@ def calc_g_matrix(P_matrix: NDArray[np.float64], eri: NDArray[np.float64]) -> ND
     -------
     g_mat : NDArray[np.float64] of dimension (n, n)
         G matrix.
-
-    
-    Notes
-    ------
-    The system bust be a closed shell: n_electrons must be even. This is asserted.
-
-    Integrals must be passed and have the same dimensions. This is asserted.
-
-    Diagonalization algorithm used is np.linalg.eigh due to the matrix being symmetric.
-    
-    The algorithm steps are:
-        - Obtain transformation matrix X from S.
-        - Guess initial density matrix P.
-        - Build core Hamiltonian H_core = T + V.
-        - SCF loop:
-            - Build G matrix from P and eri.
-            - Build Fock matrix F = H_core + G.
-            - Obtain transformed Fock matrix F' = X.T @ F @ X.
-            - Diagonalize F' to obtain orbital energies and transformed MO coefficients.
-            - Obtain untransformed MO coefficients C = X @ C'.
-            - Build new density matrix P from C.
-            - Calculate RHF energy E_RHF.
-            - Check convergence.
     """
     dim = len(P_matrix)
     g_mat = np.zeros([dim, dim])
 
-    for mu in range(0, dim):
-        for nu in range(0, dim):
-            for si in range(0,dim):
-                for la in range(0, dim):
-                    g_mat[mu, nu] += P_matrix[la, si] * (eri[mu, nu, la, si] - 0.5 * eri[mu, la, nu, si])
+    term_1 = np.einsum('mnls,ls->mn', eri, P_matrix)
+    term_2 = -0.5 * np.einsum('mlns,ls->mn', eri, P_matrix)
+
+    g_mat = term_1 + term_2
+
+    return g_mat
+    
+    # legacy
+    # for mu in range(0, dim):
+    #     for nu in range(0, dim):
+    #         for si in range(0,dim):
+    #             for la in range(0, dim):
+    #                 g_mat[mu, nu] += P_matrix[la, si] * (eri[mu, nu, la, si] - 0.5 * eri[mu, la, nu, si])
 
     
-    return g_mat
+    # return g_mat
 
-def calc_p_matrix(C_matrix: NDArray[np.float64], n_electrons: int, itr=1) -> NDArray[np.float64]:
+
+def calc_p_matrix(
+    C_matrix: NDArray[np.float64], 
+    n_electrons: int
+) -> NDArray[np.float64]:
     """
     Calculate density matrix from MO coefficients using: 
 
@@ -167,23 +169,14 @@ def calc_p_matrix(C_matrix: NDArray[np.float64], n_electrons: int, itr=1) -> NDA
     P = np.zeros([dim, dim])
 
     n_occ = int(n_electrons / 2) 
-
-    # print(n_occ)
-
-    # print('\n\n\nC* matrix in the density calculation is irhhbjk:\n', np.conj(C_matrix).T)
-    # print('\nC matrix in the density calculation is:\n', C_matrix)
-
     for mu in range(0, dim):
         for nu in range(0, dim):
             for a in range(0, n_occ):
                 contr = 2 * C_matrix[mu, a] * np.conj(C_matrix[nu, a])
-                # print(f'contr is {C_matrix[mu, a]:4f} * {np.conj(C_matrix[nu, a]):4f} * 2 = {contr:4f}')
                 P[mu, nu] += contr
-                # P[mu, nu] += 2 * C_matrix[mu, a] * np.conj(C_matrix[nu, a])
-                # print(f'P[{mu}, {nu}] adding contribution from a={a}: {contr:4f}')
-    
-    # print(f'P at iteration {itr} is:\n', P)
+
     return P
+
 
 def E_0(P: NDArray[np.float64], H_core: NDArray[np.float64], F: NDArray[np.float64]) -> float:
     """
@@ -213,6 +206,7 @@ def E_0(P: NDArray[np.float64], H_core: NDArray[np.float64], F: NDArray[np.float
             energy += 0.5 * P[mu, nu] * (H_core[mu, nu] + F[mu, nu])
     
     return energy
+
 
 def V_NN(positions: NDArray[np.float64], charges: NDArray, units: Literal['Bohr', 'Angstrom'] = 'Bohr') -> float:
     """
@@ -245,7 +239,11 @@ def V_NN(positions: NDArray[np.float64], charges: NDArray, units: Literal['Bohr'
     return V_NN
 
 
-def calc_p_matrix_comp(l_matrix: NDArray[np.complex128], r_matrix: NDArray[np.complex128], n_electrons: int, itr) -> NDArray[np.complex128]:
+def calc_p_matrix_comp(
+    l_matrix: NDArray[np.complex128], 
+    r_matrix: NDArray[np.complex128], 
+    n_electrons: int
+) -> NDArray[np.complex128]:
     """
     Calculate density matrix from MO coefficients using: 
 
@@ -274,24 +272,19 @@ def calc_p_matrix_comp(l_matrix: NDArray[np.complex128], r_matrix: NDArray[np.co
 
     n_occ = int(n_electrons / 2) 
 
-    # print(n_occ)
-
-    # print('\n\n\nLeft matrix in the density calculation is:\n', l_matrix)
-    # print('\nRight matrix in the density calculation is:\n', r_matrix)
-
     for mu in range(0, dim):
         for nu in range(0, dim):
             for a in range(0, n_occ):
                 contr = 2 * r_matrix[mu, a] *  l_matrix[nu, a] 
-                # print(f'contr is {r_matrix[mu, a]:4f} * {l_matrix[nu, a]:4f} * 2 = {contr:4f}')
-                P[mu, nu] += contr# C_matrix[nu, a] # np.conj(C_matrix[nu, a])
-                # P[mu, nu] += 2 * C_matrix[mu, a] * np.conj(C_matrix[nu, a])
-                # print(f'P[{mu}, {nu}] adding contribution from a={a}: {contr:4f}')
-    # print(f'Complex P at iteration {itr} is:\n', P)
+                P[mu, nu] += contr 
+
     return P
 
 
-def calc_g_matrix_comp(P_matrix: NDArray[np.complex128], eri: NDArray[np.complex128]) -> NDArray[np.complex128]:
+def calc_g_matrix_comp(
+    P_matrix: NDArray[np.complex128], 
+    eri: NDArray[np.complex128]
+) -> NDArray[np.complex128]:
     """
     Calculate G matrix using: 
 
@@ -308,43 +301,32 @@ def calc_g_matrix_comp(P_matrix: NDArray[np.complex128], eri: NDArray[np.complex
     -------
     g_mat : NDArray[np.float64] of dimension (n, n)
         G matrix.
-
-    
-    Notes
-    ------
-    The system bust be a closed shell: n_electrons must be even. This is asserted.
-
-    Integrals must be passed and have the same dimensions. This is asserted.
-
-    Diagonalization algorithm used is np.linalg.eigh due to the matrix being symmetric.
-    
-    The algorithm steps are:
-        - Obtain transformation matrix X from S.
-        - Guess initial density matrix P.
-        - Build core Hamiltonian H_core = T + V.
-        - SCF loop:
-            - Build G matrix from P and eri.
-            - Build Fock matrix F = H_core + G.
-            - Obtain transformed Fock matrix F' = X.T @ F @ X.
-            - Diagonalize F' to obtain orbital energies and transformed MO coefficients.
-            - Obtain untransformed MO coefficients C = X @ C'.
-            - Build new density matrix P from C.
-            - Calculate RHF energy E_RHF.
-            - Check convergence.
     """
     dim = len(P_matrix)
     g_mat = np.zeros([dim, dim], dtype=np.complex128)
 
-    for mu in range(0, dim):
-        for nu in range(0, dim):
-            for si in range(0,dim):
-                for la in range(0, dim):
-                    g_mat[mu, nu] += P_matrix[la, si] * (eri[mu, nu, la, si] - 0.5 * eri[mu, la, nu, si])
+    term_1 = np.einsum('mnls,ls->mn', eri, P_matrix)
+    term_2 = -0.5 * np.einsum('mlns,ls->mn', eri, P_matrix)
 
-    
+    g_mat = term_1 + term_2
+
     return g_mat
 
-def E_0_comp(P: NDArray[np.complex128], H_core: NDArray[np.complex128], F: NDArray[np.complex128]) -> np.complex128:
+    # legacy
+    # for mu in range(0, dim):
+    #     for nu in range(0, dim):
+    #         for si in range(0,dim):
+    #             for la in range(0, dim):
+    #                 g_mat[mu, nu] += P_matrix[la, si] * (eri[mu, nu, la, si] - 0.5 * eri[mu, la, nu, si])
+
+    # return g_mat
+
+
+def E_0_comp(
+    P: NDArray[np.complex128],
+    H_core: NDArray[np.complex128],
+    F: NDArray[np.complex128]
+ ) -> np.complex128:
     """
     Calculate Hartree-Fock energy using: 
 
@@ -362,7 +344,7 @@ def E_0_comp(P: NDArray[np.complex128], H_core: NDArray[np.complex128], F: NDArr
     Returns
     -------
     energy: float
-        Hartree-Fock energy. 
+        (Complex) Hartree-Fock energy. 
     """
     energy = 0. + 0j
     dim = len(P)
@@ -371,9 +353,23 @@ def E_0_comp(P: NDArray[np.complex128], H_core: NDArray[np.complex128], F: NDArr
         for nu in range(0, dim):
             energy += 0.5 * P[mu, nu] * (H_core[mu, nu] + F[mu, nu])
     
-    return energy
+    return np.complex128(energy)
 
-def is_diagonal(matrix: NDArray):
+
+def is_diagonal(matrix: NDArray) -> bool:
+    """
+    Check if a matrix is diagonal.
+
+    Parameters
+    ----------
+    matrix : NDArray of dimension (n, n)
+        Matrix to check.
+    
+    Returns
+    -------
+    is_diag : bool
+        True if the matrix is diagonal.
+    """
     dim = len(matrix)
     ty = type(matrix[0,0])
 

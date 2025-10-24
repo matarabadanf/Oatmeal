@@ -17,6 +17,7 @@ double cartesian_from_hermite(double x, int i, int j, double Ax, double Bx, doub
 #define MIN(x, y) (((x) < (y)) ? (x) : (y))
 
 #define MATRIX_VAL(i, j, n_cols, matrix) matrix[ (i) * n_cols + (j) ]
+
 #define E 2.71828182845904523
 #define PI 3.14159265358979323
 
