@@ -12,7 +12,7 @@ data_path = Path(__file__).parent / "data"
 
 # print(data_path)
 
-mol_He= gto.M(atom = 'He 0 0 0', spin=0, charge=0, basis='aug-ccpvtz')
+mol_He= gto.M(atom = 'He 0 0 0', spin=0, charge=0, basis='aug-cc-pvtz')
 mol_He.basis = {'He': gto.basis.parse(
     '''He    S
       2.340000E+02           0.000000E+00           2.587000E-03           0.000000E+00
@@ -201,12 +201,35 @@ def CS_RHF(
 
         # print(e_values)
 
+        R_prime = np.copy(C_prime)
+        L_prime = np.linalg.inv(C_prime)
+
+        LFR = L_prime @ F_prime @ R_prime
+
+        if iter == -1:
+            print('C_prime at first iteration:\n', C_prime)
+            print('\nL_prime at first iteration:\n', L_prime)
+            print('\nR_prime at first iteration:\n', R_prime)
+            print('\nF_prime at first iteration:\n', F_prime)
+            print("\nL'F'R' at first iteration:\n", LFR)
+            print('\nEigenvalues at first iteration:\n', e_values)
+
+        assert is_diagonal(LFR), "Matrix product L' @ F' @ R' is not diagonal" 
+
         # Obtain untransformed MO coefficients
         C_munu = X @ C_prime
+        L_munu = L_prime @ X
+        R_munu = X @ R_prime
+
+        
+        if iter == -1:
+            print('\n\n\nC_munu at first iteration:\n', C_munu)
+            print('\nL_munu at first iteration:\n', L_munu)
+            print('\nR_munu at first iteration:\n', R_munu)
 
         # Build new density matrix
         P_old = np.copy(P_new)
-        P_new = calc_p_matrix_comp(C_munu, C_munu, n_electrons=n_electrons)
+        P_new = calc_p_matrix_comp(L_munu.T, R_munu, n_electrons, iter) # TODO: why do i have to transpose here??
 
         # Calculate HF energy
         E_old = E_iter
@@ -234,10 +257,11 @@ def CS_RHF(
     return converged, E_RHF, e_values, C_munu, P_new
 
 nelec = 2
-theta = 0.0
+theta = .5
 
-converged, E_elec, E_e_values, C_munu, P = CS_RHF(overlap, kin, vnuc, eri, nelec, theta, max_iter=200, threshold=1E-12, p_guess='core', verbose=False)
-print(E_elec)
+converged, E_elec_comp, E_e_values, C_munu, P = CS_RHF(overlap, kin, vnuc, eri, nelec, theta, max_iter=100, threshold=1E-12, p_guess='core', verbose=False)
 
-converged, E_elec, E_e_values, C_munu, P = RHF(overlap, kin, vnuc, eri, nelec, max_iter=200, threshold=1E-12, p_guess='core', verbose=False)
+
+converged, E_elec, E_e_values, C_munu, P = RHF(overlap, kin, vnuc, eri, nelec, max_iter=100, threshold=1E-12, p_guess='core', verbose=False)
+print('\n\n\n', E_elec_comp)
 print(E_elec)

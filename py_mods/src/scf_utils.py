@@ -141,7 +141,7 @@ def calc_g_matrix(P_matrix: NDArray[np.float64], eri: NDArray[np.float64]) -> ND
     
     return g_mat
 
-def calc_p_matrix(C_matrix: NDArray[np.float64], n_electrons: int) -> NDArray[np.float64]:
+def calc_p_matrix(C_matrix: NDArray[np.float64], n_electrons: int, itr=1) -> NDArray[np.float64]:
     """
     Calculate density matrix from MO coefficients using: 
 
@@ -170,11 +170,19 @@ def calc_p_matrix(C_matrix: NDArray[np.float64], n_electrons: int) -> NDArray[np
 
     # print(n_occ)
 
+    # print('\n\n\nC* matrix in the density calculation is irhhbjk:\n', np.conj(C_matrix).T)
+    # print('\nC matrix in the density calculation is:\n', C_matrix)
+
     for mu in range(0, dim):
         for nu in range(0, dim):
             for a in range(0, n_occ):
-                P[mu, nu] += 2 * C_matrix[mu, a] * np.conj(C_matrix[nu, a])
+                contr = 2 * C_matrix[mu, a] * np.conj(C_matrix[nu, a])
+                # print(f'contr is {C_matrix[mu, a]:4f} * {np.conj(C_matrix[nu, a]):4f} * 2 = {contr:4f}')
+                P[mu, nu] += contr
+                # P[mu, nu] += 2 * C_matrix[mu, a] * np.conj(C_matrix[nu, a])
+                # print(f'P[{mu}, {nu}] adding contribution from a={a}: {contr:4f}')
     
+    # print(f'P at iteration {itr} is:\n', P)
     return P
 
 def E_0(P: NDArray[np.float64], H_core: NDArray[np.float64], F: NDArray[np.float64]) -> float:
@@ -237,7 +245,7 @@ def V_NN(positions: NDArray[np.float64], charges: NDArray, units: Literal['Bohr'
     return V_NN
 
 
-def calc_p_matrix_comp(l_matrix: NDArray[np.complex128], r_matrix: NDArray[np.complex128], n_electrons: int) -> NDArray[np.complex128]:
+def calc_p_matrix_comp(l_matrix: NDArray[np.complex128], r_matrix: NDArray[np.complex128], n_electrons: int, itr) -> NDArray[np.complex128]:
     """
     Calculate density matrix from MO coefficients using: 
 
@@ -245,14 +253,14 @@ def calc_p_matrix_comp(l_matrix: NDArray[np.complex128], r_matrix: NDArray[np.co
 
     Parameters
     ----------
-    C_matrix : NDArray[np.float64] of dimension (n, n)
+    C_matrix : NDArray[np.complex128] of dimension (n, n)
         Overlap matrix.
     n_electrons : int
         Number of electrons.
 
     Returns
     -------
-    P : NDArray[np.float64] of dimension (n, n)
+    P : NDArray[np.complex128] of dimension (n, n)
         Density matrix.
     
     Notes
@@ -268,11 +276,18 @@ def calc_p_matrix_comp(l_matrix: NDArray[np.complex128], r_matrix: NDArray[np.co
 
     # print(n_occ)
 
+    # print('\n\n\nLeft matrix in the density calculation is:\n', l_matrix)
+    # print('\nRight matrix in the density calculation is:\n', r_matrix)
+
     for mu in range(0, dim):
         for nu in range(0, dim):
             for a in range(0, n_occ):
-                P[mu, nu] += 2 * l_matrix[mu, a] *  np.conj(r_matrix[nu, a]) # C_matrix[nu, a] # np.conj(C_matrix[nu, a])
-    
+                contr = 2 * r_matrix[mu, a] *  l_matrix[nu, a] 
+                # print(f'contr is {r_matrix[mu, a]:4f} * {l_matrix[nu, a]:4f} * 2 = {contr:4f}')
+                P[mu, nu] += contr# C_matrix[nu, a] # np.conj(C_matrix[nu, a])
+                # P[mu, nu] += 2 * C_matrix[mu, a] * np.conj(C_matrix[nu, a])
+                # print(f'P[{mu}, {nu}] adding contribution from a={a}: {contr:4f}')
+    # print(f'Complex P at iteration {itr} is:\n', P)
     return P
 
 
@@ -357,3 +372,17 @@ def E_0_comp(P: NDArray[np.complex128], H_core: NDArray[np.complex128], F: NDArr
             energy += 0.5 * P[mu, nu] * (H_core[mu, nu] + F[mu, nu])
     
     return energy
+
+def is_diagonal(matrix: NDArray):
+    dim = len(matrix)
+    ty = type(matrix[0,0])
+
+    reference = np.zeros(dim, dtype=ty)
+
+    for i in range(dim):
+        matrix[i,i] = 0
+
+    if equiv_matrix(matrix, reference):
+        return True
+    
+    return False
