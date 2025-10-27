@@ -2,6 +2,29 @@ import numpy as np
 from numpy.typing import NDArray
 from typing import Literal
 
+def validate_determinant(n_electrons: int, determinant, expected_dim: int) -> NDArray[np.int16]:
+    natural_occupation = True
+    if type(determinant) == int:
+        if determinant == -1:
+            determinant = np.zeros([expected_dim], dtype=np.int32)
+            for i in range(int(n_electrons/2)):
+                determinant[i] = 2
+        else:
+            raise TypeError('determinant must be -1 or np.ndarray([2,2,0,...])')
+
+    if type(determinant) != int:
+        natural_occupation = False
+        assert type(determinant) == np.ndarray, 'Ocupation numbers must be given in np.array([2, 2, 0, 0, ...]) format'
+        assert sum(determinant) == n_electrons,  f'determinant determinant ({sum(determinant)} electrons) does not have the same number of electrons as n_electrons ({n_electrons})'
+
+        if len(determinant) != expected_dim:
+            new_occ = np.zeros(expected_dim)
+            for i, oc in enumerate(determinant):
+                new_occ[i] = oc
+            determinant = new_occ
+
+    return determinant, natural_occupation
+
 def transformation_matrix(
     S_munu: NDArray[np.float64], 
     method: Literal['symmetric'] ='symmetric', 
@@ -238,8 +261,64 @@ def V_NN(positions: NDArray[np.float64], charges: NDArray, units: Literal['Bohr'
     
     return V_NN
 
+def kroeneker_delta(i: int, j: int) -> int:
+    if i == j:
+        return 1
+    else:
+        return 0
 
 def calc_p_matrix_comp(
+    l_matrix: NDArray[np.complex128], 
+    r_matrix: NDArray[np.complex128], 
+    n_electrons: int,
+    determinant: list[int] = None,
+    natural_occupation = False,
+) -> NDArray[np.complex128]:
+    """
+    Calculate density matrix from MO coefficients using: 
+
+    P_{mu, nu} = 2 * sum_{a}^{n_occ} C_{mu, a} * C_{nu, a}^*
+
+    Parameters
+    ----------
+    C_matrix : NDArray[np.complex128] of dimension (n, n)
+        Overlap matrix.
+    n_electrons : int
+        Number of electrons.
+
+    Returns
+    -------
+    P : NDArray[np.complex128] of dimension (n, n)
+        Density matrix.
+    
+    Notes
+    -------
+    n_occ is divided by 2 due to this being used for the RHF case.
+    """
+    dim = len(r_matrix)
+    assert len(l_matrix) == dim
+    assert n_electrons % 2 == 0, 'This only works for RHF for now'
+    
+    P = np.zeros([dim, dim], dtype=np.complex128)
+
+    if natural_occupation:
+        n_occ = int(n_electrons / 2) 
+        for mu in range(0, dim):
+            for nu in range(0, dim):
+                for a in range(0, n_occ):
+                    contr = 2 * r_matrix[mu, a] *  l_matrix[nu, a] 
+                    P[mu, nu] += contr 
+
+    else:
+        for mu in range(0, dim):
+            for nu in range(0, dim):
+                for a in range(0, dim):
+                    contr = 2 * r_matrix[mu, a] *  l_matrix[nu, a] * kroeneker_delta(2, determinant[a])
+                    P[mu, nu] += contr 
+
+    return P
+
+def calc_p_matrix_comp_legacy(
     l_matrix: NDArray[np.complex128], 
     r_matrix: NDArray[np.complex128], 
     n_electrons: int
@@ -279,7 +358,6 @@ def calc_p_matrix_comp(
                 P[mu, nu] += contr 
 
     return P
-
 
 def calc_g_matrix_comp(
     P_matrix: NDArray[np.complex128], 

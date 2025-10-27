@@ -17,6 +17,7 @@ def CS_RHF(
     eri: NDArray[np.float64], 
     n_electrons: int, 
     theta: float,
+    occupation = -1,
     max_iter: int = 100, 
     threshold: float = 1E-12, 
     p_guess: Literal['core', 'ones'] = 'core', 
@@ -86,6 +87,9 @@ def CS_RHF(
 
     # Otain transformation matrix 
     dim = len(S)
+
+    det, natural_occupation = validate_determinant(n_electrons, occupation, dim)
+
     X = transformation_matrix(S) + 0j
     # print(type(X[0][0]))
 
@@ -93,12 +97,6 @@ def CS_RHF(
     T_scaled = T * np.exp(-(0+2j) * theta)
     V_scaled = V * np.exp(-(0+1j) * theta)
     eri_scaled = eri * np.exp(-(0+1j) * theta)
-
-    # print(np.max(np.abs(T-T_scaled)))
-    # print(np.max(np.abs(V-V_scaled)))
-    # print(np.max(np.abs(eri-eri_scaled)))
-
-    # print(X)
 
     # Guess initial density matrix
     if p_guess == 'core':
@@ -167,7 +165,6 @@ def CS_RHF(
         L_munu = L_prime @ X
         R_munu = X @ R_prime
 
-        
         if iter == -1:
             print('\n\n\nC_munu at first iteration:\n', C_munu)
             print('\nL_munu at first iteration:\n', L_munu)
@@ -175,7 +172,10 @@ def CS_RHF(
 
         # Build new density matrix
         P_old = np.copy(P_new)
-        P_new = calc_p_matrix_comp(L_munu.T, R_munu, n_electrons) # TODO: why do i have to transpose here??
+        P_new = calc_p_matrix_comp(L_munu.T, R_munu, n_electrons, determinant=det, natural_occupation=natural_occupation) # TODO: why do i have to transpose here??
+
+        # print(P_old)
+        # print('\n\n\n')
 
         # Calculate HF energy
         E_old = E_iter
@@ -190,11 +190,11 @@ def CS_RHF(
     return converged, E_RHF, e_values, C_munu, P_new
 
 
-def theta_traj(max_theta, n_points, overlap, kin, vnuc, eri, nelec, th, max_iter=100, threshold=1E-12, p_guess='core', verbose=False):
+def theta_traj(max_theta, n_points, overlap, kin, vnuc, eri, nelec, th, occupation=-1, max_iter=100, threshold=1E-12, p_guess='core', verbose=False):
     thetas = np.linspace(0, max_theta, n_points)
     energies = []
     for th in thetas:
-        converged, E_elec, E_e_values, C_munu, P = CS_RHF(overlap, kin, vnuc, eri, nelec, th, max_iter, threshold, p_guess, verbose=False)
+        converged, E_elec, E_e_values, C_munu, P = CS_RHF(overlap, kin, vnuc, eri, nelec, th, occupation=occupation, max_iter=max_iter, threshold=threshold, p_guess=p_guess, verbose=verbose)
         if converged:
             energies.append(E_elec)
         if verbose and converged:
@@ -275,20 +275,38 @@ if __name__ == "__main__":
 
     nelec = 2
     theta = 0.18
+    occ = np.array([0,2,0])
 
     # even_tempered_demonstration(7.668876968794860E-002, 1.9581497063588078, 29)
 
-    converged, E_elec_comp, E_e_values, C_munu, P = CS_RHF(overlap, kin, vnuc, eri, nelec, theta, max_iter=500, threshold=1E-12, p_guess='core', verbose=True)
-    plot_theta_orbital_energies(E_e_values, theta)
+    converged, E_elec_comp, E_e_values, C_munu, P = CS_RHF(overlap, kin, vnuc, eri, nelec, theta, occupation=occ, max_iter=500, threshold=1E-12, p_guess='core', verbose=True)
+    # plot_theta_orbital_energies(E_e_values, theta, xrange=[-3, 4])
 
-    converged, E_elec, E_e_values, C_munu, P = RHF(overlap, kin, vnuc, eri, nelec, max_iter=100, threshold=1E-12, p_guess='core', verbose=False)
-    print('\n\n\nPyscf energy obtained')
-    print(' ',e_He)
-    print('Comparison between unscaled CSRHF and RHF routines\n', E_elec_comp)
-    print(' ',E_elec)
+    # converged, E_elec, E_e_values, C_munu, P = RHF(overlap, kin, vnuc, eri, nelec, max_iter=100, threshold=1E-12, p_guess='core', verbose=False)
+    # print('\n\n\nPyscf energy obtained')
+    # print(' ',e_He)
+    # print('Comparison between unscaled CSRHF and RHF routines\n', E_elec_comp)
+    # print(' ',E_elec)
 
-    traj_energies = theta_traj(0.5, 50, overlap, kin, vnuc, eri, nelec, theta, max_iter=100, threshold=1E-12, p_guess='core', verbose=True)
-    plot_theta_traj(traj_energies[1]) 
+    # traj_energies = theta_traj(0.3, 30, overlap, kin, vnuc, eri, nelec, theta, occupation=occ, max_iter=100, threshold=1E-12, p_guess='core', verbose=False)
+    # plot_theta_traj(traj_energies[1]) 
 
     # plt.plot(traj_energies[0], [en.imag for en in traj_energies[1]])
     # plt.show()
+
+    mf = scf.RHF(mol_He)
+    mf.kernel()
+
+    # Suppose you want to make an excited-state determinant
+    # e.g., promote one electron from orbital 4 to orbital 5
+    occ = mf.mo_occ.copy()
+    print(occ)
+    occ[0] = 0  # unoccupy orbital 4
+    occ[1] = 2  # occupy orbital 5 with both spins
+    mf.mo_occ = occ
+
+    # You can now compute energy with this modified determinant
+    e = mf.energy_tot()
+    occ = mf.mo_occ.copy()
+    print(occ)
+    print("Energy of modified determinant:", e) 
