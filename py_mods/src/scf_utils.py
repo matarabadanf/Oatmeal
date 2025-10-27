@@ -1,97 +1,25 @@
 import numpy as np
 from numpy.typing import NDArray
-from typing import Literal
+from typing import Literal, Optional, Union, Tuple, Sequence
 
-def validate_determinant(n_electrons: int, determinant, expected_dim: int) -> NDArray[np.int16]:
-    natural_occupation = True
-    if type(determinant) == int:
-        if determinant == -1:
-            determinant = np.zeros([expected_dim], dtype=np.int32)
-            for i in range(int(n_electrons/2)):
-                determinant[i] = 2
-        else:
-            raise TypeError('determinant must be -1 or np.ndarray([2,2,0,...])')
+# --- Linalg Utilities ---
 
-    if type(determinant) != int:
-        natural_occupation = False
-        assert type(determinant) == np.ndarray, 'Ocupation numbers must be given in np.array([2, 2, 0, 0, ...]) format'
-        assert sum(determinant) == n_electrons,  f'determinant determinant ({sum(determinant)} electrons) does not have the same number of electrons as n_electrons ({n_electrons})'
-
-        if len(determinant) != expected_dim:
-            new_occ = np.zeros(expected_dim)
-            for i, oc in enumerate(determinant):
-                new_occ[i] = oc
-            determinant = new_occ
-
-    return determinant, natural_occupation
-
-def transformation_matrix(
-    S_munu: NDArray[np.float64], 
-    method: Literal['symmetric'] ='symmetric', 
-    verbose: bool = False
-) -> NDArray[np.float64]:
-    """
-    Calculate The normalization transformation matrix X.
-
-    Uses symmetric orthogonalization. This is obtaining the matrix S^{-1/2}
-    by obtaining the diagonal form of S, s. 
-    
-    U^{dagger} @ S @ U = s
-    
-    The diagonal matrix s^{-1/2} is easily computed and to obtain S^{-1/2} we
-    use the transformation:
-    
-    X = S^{-1/2} = U @ s^{-1/2} @ U^{dagger} 
+def kroeneker_delta(i: int, j: int) -> int:
+    """Kronecker delta function.
 
     Parameters
-    ------
-    S_munu : np.ndarray of dimension (n, n)
-        Overlap matrix. 
-    method : Literal['canonical', 'symmetric']
-        Method to use for orthogonalization.ß
-    verbose : bool, optional
-        If True, prints iterations.
-    
+    ----------
+    i : int
+        First index.
+    j : int
+        Second index.
+
     Returns
-    ------
-    X : np.ndarray of dimension (n, n)
-        Transformation matrix X.
-
-    Notes 
-    ------
-    The operation S^{-1/2} @ S @ S^{-1/2} = Identity must always hold. This is asserted.
+    -------
+    int
+        1 if i equals j, otherwise 0.
     """
-    assert method in ['canonical', 'symmetric'], "method must be either 'canonical' or 'symmetric'"
-    dim = len(S_munu)
-
-    # diagonalize U.T @ S @ U = s
-    s, U = np.linalg.eigh(S_munu)
-
-    # print(s)
-
-    s_root = np.zeros([dim, dim])
-
-    # calculate s^{-0.5}
-    for index, eigenvalue in enumerate(s):
-        s_root[index,index] = 1/np.sqrt(eigenvalue)
-
-    if method == 'symmetric':
-        X = U @ s_root @ U.T
-    elif method == 'canonical':
-        X = U @ s_root
-    
-    # transformation matrix test
-    transformed = X.T @ S_munu @ X
-
-    np.savetxt(f'trans.dat', transformed)
-    
-    if verbose:
-        print(transformed)
-
-    assert equiv_matrix(transformed, np.identity(len(S_munu))), "transformation matrix calculation failed"
-
-    return X
-
+    return 1 if i == j else 0
 
 def equiv_matrix(
     prev: NDArray[np.float64], 
@@ -115,10 +43,174 @@ def equiv_matrix(
     converged : bool
         True if the maximum difference between arrays is less than threshold.
     """
-    diff = np.abs(curr - prev)
-    max_diff = np.max(diff)
+    return np.max(np.abs(curr - prev)) < threshold
 
-    return max_diff < threshold
+
+def is_diagonal(matrix: NDArray, atol: float = 1e-8) -> bool:
+    """Return True if matrix is diagonal (within numerical tolerance).
+
+    Parameters
+    ----------
+    matrix : NDArray, shape (n, n)
+        Matrix to check.
+
+    Returns
+    -------
+    is_diag : bool
+        True if off-diagonal elements are (near) zero.
+    """
+    dim = len(matrix)
+    ty = type(matrix[0,0])
+
+    reference = np.zeros(dim, dtype=ty)
+
+    for i in range(dim):
+        matrix[i,i] = 0
+
+    if equiv_matrix(matrix, reference):
+        return True
+    
+    return False
+
+
+def transformation_matrix(
+    S_munu: NDArray[np.float64], 
+    method: Literal['canonical', 'symmetric'] ='symmetric', 
+    verbose: bool = False
+) -> NDArray[np.float64]:
+    """
+    Calculate the basis transformation matrix X.
+
+    Uses symmetric or canonical orthogonalization.
+    - symmetric: X = S^{-1/2} = U @ s^{-1/2} @ U^T
+    - canonical: X = U @ s^{-1/2}
+
+    Parameters
+    ----------
+    S_munu : NDArray[np.float64], shape (n, n)
+        Overlap matrix.
+    method : {'canonical', 'symmetric'}
+        Orthogonalization method.
+    verbose : bool
+        If True prints the transformed matrix.
+
+    Returns
+    -------
+    X : NDArray[np.float64], shape (n, n)
+        Transformation matrix.
+    """
+    assert method in ['canonical', 'symmetric'], "method must be either 'canonical' or 'symmetric'"
+    dim = len(S_munu)
+
+    # diagonalize U.T @ S @ U = s
+    s, U = np.linalg.eigh(S_munu)
+
+    s_root = np.diag(1 / np.sqrt(s))
+
+    if method == 'symmetric':
+        X = U @ s_root @ U.T
+    elif method == 'canonical':
+        X = U @ s_root
+    
+    # transformation matrix test
+    transformed = X.T @ S_munu @ X
+
+    np.savetxt(f'trans.dat', transformed)
+    
+    if verbose:
+        print(transformed)
+
+    assert equiv_matrix(transformed, np.identity(len(S_munu))), "transformation matrix calculation failed"
+
+    return X
+
+
+# --- Real SCF Helper Functions ---
+
+def validate_determinant(
+    n_electrons: int,
+    determinant: Union[int, NDArray[np.int32], None],
+    expected_dim: int
+) -> Tuple[NDArray[np.int32], bool]:
+    """
+    Validate or construct an occupation-number determinant.
+
+    Parameters
+    ----------
+    n_electrons : int
+        Total number of electrons.
+    determinant : int or NDArray[np.int32] or None
+        If -1 (or None) build a default RHF occupation vector (2,2,...,0).
+        If an ndarray is provided it must sum to n_electrons.
+    expected_dim : int
+        Expected length of the determinant vector; arrays shorter are padded with zeros.
+
+    Returns
+    -------
+    determinant : NDArray[np.int32]
+        Validated (and possibly padded) occupation vector with dtype int32.
+    natural_occupation : bool
+        True if determinant was constructed as the natural (RHF) occupation.
+    """
+    natural_occupation = True
+
+    if determinant is None:
+        determinant = -1
+
+    if isinstance(determinant, int):
+        if determinant == -1:
+            determinant = np.zeros([expected_dim], dtype=np.int32)
+            for i in range(int(n_electrons / 2)):
+                determinant[i] = 2
+        else:
+            raise TypeError('determinant must be -1, None or a numpy array of occupations')
+
+    if not isinstance(determinant, np.ndarray):
+        raise TypeError('determinant must be a numpy.ndarray when not -1/None')
+
+    natural_occupation = False
+    if determinant.dtype.kind not in ('i', 'u'):
+        determinant = determinant.astype(np.int32)
+
+    if int(np.sum(determinant)) != n_electrons:
+        raise ValueError(f'determinant sum ({int(np.sum(determinant))}) != n_electrons ({n_electrons})')
+
+    if len(determinant) != expected_dim:
+        new_occ = np.zeros(expected_dim, dtype=np.int32)
+        for i, oc in enumerate(determinant):
+            if i >= expected_dim:
+                break
+            new_occ[i] = int(oc)
+        determinant = new_occ
+
+    return determinant.astype(np.int32), natural_occupation
+
+def calc_p_matrix(
+    C_matrix: NDArray[np.float64], 
+    n_electrons: int
+) -> NDArray[np.float64]:
+    """
+    Calculate the (RHF) density matrix from MO coefficients.
+
+    P_{mu, nu} = 2 * sum_{a}^{n_occ} C_{mu, a} * C_{nu, a}^*
+
+    Parameters
+    ----------
+    C_matrix : NDArray[np.float64], shape (n, n)
+        Molecular orbital coefficient matrix.
+    n_electrons : int
+        Number of electrons (must be even for RHF).
+
+    Returns
+    -------
+    P : NDArray[np.float64], shape (n, n)
+        Density matrix.
+    """
+    dim = len(C_matrix)
+    n_occ = n_electrons // 2 
+    P = 2 * np.einsum('mu,nu->mn', C_matrix[:, :n_occ], np.conj(C_matrix[:, :n_occ]))
+
+    return P
 
 
 def calc_g_matrix(
@@ -142,220 +234,194 @@ def calc_g_matrix(
     g_mat : NDArray[np.float64] of dimension (n, n)
         G matrix.
     """
-    dim = len(P_matrix)
-    g_mat = np.zeros([dim, dim])
-
-    term_1 = np.einsum('mnls,ls->mn', eri, P_matrix)
-    term_2 = -0.5 * np.einsum('mlns,ls->mn', eri, P_matrix)
-
-    g_mat = term_1 + term_2
-
-    return g_mat
-    
-    # legacy
-    # for mu in range(0, dim):
-    #     for nu in range(0, dim):
-    #         for si in range(0,dim):
-    #             for la in range(0, dim):
-    #                 g_mat[mu, nu] += P_matrix[la, si] * (eri[mu, nu, la, si] - 0.5 * eri[mu, la, nu, si])
-
-    
-    # return g_mat
-
-
-def calc_p_matrix(
-    C_matrix: NDArray[np.float64], 
-    n_electrons: int
-) -> NDArray[np.float64]:
-    """
-    Calculate density matrix from MO coefficients using: 
-
-    P_{mu, nu} = 2 * sum_{a}^{n_occ} C_{mu, a} * C_{nu, a}^*
-
-    Parameters
-    ----------
-    C_matrix : NDArray[np.float64] of dimension (n, n)
-        Overlap matrix.
-    n_electrons : int
-        Number of electrons.
-
-    Returns
-    -------
-    P : NDArray[np.float64] of dimension (n, n)
-        Density matrix.
-    
-    Notes
-    -------
-    n_occ is divided by 2 due to this being used for the RHF case.
-    """
-    dim = len(C_matrix)
-    P = np.zeros([dim, dim])
-
-    n_occ = int(n_electrons / 2) 
-    for mu in range(0, dim):
-        for nu in range(0, dim):
-            for a in range(0, n_occ):
-                contr = 2 * C_matrix[mu, a] * np.conj(C_matrix[nu, a])
-                P[mu, nu] += contr
-
-    return P
-
+    return np.einsum('mnls,ls->mn', eri, P_matrix) - 0.5 * np.einsum('mlns,ls->mn', eri, P_matrix)
 
 def E_0(P: NDArray[np.float64], H_core: NDArray[np.float64], F: NDArray[np.float64]) -> float:
     """
-    Calculate Hartree-Fock energy using: 
+    Calculate Hartree-Fock electronic energy:
 
-    E_0 = 0.5 * sum_{mu, nu} P_{mu, nu} * (H^core_{mu, nu} + F_{mu, nu})
+    E_0 = 0.5 * sum_{mu,nu} P_{mu,nu} * (H_core_{mu,nu} + F_{mu,nu})
 
     Parameters
     ----------
-    P : NDArray[np.float64] of dimension (n, n)
-        Overlap matrix.
-    H_core : NDArray[np.float64] of dimension (n, n)
-        Kinetic energy matrix.
-    F : NDArray[np.float64] of dimension (n, n)
-        Nuclear attraction matrix.
+    P : NDArray[np.float64], shape (n, n)
+        Density matrix.
+    H_core : NDArray[np.float64], shape (n, n)
+        Core Hamiltonian (kinetic + nuclear attraction).
+    F : NDArray[np.float64], shape (n, n)
+        Fock matrix.
 
     Returns
     -------
-    energy: float
-        Hartree-Fock energy. 
+    energy : float
+        Electronic Hartree-Fock energy.
     """
-    energy = 0.0
-    dim = len(P)
+    return 0.5 * np.sum(P * (H_core + F))
 
-    for mu in range(0, dim):
-        for nu in range(0, dim):
-            energy += 0.5 * P[mu, nu] * (H_core[mu, nu] + F[mu, nu])
-    
-    return energy
-
-
-def V_NN(positions: NDArray[np.float64], charges: NDArray, units: Literal['Bohr', 'Angstrom'] = 'Bohr') -> float:
+def V_NN(
+    positions: NDArray[np.float64], 
+    charges: Union[NDArray[np.int32], Sequence[int]], 
+    units: Literal['Bohr', 'Angstrom'] = 'Bohr'
+) -> float:
     """
-    Calculate nuclear repulsion energy.
+    Nuclear repulsion energy.
 
     Parameters
     ----------
-    positions : NDArray[np.float64] of dimension (n_atoms, 3)
-        Atomic positions.
-    charges : NDArray[np.int] of dimension (n_atoms,)
-        Atomic charges.
+    positions : NDArray[np.float64], shape (n_atoms, 3)
+        Atomic coordinates.
+    charges : array-like of ints, shape (n_atoms,)
+        Nuclear charges.
+    units : {'Bohr', 'Angstrom'}
+        Units of positions input. If 'Angstrom', positions are converted to Bohr.
 
     Returns
     -------
     V_NN : float
-        Nuclear repulsion energy.
+        Nuclear repulsion energy in Hartree.
     """
     if units == 'Angstrom':
         positions /= 0.529177249
-        print(positions)
 
     V_NN = 0.0
     n_atoms = len(positions)
 
     for i in range(n_atoms):
-        for j in range(i+1, n_atoms):
+        for j in range(i + 1, n_atoms):
             R_ij = np.linalg.norm(positions[i] - positions[j])
             V_NN += (charges[i] * charges[j]) / R_ij
     
     return V_NN
 
-def kroeneker_delta(i: int, j: int) -> int:
-    if i == j:
-        return 1
+
+# --- Complex SCF Helper Functions ---
+def scale_integrals(T: NDArray[np.float64], V: NDArray[np.float64], eri: NDArray[np.float64], theta: float) -> NDArray[np.complex128]:
+    """
+    Scale integrals according to the complex-scaling angle theta.
+
+    Parameters
+    ----------
+    T : NDArray[np.float64], shape (n, n)
+        Kinetic energy matrix.
+    V : NDArray[np.float64], shape (n, n)
+        Nuclear attraction matrix.
+    eri : NDArray[np.float64], shape (n, n, n, n)
+        Electron repulsion integrals.
+    theta : float
+        Complex-scaling angle (radians).
+
+    Returns
+    -------
+    T_scaled, V_scaled, eri_scaled : tuple of NDArray[np.complex128]
+        Scaled kinetic, potential and two-electron integrals.
+    """
+    exp_t2 = np.exp(-2j * theta)
+    exp_t1 = np.exp(-1j * theta)
+    return T * exp_t2, V * exp_t1, eri * exp_t1
+
+def guess_density(dim: int, method: Literal['core', 'ones']) -> NDArray[np.complex128]:
+    """Generate an initial guess density matrix.
+
+    Parameters
+    ----------
+    dim : int
+        Dimension of the basis (number of AOs).
+    method : {'core', 'ones'}
+        Method for generating the guess density.
+
+    Returns
+    -------
+    P_guess : NDArray[np.complex128], shape (dim, dim)
+        Initial guess density matrix.
+    """
+    if method == 'core':
+        P_guess = np.zeros((dim, dim), dtype=np.complex128)
+    elif method == 'ones':
+        P_guess = np.ones((dim, dim), dtype=np.complex128)
     else:
-        return 0
+        raise ValueError("Invalid method for guess density. Choose 'core' or 'ones'.")
+
+    return P_guess
+
+def diagonalize_biorthogonal(F_prime: NDArray[np.complex128]):
+    """
+    Diagonalize a (generally non-Hermitian) transformed Fock matrix F'.
+
+    Uses numpy.linalg.eig to obtain right eigenvectors; constructs left
+    eigenvectors as the inverse of the right eigenvector matrix.
+
+    Parameters
+    ----------
+    F_prime : NDArray[np.complex128], shape (n, n)
+        Transformed Fock matrix to diagonalize.
+
+    Returns
+    -------
+    e_values : NDArray[np.complex128], shape (n,)
+        Eigenvalues (orbital energies), sorted ascending.
+    C_prime : NDArray[np.complex128], shape (n, n)
+        Right eigenvector matrix whose columns are eigenvectors.
+    L_prime : NDArray[np.complex128], shape (n, n)
+        Left eigenvector matrix (inverse of C_prime).
+    R_prime : NDArray[np.complex128], shape (n, n)
+        Copy of C_prime (right eigenvectors).
+    LFR : NDArray[np.complex128], shape (n, n)
+        Product L_prime @ F_prime @ R_prime, should be diagonal.
+    """
+    e_values, C_prime = np.linalg.eig(F_prime)
+
+    idx = e_values.argsort()
+    e_values = e_values[idx]
+    C_prime = C_prime[:, idx]
+    R_prime = np.copy(C_prime)
+
+    L_prime = np.linalg.inv(C_prime)
+
+    LFR = L_prime @ F_prime @ R_prime
+
+    return e_values, C_prime, L_prime, R_prime, LFR
 
 def calc_p_matrix_comp(
     l_matrix: NDArray[np.complex128], 
     r_matrix: NDArray[np.complex128], 
     n_electrons: int,
-    determinant: list[int] = None,
-    natural_occupation = False,
+    determinant: Optional[Union[NDArray[np.int32], Sequence[int]]] = None,
+    natural_occupation: bool = False,
 ) -> NDArray[np.complex128]:
     """
-    Calculate density matrix from MO coefficients using: 
+    Calculate density matrix from biorthonormal left/right MO coefficient matrices.
 
-    P_{mu, nu} = 2 * sum_{a}^{n_occ} C_{mu, a} * C_{nu, a}^*
+    P_{mu,nu} = 2 * sum_{a in occupied} r_{mu,a} * l_{nu,a}
 
     Parameters
     ----------
-    C_matrix : NDArray[np.complex128] of dimension (n, n)
-        Overlap matrix.
+    l_matrix, r_matrix : NDArray[np.complex128], shape (n, n)
+        Left and right molecular orbital coefficient matrices (biorthonormal).
     n_electrons : int
-        Number of electrons.
+        Total number of electrons (must be even for RHF-like occupancy).
+    determinant : ndarray or sequence of ints, optional
+        Occupation vector (e.g. [2,2,0,...]) selecting which orbitals are occupied.
+        If None and natural_occupation is True a default RHF occupation is used.
+    natural_occupation : bool
+        If True ignores determinant and uses the lowest n_electrons/2 orbitals.
 
     Returns
     -------
-    P : NDArray[np.complex128] of dimension (n, n)
-        Density matrix.
-    
-    Notes
-    -------
-    n_occ is divided by 2 due to this being used for the RHF case.
+    P : NDArray[np.complex128], shape (n, n)
+        Complex density matrix.
     """
-    dim = len(r_matrix)
-    assert len(l_matrix) == dim
     assert n_electrons % 2 == 0, 'This only works for RHF for now'
     
-    P = np.zeros([dim, dim], dtype=np.complex128)
+    P = np.zeros((len(r_matrix), len(r_matrix)), dtype=np.complex128)
 
     if natural_occupation:
-        n_occ = int(n_electrons / 2) 
-        for mu in range(0, dim):
-            for nu in range(0, dim):
-                for a in range(0, n_occ):
-                    contr = 2 * r_matrix[mu, a] *  l_matrix[nu, a] 
-                    P[mu, nu] += contr 
-
+        n_occ = n_electrons // 2 
+        P += 2 * np.einsum('mu,nu->mn', r_matrix[:, :n_occ], l_matrix[:, :n_occ])
     else:
-        for mu in range(0, dim):
-            for nu in range(0, dim):
-                for a in range(0, dim):
-                    contr = 2 * r_matrix[mu, a] *  l_matrix[nu, a] * kroeneker_delta(2, determinant[a])
-                    P[mu, nu] += contr 
-
-    return P
-
-def calc_p_matrix_comp_legacy(
-    l_matrix: NDArray[np.complex128], 
-    r_matrix: NDArray[np.complex128], 
-    n_electrons: int
-) -> NDArray[np.complex128]:
-    """
-    Calculate density matrix from MO coefficients using: 
-
-    P_{mu, nu} = 2 * sum_{a}^{n_occ} C_{mu, a} * C_{nu, a}^*
-
-    Parameters
-    ----------
-    C_matrix : NDArray[np.complex128] of dimension (n, n)
-        Overlap matrix.
-    n_electrons : int
-        Number of electrons.
-
-    Returns
-    -------
-    P : NDArray[np.complex128] of dimension (n, n)
-        Density matrix.
-    
-    Notes
-    -------
-    n_occ is divided by 2 due to this being used for the RHF case.
-    """
-    dim = len(r_matrix)
-    assert len(l_matrix) == dim
-    
-    P = np.zeros([dim, dim], dtype=np.complex128)
-
-    n_occ = int(n_electrons / 2) 
-
-    for mu in range(0, dim):
-        for nu in range(0, dim):
-            for a in range(0, n_occ):
-                contr = 2 * r_matrix[mu, a] *  l_matrix[nu, a] 
-                P[mu, nu] += contr 
+        for mu in range(len(r_matrix)):
+            for nu in range(len(r_matrix)):
+                for a in range(len(r_matrix)):
+                    P[mu, nu] += 2 * r_matrix[mu, a] * l_matrix[nu, a] * kroeneker_delta(2, determinant[a])
 
     return P
 
@@ -380,25 +446,7 @@ def calc_g_matrix_comp(
     g_mat : NDArray[np.float64] of dimension (n, n)
         G matrix.
     """
-    dim = len(P_matrix)
-    g_mat = np.zeros([dim, dim], dtype=np.complex128)
-
-    term_1 = np.einsum('mnls,ls->mn', eri, P_matrix)
-    term_2 = -0.5 * np.einsum('mlns,ls->mn', eri, P_matrix)
-
-    g_mat = term_1 + term_2
-
-    return g_mat
-
-    # legacy
-    # for mu in range(0, dim):
-    #     for nu in range(0, dim):
-    #         for si in range(0,dim):
-    #             for la in range(0, dim):
-    #                 g_mat[mu, nu] += P_matrix[la, si] * (eri[mu, nu, la, si] - 0.5 * eri[mu, la, nu, si])
-
-    # return g_mat
-
+    return np.einsum('mnls,ls->mn', eri, P_matrix) - 0.5 * np.einsum('mlns,ls->mn', eri, P_matrix)
 
 def E_0_comp(
     P: NDArray[np.complex128],
@@ -406,57 +454,23 @@ def E_0_comp(
     F: NDArray[np.complex128]
  ) -> np.complex128:
     """
-    Calculate Hartree-Fock energy using: 
+    Complex-valued Hartree-Fock energy:
 
-    E_0 = 0.5 * sum_{mu, nu} P_{mu, nu} * (H^core_{mu, nu} + F_{mu, nu})
-
-    Parameters
-    ----------
-    P : NDArray[np.float64] of dimension (n, n)
-        Overlap matrix.
-    H_core : NDArray[np.float64] of dimension (n, n)
-        Kinetic energy matrix.
-    F : NDArray[np.float64] of dimension (n, n)
-        Nuclear attraction matrix.
-
-    Returns
-    -------
-    energy: float
-        (Complex) Hartree-Fock energy. 
-    """
-    energy = 0. + 0j
-    dim = len(P)
-
-    for mu in range(0, dim):
-        for nu in range(0, dim):
-            energy += 0.5 * P[mu, nu] * (H_core[mu, nu] + F[mu, nu])
-    
-    return np.complex128(energy)
-
-
-def is_diagonal(matrix: NDArray) -> bool:
-    """
-    Check if a matrix is diagonal.
+    E_0 = 0.5 * sum_{mu,nu} P_{mu,nu} * (H_core_{mu,nu} + F_{mu,nu})
 
     Parameters
     ----------
-    matrix : NDArray of dimension (n, n)
-        Matrix to check.
-    
+    P : NDArray[np.complex128], shape (n, n)
+        Density matrix (complex).
+    H_core : NDArray[np.complex128], shape (n, n)
+        Core Hamiltonian (complex).
+    F : NDArray[np.complex128], shape (n, n)
+        Fock matrix (complex).
+
     Returns
     -------
-    is_diag : bool
-        True if the matrix is diagonal.
+    energy : np.complex128
+        Complex electronic energy.
     """
-    dim = len(matrix)
-    ty = type(matrix[0,0])
+    return np.sum(P * (H_core + F)) * 0.5
 
-    reference = np.zeros(dim, dtype=ty)
-
-    for i in range(dim):
-        matrix[i,i] = 0
-
-    if equiv_matrix(matrix, reference):
-        return True
-    
-    return False

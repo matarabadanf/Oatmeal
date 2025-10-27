@@ -1,12 +1,22 @@
-import numpy as np 
+import numpy as np
 from py_mods.src.RHF import RHF
-from py_mods.src.scf_utils import * 
+from py_mods.src.scf_utils import (
+    validate_determinant,
+    transformation_matrix,
+    equiv_matrix,
+    calc_g_matrix_comp,
+    calc_p_matrix_comp,
+    E_0_comp,
+    is_diagonal,
+    guess_density,
+    diagonalize_biorthogonal,
+    scale_integrals
+)
 from pyscf import gto, scf
 from pathlib import Path
 from numpy.typing import NDArray
-from typing import Literal, Tuple
-import matplotlib.pyplot as plt 
-import scipy
+from typing import Literal, Optional, Union, Tuple, Sequence
+import matplotlib.pyplot as plt
 
 from py_mods.src.basis_utils import even_temp_uncontr_str, even_tempered_demonstration
 
@@ -17,7 +27,7 @@ def CS_RHF(
     eri: NDArray[np.float64], 
     n_electrons: int, 
     theta: float,
-    occupation = -1,
+    occupation: Union[int, NDArray[np.int32], None] = None,
     max_iter: int = 100, 
     threshold: float = 1E-12, 
     p_guess: Literal['core', 'ones'] = 'core', 
@@ -26,61 +36,48 @@ def CS_RHF(
     """
     Perform a Complex Scaled RHF calculation.
 
-    Takes S, T, V and eri matrix elements and computes the RHF procedure. 
-
-    Introduces complex scaling by an angle theta. 
+    Takes overlap, kinetic, nuclear attraction and two-electron integrals,
+    applies complex scaling by angle `theta` and runs an RHF-like SCF loop
+    using biorthogonal diagonalization.
 
     Parameters
     ----------
-    S : NDArray[np.float64] of dimension (n, n)
+    S : NDArray[np.float64], shape (n, n)
         Overlap matrix.
-    T : NDArray[np.float64] of dimension (n, n)
+    T : NDArray[np.float64], shape (n, n)
         Kinetic energy matrix.
-    V : NDArray[np.float64] of dimension (n, n)
+    V : NDArray[np.float64], shape (n, n)
         Nuclear attraction matrix.
-    eri : NDArray[np.float64] of dimension (n, n, n, n)
+    eri : NDArray[np.float64], shape (n, n, n, n)
         Electron repulsion integrals.
     n_electrons : int
-        Number of electrons.
+        Total number of electrons (must be even for closed-shell RHF).
+    theta : float
+        Complex-scaling angle (radians).
+    occupation : int or NDArray[np.int32] or None
+        If -1 (or None) build a default RHF occupation vector (2,2,...,0).
+        If an ndarray is provided it must sum to n_electrons.
     max_iter : int, optional
-        Maximum number of SCF iterations.
+        Maximum SCF iterations.
     threshold : float, optional
-        Convergence threshold for max density matrix diff.
-    p_guess : Literal['core'], optional
-        Initial density matrix guess.
+        Convergence threshold for density matrix difference.
+    p_guess : {'core', 'ones'}, optional
+        Initial density guess.
     verbose : bool, optional
-        If True, prints iterations.
+        If True print iteration progress.
 
     Returns
     -------
-    Tuple containing:
-        - converged (bool): Convergence status.
-        - E_RHF (float): Final RHF energy.
-        - e_values (NDArray[np.float64][n, n]): Orbital energies.
-        - C_munu (NDArray[np.float64][n, n]): Molecular orbital coefficients.
-        - P (NDArray[np.float64][n, n]): Final density matrix.
-    
-    Notes
-    ------
-    The system bust be a closed shell: n_electrons must be even. This is asserted.
-
-    Integrals must be passed and have the same dimensions. This is asserted.
-
-    Diagonalization algorithm used is np.linalg.eigh due to the matrix being symmetric.
-    
-    The algorithm steps are:
-        - Obtain transformation matrix X from S.
-        - Guess initial density matrix P.
-        - Build core Hamiltonian H_core = T + V.
-        - SCF loop:
-            - Build G matrix from P and eri.
-            - Build Fock matrix F = H_core + G.
-            - Obtain transformed Fock matrix F' = X.T @ F @ X.
-            - Diagonalize F' to obtain orbital energies and transformed MO coefficients.
-            - Obtain untransformed MO coefficients C = X @ C'.
-            - Build new density matrix P from C.
-            - Calculate RHF energy E_RHF.
-            - Check convergence.
+    converged : bool
+        True if SCF converged within max_iter.
+    E_RHF : complex
+        Final complex electronic energy (Hartree).
+    e_values : NDArray[np.complex128], shape (n,)
+        Orbital energies (possibly complex).
+    C_munu : NDArray[np.complex128], shape (n, n)
+        Molecular orbital coefficients (untransformed).
+    P_new : NDArray[np.complex128], shape (n, n)
+        Final density matrix.
     """
     assert len(T) == len(V) == len(S), "Matrices T, V, S must have the same dimensions"
     assert n_electrons % 2 == 0, "RHF can only be closed-shell systems"
@@ -94,21 +91,12 @@ def CS_RHF(
     # print(type(X[0][0]))
 
     # rescaling the integrals
-    T_scaled = T * np.exp(-(0+2j) * theta)
-    V_scaled = V * np.exp(-(0+1j) * theta)
-    eri_scaled = eri * np.exp(-(0+1j) * theta)
+    T_scaled, V_scaled, eri_scaled = scale_integrals(T, V, eri, theta)
+    H_core = T_scaled + V_scaled
 
     # Guess initial density matrix
-    if p_guess == 'core':
-        P = np.zeros([dim, dim], dtype=np.complex128)
-    elif p_guess == 'ones':
-        P = np.ones([dim, dim], dtype=np.complex128)
-    
-    P_old = np.zeros([dim, dim], dtype=np.complex128)
-    P_new = np.copy(P)
-
-    # Build core Hamiltonian
-    H_core = T_scaled + V_scaled
+    P_new = guess_density(dim, p_guess)
+    P_old = np.copy(P_new)
 
     E_iter = 0+0j
     Delta_E = 0+0j
@@ -137,27 +125,8 @@ def CS_RHF(
         F_prime = X @ F @ X.T
 
         # Diagonalize transformed Fock matrix to obtain energies and transformed MO coefficients
-        e_values, C_prime = np.linalg.eig(F_prime) # here is eig because we are in the scaled case
+        e_values, C_prime, L_prime, R_prime, LFR = diagonalize_biorthogonal(F_prime)
 
-        idx = e_values.argsort()
-        e_values = e_values[idx]
-        C_prime = C_prime[:,idx]
-
-        # to explore tomorrow. We need to look at biorthogonal solutions. 
-        R_prime = np.copy(C_prime)
-        L_prime = np.linalg.inv(C_prime)
-
-        LFR = L_prime @ F_prime @ R_prime
-
-        if iter == -1:
-            print('C_prime at first iteration:\n', C_prime)
-            print('\nL_prime at first iteration:\n', L_prime)
-            print('\nR_prime at first iteration:\n', R_prime)
-            print('\nF_prime at first iteration:\n', F_prime)
-            print("\nL'F'R' at first iteration:\n", LFR)
-            print('\nEigenvalues at first iteration:\n', e_values)
-
-        # print(LFR)
         assert is_diagonal(LFR), "Matrix product L' @ F' @ R' is not diagonal" 
 
         # Obtain untransformed MO coefficients
@@ -165,17 +134,9 @@ def CS_RHF(
         L_munu = L_prime @ X
         R_munu = X @ R_prime
 
-        if iter == -1:
-            print('\n\n\nC_munu at first iteration:\n', C_munu)
-            print('\nL_munu at first iteration:\n', L_munu)
-            print('\nR_munu at first iteration:\n', R_munu)
-
         # Build new density matrix
         P_old = np.copy(P_new)
         P_new = calc_p_matrix_comp(L_munu.T, R_munu, n_electrons, determinant=det, natural_occupation=natural_occupation) # TODO: why do i have to transpose here??
-
-        # print(P_old)
-        # print('\n\n\n')
 
         # Calculate HF energy
         E_old = E_iter
@@ -190,7 +151,32 @@ def CS_RHF(
     return converged, E_RHF, e_values, C_munu, P_new
 
 
-def theta_traj(max_theta, n_points, overlap, kin, vnuc, eri, nelec, th, occupation=-1, max_iter=100, threshold=1E-12, p_guess='core', verbose=False):
+def theta_traj(max_theta, n_points, overlap, kin, vnuc, eri, nelec, occupation=-1, max_iter=100, threshold=1E-12, p_guess='core', verbose=False):
+    """
+    Sample CS_RHF energies along a theta trajectory.
+
+    Parameters
+    ----------
+    max_theta : float
+        Maximum theta to sample (radians).
+    n_points : int
+        Number of points along the trajectory.
+    overlap, kin, vnuc, eri : NDArray
+        Integral arrays passed to CS_RHF.
+    nelec : int
+        Number of electrons.
+    occupation : int or array-like, optional
+        Occupation vector or -1 for default.
+    max_iter, threshold, p_guess, verbose : optional
+        SCF control parameters forwarded to CS_RHF.
+
+    Returns
+    -------
+    thetas : NDArray
+        Array of sampled theta values.
+    energies : list
+        List of complex energies for converged points.
+    """
     thetas = np.linspace(0, max_theta, n_points)
     energies = []
     for th in thetas:
@@ -203,6 +189,18 @@ def theta_traj(max_theta, n_points, overlap, kin, vnuc, eri, nelec, th, occupati
     return thetas, energies
 
 def plot_theta_traj(energies):
+    """
+    Plot the complex energy trajectory (Im vs Re) for a list of energies.
+
+    Parameters
+    ----------
+    energies : sequence of complex
+        Energies to plot.
+
+    Returns
+    -------
+    None
+    """
     reals = [energy.real for energy in energies]
     imags = [energy.imag for energy in energies]
     plt.plot(reals, imags, marker='o')
@@ -217,6 +215,22 @@ def plot_theta_traj(energies):
     plt.show()
 
 def plot_theta_orbital_energies(energies, theta, xrange=[0,0]):
+    """
+    Scatter plot of orbital energies (Im vs Re).
+
+    Parameters
+    ----------
+    energies : sequence of complex
+        Orbital energies.
+    theta : float
+        Theta value used (for title).
+    xrange : sequence, optional
+        x-axis limits for filtering/zooming. Default disables filtering.
+
+    Returns
+    -------
+    None
+    """
     reals = [energy.real for energy in energies]
     imags = [energy.imag for energy in energies]
     if xrange != [0,0]:
@@ -237,76 +251,4 @@ def plot_theta_orbital_energies(energies, theta, xrange=[0,0]):
 
 
 if __name__ == "__main__":
-
-    data_path = Path(__file__).parent / "data"
-
-    # print(data_path)
-
-    mol_He= gto.M(atom = 'He 0 0 0', spin=0, charge=0, basis='aug-cc-pvqz')
-
-    He_tempered_str = even_temp_uncontr_str('He', 'S', 7.668876968794860E-002, 1.9581497063588078, 29)
-    # print(He_tempered_str)
-    mol_He.basis = {'He': gto.basis.parse(He_tempered_str)}
-
-    mol_He.build()
-
-    # print(mol_He.basis)
-
-
-    kin = mol_He.intor('int1e_kin')
-    vnuc = mol_He.intor('int1e_nuc')
-    overlap = mol_He.intor('int1e_ovlp')
-    eri = mol_He.intor('int2e')
-
-
-    # np.savetxt(f'{data_path}/He_kin_ccpvdz.dat', kin)
-    # np.savetxt(f'{data_path}/He_vnuc_ccpvdz.dat', vnuc)
-    # np.savetxt(f'{data_path}/He_S_ccpvdz.dat', overlap)
-    # np.save(f'{data_path}/He_eri_ccpvdz.npy', eri) # cannot He savetxt, has to He np binary
-    
-
-    rhf_He = scf.RHF(mol_He)
-    e_He = rhf_He.kernel()
-
-    # np.save('../He_e_hf_ccpvdz', e_He)
-
-    # print(e_He)
-
-
-    nelec = 2
-    theta = 0.18
-    occ = np.array([0,2,0])
-
-    # even_tempered_demonstration(7.668876968794860E-002, 1.9581497063588078, 29)
-
-    converged, E_elec_comp, E_e_values, C_munu, P = CS_RHF(overlap, kin, vnuc, eri, nelec, theta, occupation=occ, max_iter=500, threshold=1E-12, p_guess='core', verbose=True)
-    # plot_theta_orbital_energies(E_e_values, theta, xrange=[-3, 4])
-
-    # converged, E_elec, E_e_values, C_munu, P = RHF(overlap, kin, vnuc, eri, nelec, max_iter=100, threshold=1E-12, p_guess='core', verbose=False)
-    # print('\n\n\nPyscf energy obtained')
-    # print(' ',e_He)
-    # print('Comparison between unscaled CSRHF and RHF routines\n', E_elec_comp)
-    # print(' ',E_elec)
-
-    # traj_energies = theta_traj(0.3, 30, overlap, kin, vnuc, eri, nelec, theta, occupation=occ, max_iter=100, threshold=1E-12, p_guess='core', verbose=False)
-    # plot_theta_traj(traj_energies[1]) 
-
-    # plt.plot(traj_energies[0], [en.imag for en in traj_energies[1]])
-    # plt.show()
-
-    mf = scf.RHF(mol_He)
-    mf.kernel()
-
-    # Suppose you want to make an excited-state determinant
-    # e.g., promote one electron from orbital 4 to orbital 5
-    occ = mf.mo_occ.copy()
-    print(occ)
-    occ[0] = 0  # unoccupy orbital 4
-    occ[1] = 2  # occupy orbital 5 with both spins
-    mf.mo_occ = occ
-
-    # You can now compute energy with this modified determinant
-    e = mf.energy_tot()
-    occ = mf.mo_occ.copy()
-    print(occ)
-    print("Energy of modified determinant:", e) 
+    pass
