@@ -212,18 +212,26 @@ def plot_theta_traj(energies):
     plt.ticklabel_format(style='sci', axis='both', scilimits=(0,0))
     # plt.axhline(y=0, color='k', linestyle='-', alpha=0.3)
     # plt.axvline(x=0, color='k', linestyle='-', alpha=0.3)
+    plt.ticklabel_format(style='sci')
     plt.grid(True, alpha=0.3)
     plt.show()
 
-def plot_theta_orbital_energies(energies, theta):
+def plot_theta_orbital_energies(energies, theta, xrange=[0,0]):
     reals = [energy.real for energy in energies]
     imags = [energy.imag for energy in energies]
+    if xrange != [0,0]:
+        plt.xlim(xrange)
+        reals = [re for re in reals if re < xrange[1]]
+        imags = imags[0:len(reals)]
+
     plt.scatter(reals, imags, marker='o')
     plt.xlabel('Re(Orbital Energies)')
     plt.ylabel('Im(Orbital Energies)')
+    plt.ticklabel_format(style='sci')
     plt.title(f'Complex Scaled RHF Orbital Energies at Theta={theta}')
     plt.axhline(y=0, color='k', linestyle='-', alpha=0.3)
     plt.axvline(x=0, color='k', linestyle='-', alpha=0.3)
+
     plt.grid(True, alpha=0.3)
     plt.show()
 
@@ -266,7 +274,7 @@ if __name__ == "__main__":
 
 
     nelec = 2
-    theta = 0.0
+    theta = 0.18
 
     # even_tempered_demonstration(7.668876968794860E-002, 1.9581497063588078, 29)
 
