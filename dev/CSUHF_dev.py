@@ -271,7 +271,7 @@ if __name__ == "__main__":
     # even_tempered_demonstration(7.668876968794860E-002, 1.9581497063588078, 29)
 
     converged, E_elec_comp, E_e_values, C_munu, P = CS_RHF(overlap, kin, vnuc, eri, nelec, theta, max_iter=500, threshold=1E-12, p_guess='core', verbose=True)
-    # plot_theta_orbital_energies(E_e_values, theta)
+    plot_theta_orbital_energies(E_e_values, theta)
 
     converged, E_elec, E_e_values, C_munu, P = RHF(overlap, kin, vnuc, eri, nelec, max_iter=100, threshold=1E-12, p_guess='core', verbose=False)
     print('\n\n\nPyscf energy obtained')
@@ -279,5 +279,8 @@ if __name__ == "__main__":
     print('Comparison between unscaled CSRHF and RHF routines\n', E_elec_comp)
     print(' ',E_elec)
 
-    # traj_energies = theta_traj(0.5, 50, overlap, kin, vnuc, eri, nelec, theta, max_iter=100, threshold=1E-12, p_guess='core', verbose=False)
-    # plot_theta_traj(traj_energies[1]) 
+    traj_energies = theta_traj(0.5, 50, overlap, kin, vnuc, eri, nelec, theta, max_iter=100, threshold=1E-12, p_guess='core', verbose=True)
+    plot_theta_traj(traj_energies[1]) 
+
+    # plt.plot(traj_energies[0], [en.imag for en in traj_energies[1]])
+    # plt.show()

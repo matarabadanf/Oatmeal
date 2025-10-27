@@ -36,6 +36,18 @@ def test_Li() -> None:
     assert converged, "Calculation did not converge"
     assert abs(E_hf - E_hf_sto3g_li) < 1E-8, f"SCF energy does not match reference value {E_hf} != {E_hf_sto3g_li}"
 
+def test_He() -> None:
+    S_ccpvdz_He    = np.loadtxt(f'{data_path}/He_S_ccpvdz.dat')
+    T_ccpvdz_He    = np.loadtxt(f'{data_path}/He_kin_ccpvdz.dat')
+    V_ccpvdz_He    = np.loadtxt(f'{data_path}/He_vnuc_ccpvdz.dat')
+    eri_ccpvdz_He  = np.load(f'{data_path}/He_eri_ccpvdz.npy')
+    E_hf_ccpvdz_He = np.load(f'{data_path}/He_e_hf_ccpvdz.npy')
+
+    # test: SCF convergence for He in ccpvdz
+    converged, E_hf, E_e_values, C_munu, P = RHF(S_ccpvdz_He, T_ccpvdz_He, V_ccpvdz_He, eri_ccpvdz_He, n_electrons=2, max_iter=100, threshold=1E-14, p_guess='core', verbose=False)
+    assert converged, "Calculation did not converge"
+    assert abs(E_hf - E_hf_ccpvdz_He) < 1E-8, f"SCF energy does not match reference value {E_hf} != {E_hf_ccpvdz_He}"
+
 def test_Be() -> None:
     S_ccpvdz_Be    = np.loadtxt(f'{data_path}/Be_S_ccpvdz.dat')
     T_ccpvdz_Be    = np.loadtxt(f'{data_path}/Be_kin_ccpvdz.dat')
