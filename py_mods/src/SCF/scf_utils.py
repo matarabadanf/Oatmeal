@@ -31,9 +31,9 @@ def equiv_matrix(
 
     Parameters
     ------
-    prev : NDArray[np.float64] of dimension (n, n)
+    prev : NDArray[np.float64], shape (n, n)
         Previous array to compare.
-    curr : NDArray[np.float64] of dimension (n, n)
+    curr : NDArray[np.float64], shape (n, n)
         Current array to compare.
     threshold : float
         Convergence threshold.

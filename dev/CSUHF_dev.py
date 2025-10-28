@@ -1,6 +1,6 @@
 import numpy as np
 from py_mods.src.SCF.RHF import RHF
-from py_mods.src.integrals.scf_utils import (
+from py_mods.src.SCF.scf_utils import (
     validate_determinant,
     transformation_matrix,
     equiv_matrix,
@@ -12,13 +12,10 @@ from py_mods.src.integrals.scf_utils import (
     diagonalize_biorthogonal,
     scale_integrals
 )
-from pyscf import gto, scf
-from pathlib import Path
-from numpy.typing import NDArray
-from typing import Literal, Optional, Union, Tuple, Sequence
-import matplotlib.pyplot as plt
 
-from py_mods.src.SCF.basis_utils import even_temp_uncontr_str, even_tempered_demonstration
+from numpy.typing import NDArray
+from typing import Literal, Union, Tuple
+import matplotlib.pyplot as plt
 
 def CS_RHF(
     S: NDArray[np.float64],

@@ -1,7 +1,7 @@
 import numpy as np
 from numpy.typing import NDArray
 from typing import Literal, Tuple
-from py_mods.src.integrals.scf_utils import transformation_matrix, equiv_matrix, calc_g_matrix, calc_p_matrix, E_0
+from py_mods.src.SCF.scf_utils import transformation_matrix, equiv_matrix, calc_g_matrix, calc_p_matrix, E_0
 
 def RHF(
     S: NDArray[np.float64],
