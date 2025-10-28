@@ -1,6 +1,6 @@
 import ctypes
 from pathlib import Path
-from py_mods.src._c_importer import get_lib_ext
+from py_mods.src._interfaces._c_importer import get_lib_ext
 
 lib_folder = Path(__file__).parent.parent / "c_libs"
 ext = get_lib_ext()
