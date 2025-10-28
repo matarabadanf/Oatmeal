@@ -13,15 +13,15 @@ class Primitive:
         Center coordinates (3D vector)
     exp : float
         Gaussian exponent
-    l : int
+    angular_momentum : int
         Angular momentum quantum number
     norm : float
         Normalization coefficient
     """
-    def __init__(self, R: NDArray[np.float64], exp: float,  l: int, norm: float):
+    def __init__(self, R: NDArray[np.float64], exp: float,  angular_momentum: int, norm: float):
         self.exp = float(exp)
         self.R = np.asarray(R, dtype=np.float64)
-        self.angular_momentum = l
+        self.angular_momentum = angular_momentum
         self.norm = float(norm)
         
         if self.R.shape != (3,):

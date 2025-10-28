@@ -12,7 +12,7 @@ class Contracted:
     primitives: list[Primitive]
     c_coeff: list[float]
 
-    def __init__(self, R: np.ndarray, exps: list[float], c_coeff: list[float], angular_momentum: int) -> None:
+    def __init__(self, R: np.ndarray, exps: list[float], d_coeff: list[float], angular_momentum: int) -> None:
         """
         Parameters
         ----------
@@ -20,14 +20,16 @@ class Contracted:
             Center of the basis function (length 3).
         exps : List[float]
             Gaussian exponents (a_i) for each primitive.
-        c_coeff : List[float]
+        d_coeff : List[float]
             Contraction coefficients (d_i) for each primitive.
         angular_momentum : int
             Total angular momentum l.
         """
+        assert len(exps) == len(d_coeff), 'Number of exponents and expansion coefficients must be the same.'
+
         self.n_primitives = len(exps)
         self.angular_momentum = angular_momentum
-        self.c_coeff = c_coeff
+        self.d_coeff = d_coeff
 
         self.normalization_constants = [1.0 for _ in exps]
 
@@ -36,15 +38,18 @@ class Contracted:
             Primitive(R=np.array(R, dtype=float),
                       exp=exp,
                       angular_momentum=angular_momentum,
-                      normalization_constant=norm)
+                      norm=norm)
             for exp, norm in zip(exps, self.normalization_constants)
         ]
 
-        for i, prim in enumerate(self.primitives):
-            N_a = N_const(prim)
-            prim.normalization_constant = N_a
-            self.normalization_constants[i] = N_a
-            self.c_coeff[i] = N_a * c_coeff[i]
+        # enforce normalization in the inner primitives for later function calls
+        self.normalization_constants = np.array([N_const(basis) for basis in self.primitives])
+        for i, _ in enumerate(self.primitives):
+            self.primitives[i].norm = self.normalization_constants[i]
+
+        # define the linear expansion coefficients 
+        self.c_coeff = np.array([self.d_coeff[i] * self.normalization_constants[i] for i in range(self.n_primitives)])
+
 
 
 def normalize(basis: Primitive) -> None:

@@ -45,7 +45,7 @@ def obara_saika_bottom_up(Ax: float, Bx: float, a: float, b: float, i: int, j: i
     Implements the recursive relations described in Helgaker, Jørgensen &
     Olsen, *Molecular Electronic-Structure Theory*, Ch. 9.
     """
-    max_dim = max(i,j)
+    max_dim = max(i,j) + 1
 
     if i == j:
         max_dim += 1
@@ -114,8 +114,10 @@ def S_1D(Ax: float, Bx: float, a: float, b: float, i: int, j: int) -> float:
     """
     if i*j == 0 and i != j:
         return 0
+    
+    result = float(obara_saika_bottom_up(Ax, Bx, a, b, i, j)[i][j]) # TODO: something fishy here
 
-    return float(obara_saika_bottom_up(Ax, Bx, a, b, i, j)[i][j])
+    return result
 
 
 def kinetic_energy_integrals(Ax: float, Bx: float, a: float, b: float, ii: int, jj: int) -> float:

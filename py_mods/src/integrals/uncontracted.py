@@ -4,8 +4,12 @@ from dataclasses import dataclass
 from py_mods.src.integrals.internal.coulomb_utils import h_ab_Z
 from py_mods.src.integrals.primitive import Primitive
 from py_mods.src.integrals.internal.ST_utils import S_1D, kinetic_energy_integrals
+from typing import Tuple
+# from py_mods.src.integrals.basis_set import Contracted
 
-def N_const(basis: Primitive) -> float:
+# --- Normalization and projection utilities ---
+
+def N_const(basis: Primitive) -> float: # TODO: the issue is here
     """
     Calculate normalization constant of a Primitive.
 
@@ -25,7 +29,7 @@ def N_const(basis: Primitive) -> float:
         N_A : float
             normalization constant.
     """
-    projection = np.array([basis.angular_momentum,0,0])
+    projection = np.array([basis.angular_momentum, 0, 0])
 
     S_3d = S_3D(basis, projection, basis, projection)
     N_A = 1.0 / np.sqrt(S_3d)
@@ -102,7 +106,7 @@ def orthogonal(i:int, j:int) -> bool:
         return True
 
 
-##################################
+# --- Overlap 3D with primitives ---
 def S_3D_components(basis_1: Primitive, projection_1: np.ndarray, basis_2: Primitive, projection_2: np.ndarray) -> np.ndarray:
     """
     Compute the three Cartesian components of the 3D overlap between two primitive functions.
@@ -131,14 +135,13 @@ def S_3D_components(basis_1: Primitive, projection_1: np.ndarray, basis_2: Primi
         1D numpy array of shape (3,) with the overlap components [S_x, S_y, S_z].
         If the projection vectors are orthogonal and both l1 and l2 are nonzero,
         returns numpy.array([0, 0, 0]).
+
+    Notes 
+    -------
+        - We will do it this way for now, since we have to test for d functions. 
+        It is true that the calculation of the three 1d overlaps might be redundant, 
+        but it must be checked out. 
     """
-    scalar_product = np.dot(projection_1, projection_2)
-    l1 = basis_1.angular_momentum
-    l2 = basis_2.angular_momentum
-
-    if scalar_product == 0 and l1 != 0 and l2 != 0:
-        return np.array([0,0,0])
-
     # If there is overlap calculate it
     R_a = basis_1.R
     R_b = basis_2.R
@@ -146,14 +149,10 @@ def S_3D_components(basis_1: Primitive, projection_1: np.ndarray, basis_2: Primi
     alpha = basis_1.exp
     beta = basis_2.exp
 
-    a, c, e = projection_1
-    b, d, f = projection_2
-
     overlap_components = np.zeros(3)
 
     for comp, _ in enumerate(overlap_components):
-        # if not orthogonal(projection_1[comp], projection_2[comp]):
-            overlap_components[comp] = S_1D(R_a[comp], R_b[comp], alpha, beta, projection_1[comp], projection_2[comp])
+        overlap_components[comp] = S_1D(R_a[comp], R_b[comp], alpha, beta, projection_1[comp], projection_2[comp])
 
     return overlap_components
 
@@ -182,6 +181,9 @@ def S_3D(basis_1: Primitive, projection_1, basis_2: Primitive, projection_2) -> 
     S_ab, S_cd, S_ef =  S_3D_components(basis_1, projection_1, basis_2, projection_2)
 
     return S_ab * S_cd * S_ef
+
+
+# --- Kinetic 3D with primitives ---
 
 def T_3D(basis_1: Primitive, projection_1: np.ndarray, basis_2: Primitive, projection_2: np.ndarray) -> float:
     """
@@ -242,40 +244,9 @@ def calculate_primitive_dimension(basis_list: list[Primitive]):
     return [project_dim(basis.angular_momentum) for basis in basis_list]
 
 
-def calc_S_uncontracted(contracted_basis_1: list[Primitive], contracted_basis_2: list[Primitive]):
-    # for now we will asume that the selection rule responsability is elsewhere
-    # and focus on the projection aspect rather.
-    # therefore the basis introduced in this functions must have the same l
+# --- Overlap and Kinetic 3D primitive matrices ---
 
-    projections = project(contracted_basis_1[0].angular_momentum)
-
-    angular_dimension = len(projections)
-
-    dim_1 = len(projections*len(contracted_basis_1))
-
-    S_prim_mat = np.zeros([dim_1, dim_1])
-    T_prim_mat = np.zeros([dim_1, dim_1])
-
-
-    for p1, projection_1 in enumerate(projections):
-        for p2, projection_2 in enumerate(projections):
-
-            # print(projection_1, projection_2)
-
-            if projection_1 != projection_2:
-                continue
-
-            l_index_1 = p1 * angular_dimension
-            l_index_2 = p2 * angular_dimension
-
-            for i, primitive in enumerate(contracted_basis_1):
-                for j, primitive_2 in enumerate(contracted_basis_2):
-                    s_ab, s_cd, s_ef = S_3D_components(primitive, projection_1, primitive_2, projection_2)
-                    S_prim_mat[l_index_1 + i][l_index_2 + j] = s_ab * s_cd * s_ef
-                    T_prim_mat[l_index_1 + i][l_index_2 + j] = T_3D(primitive, projection_1, primitive_2, projection_2)
-
-    return S_prim_mat, T_prim_mat
-
+# --- Potential 3D primitive matrices ---
 def calc_V_uncontracted(contracted_basis_1: list[Primitive], contracted_basis_2: list[Primitive], charge, atom_position):
     # for now we will asume that the selection rule responsability is elsewhere
     # and focus on the projection aspect rather.
@@ -305,38 +276,4 @@ def calc_V_uncontracted(contracted_basis_1: list[Primitive], contracted_basis_2:
 
 if __name__ == '__main__':
     pass 
-    # # Primitives for tests
-    # basis_1 = Primitive(np.array([0,0,0]), 0.5, 0, 1)
-    # basis_2 = Primitive(np.array([0,0,0]), 0.5, 0, 1)
-    # normalize(basis_1)
-    # normalize(basis_2)
 
-    # # Test 1: self overlap 
-    # self_overlap = basis_1.normalization_constant ** 2 * S_3D(basis_1, np.array([0,0,0]), basis_1, np.array([0,0,0]))
-    # assert abs(self_overlap - 1) < 0.000001, f"Self overlap test failed: value is {self_overlap}, should be 1"
-
-    # # Test 2: different projection overlap 
-    # diff_l = basis_1.normalization_constant ** 2 * S_3D(basis_1, np.array([0,0,0]), basis_1, np.array([1,0,0]))
-    # assert diff_l == 0, f"Different l overlap test failed: value is {diff_l}, should be 0"
-
-    # # New primitives for further tests:
-    # basis_1 = Primitive(np.array([0,0,0]), 0.5, 1, 1)
-    # basis_2 = Primitive(np.array([0,0,0]), 0.5, 1, 1)
-    # # normalize(basis_1)
-    # # normalize(basis_2)
-
-    # # Test 3: Kinetic energy with different l:
-    # t_test = T_3D(basis_1, np.array([1,0,0]), basis_2, np.array([0,0,0]))
-    # assert abs(t_test-0) < 0.0000001, f"Kinetic energy different l test failed: value is {t_test}, should be 0"
-
-    # # Test 4: Kinetic energy with same l:
-    # t_test = T_3D(basis_1, np.array([1,0,0]), basis_2, np.array([1,0,0]))
-    # assert abs(t_test-3.4802049980198166) < 0.0000001 , f"Kinetic energy same l test failed: value is {t_test}, should be 3.4802049980198166"
-
-    # # test contraction 
-    # alphas = [3.42525091, 0.62391373, 0.16885540]
-    # d =      [0.15432897, 0.53532814, 0.44463454]
-
-    # sto_3g_1s_h1 = Contracted(np.array([0,0,0]), alphas, d, 0)
-
-    # # print(sto_3g_1s_h1.c_coeff)
