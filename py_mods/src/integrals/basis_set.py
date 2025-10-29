@@ -42,15 +42,38 @@ class Contracted:
             for exp, norm in zip(exps, self.normalization_constants)
         ]
 
+        consts = []
+
+        for primitive in self.primitives:
+            red_projs = _reduced_projections(primitive.angular_momentum) # _reduced_projections(primitive.angular_momentum)
+            for index, proj in enumerate(red_projs):
+                const =  N_const(primitive, proj) 
+                consts.append(const) 
+                primitive.norm[index] = const
+
         # enforce normalization in the inner primitives for later function calls
-        self.normalization_constants = np.array([N_const(basis) for basis in self.primitives])
-        for i, _ in enumerate(self.primitives):
-            self.primitives[i].norm = self.normalization_constants[i]
+        self.normalization_constants = np.array(consts).reshape(self.n_primitives, -1).T
 
-        # define the linear expansion coefficients 
-        self.c_coeff = np.array([self.d_coeff[i] * self.normalization_constants[i] for i in range(self.n_primitives)])
+        # we define the c_coefficients for the different internal angular momentum 
+        # posibilities. For example, in the case of l = 2, there are two 
+        # cartesian types of combinations: [2,0,0] and [1,1,0]. Therefore we need 
+        # both to define correctly the overlaps contractions and so on 
+        self.c_coeff = self.normalization_constants * self.d_coeff
+
+        # this array will help because later when we calculate matrix elements
+        # we can map the mu nu to the expansion coefficient. 
+        self.coeff_guide = _coeff_indices(self.angular_momentum)
 
 
+def _coeff_indices(l: int) -> list[int]:
+    if l == 0:
+        return [0]
+    elif l == 1:
+        return [0,0,0]
+    elif l == 2: 
+        return [0,0,0,1,1,1]
+    elif l == 3:
+        return [0,0,0,1,1,1,1,1,1,2]
 
 def normalize(basis: Primitive) -> None:
     """
@@ -70,3 +93,44 @@ def normalize(basis: Primitive) -> None:
     """
     norm = N_const(basis)
     basis.normalization_constant = norm
+
+def _norm_helper(l):
+    return l if l > 1 else 1
+
+def _reduced_projections(l):
+    if l == 0:
+        return [[0,0,0]]
+    elif l == 1:
+        return [[1,0,0]]
+    elif l == 2:
+        return [[2,0,0], [1,1,0]]
+    elif l == 3:
+        return [[3,0,0], [2,1,0], [1,1,1]]
+    else:
+        return []
+
+def _project_internal(l: int) -> list[list[int]]:
+    """
+    Return projections with total angular momentum l.
+
+
+    Parameters
+    ------
+    l : int
+        total angular momentum.
+
+    Returns
+    ------
+    projections : list[list[int]]
+        all possible projections with total angular momentum l.
+    """
+    if l == 0:
+        return [[0,0,0]]
+    elif l == 1:
+        return [[1,0,0], [0,1,0], [0,0,1]]
+    elif l == 2:
+        return [[2,0,0], [0,2,0], [0,0,2], [1,1,0], [0,1,1], [1,0,1]]
+    elif l == 3:
+        return [[3,0,0], [0,3,0], [0,0,3], [2,1,0], [0,2,1], [1,0,2], [2,0,1], [1,2,0], [0,1,2], [1,1,1]]
+    else:
+        return []

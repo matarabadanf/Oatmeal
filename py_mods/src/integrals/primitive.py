@@ -22,9 +22,14 @@ class Primitive:
         self.exp = float(exp)
         self.R = np.asarray(R, dtype=np.float64)
         self.angular_momentum = angular_momentum
-        self.norm = float(norm)
+        self.norm = np.array([norm for i in range(_norm_helper(self.angular_momentum))]) # np.ones(_norm_helper(self.angular_momentum))
         
         if self.R.shape != (3,):
             raise ValueError("R must be a 3D vector")
-        
+
+
+def _norm_helper(l):
+    return l if l > 1 else 1
+
+
 

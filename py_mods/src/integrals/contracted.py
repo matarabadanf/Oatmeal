@@ -1,34 +1,12 @@
+from calendar import c
+from email import message
 import numpy as np
 from numpy.typing import NDArray
 from typing import Tuple, List, Union
-from py_mods.src.integrals.uncontracted import S_3D, T_3D, calc_V_uncontracted, project, project_dim
+from py_mods.src.integrals.internal.coulomb_utils import h_ab_Z
+from py_mods.src.integrals.uncontracted import S_3D, T_3D, project, project_dim
 from py_mods.src.integrals.primitive import Primitive
 from py_mods.src.integrals.basis_set import Contracted
-
-def contracted_matrix_element(uncontracted_matrix, c_mu, c_nu) -> float:
-# Now looping over the size of the matrices:
-    contr_prop = 0.0
-
-    max_p = len(c_mu)
-    max_q = len(c_nu)
-
-    # print(f'max_p = {max_p}, max_q = {max_q}')
-    # print(uncontracted_matrix)
-
-    for p in range(max_p):
-        for q in range(max_q):
-            contr_prop += c_mu[p] * c_nu[q] * uncontracted_matrix[p][q]
-
-    return contr_prop
-
-def extend_contraction_coefficients(c_mu: list, projection_dim:int) -> List:
-    extended_c_mu = []
-    for dim in range(projection_dim):
-        # print(f'Since dimension is {project_dim}')
-        sublist = c_mu
-        # print(f'I will add {sublist}')
-        extended_c_mu.extend(sublist)
-    return extended_c_mu
 
 def mu_to_primitive_map(l_dim):
     map_list = []
@@ -36,47 +14,7 @@ def mu_to_primitive_map(l_dim):
         map_list.extend([i] * dim)
     return map_list
 
-# --- Contracted Overlap and Kinetic energy ---
 
-def ST_sub_matrix_contracted(cont_1: Contracted, proj_1: NDArray[np.int64], cont_2: Contracted, proj_2: NDArray[np.int64]) -> float:
-    """
-    Calculate the contracted overlap and kinetic energy matrix elements.
-
-    Parameters
-    ----------
-    contracted_basis_1 : list[Primitive]
-        List of Primitive objects for the first contracted basis function.
-    contracted_basis_2 : list[Primitive]
-        List of Primitive objects for the second contracted basis function.
-    c_mu : list[float]
-        Contraction coefficients for the first contracted basis function.
-    c_nu : list[float]
-        Contraction coefficients for the second contracted basis function.
-    
-    Returns
-    -------
-    tuple
-
-    """
-    c_mu = cont_1.c_coeff
-    c_nu = cont_2.c_coeff
-
-    prim_mu = cont_1.primitives
-    prim_nu = cont_2.primitives
-
-    overlap = 0.0
-    kinetic = 0.0  
-
-    for i, prim_i in enumerate(prim_mu):
-        for j, prim_j in enumerate(prim_nu):
-
-            S_ij = S_3D(prim_i, proj_1, prim_j, proj_2) # TODO: there is a bug for d 
-            T_ij = T_3D(prim_i, proj_1, prim_j, proj_2) 
-
-            overlap += c_mu[i] * c_nu[j] * S_ij
-            kinetic += c_mu[i] * c_nu[j] * T_ij
-
-    return overlap, kinetic
 
 def check_orthogonality(mu: NDArray[np.int64]) -> NDArray[np.bool]:
     """
@@ -121,11 +59,25 @@ def check_ortho_projection(l_projs: List[List[int]], l_truth_matrix: NDArray[np.
 
     return truth_matrix
 
+def plot_truth_matrix(truth_matrix: NDArray[np.bool], lab='l') -> None:
+    import matplotlib.pyplot as plt
+
+    plt.imshow(truth_matrix, cmap='gray', interpolation='nearest')
+    plt.title(f'{lab} orthogonality Truth Matrix')
+    plt.xlabel('Basis Function Index')
+    plt.ylabel('Basis Function Index')
+    plt.colorbar(label='Orthogonal (True/False)')
+    plt.show()
+
+################################################
+# --- Contracted Overlap and Kinetic energy ---#
+################################################
 
 def ST_contracted(basis_or_data: Union[
         List[Contracted],
-        Tuple[List[int], List[List[Primitive]], List[List[float]]]
-    ]
+        Tuple[List[int], List[List[Primitive]], List[List[float]]],
+    ],
+    graph=False
 ) -> Tuple[NDArray[np.float64], NDArray[np.float64]]:
     """
     Calculate the contracted overlap and kinetic energy matrices.
@@ -158,7 +110,7 @@ def ST_contracted(basis_or_data: Union[
 
     # get the dimensions of each contracted basis. This is that s will be 1, p 3, d 6, ...
     l_dim = [project_dim(primitives[i][0].angular_momentum) for i in range(len(n_primitives))]
-
+    
     # get the projections of each contracted basis. Same as before, because we will need them.
     l_projs = [project(primitives[i][0].angular_momentum) for i in range(len(n_primitives))]
 
@@ -168,12 +120,17 @@ def ST_contracted(basis_or_data: Union[
     # this takes space, but it is nice to have the matrix. can be later removed.
     l_mu = np.array([sum(proj) for proj in l_projs], dtype=np.int64)
     calculate_element = check_orthogonality(l_mu)
-
+    if graph:
+        plot_truth_matrix(calculate_element)
     # same here
     calculate_element = check_ortho_projection(l_projs, calculate_element)
-
+    if graph:
+        plot_truth_matrix(calculate_element, 'projection')
     # The contracted matrix will be as large as the total number of projections. 
     size_mat = sum(l_dim)
+
+    contraction_guides = [contracted.coeff_guide for contracted in basis_or_data]
+    contraction_guides = [item for sublist in contraction_guides for item in sublist]
 
     S_contracted_matrix = np.zeros([size_mat, size_mat])
     T_contracted_matrix = np.zeros([size_mat, size_mat])
@@ -201,93 +158,160 @@ def ST_contracted(basis_or_data: Union[
             proj_1 = np.array(l_projs[mu])
             proj_2 = np.array(l_projs[nu])
 
-            cont_1 = basis_or_data[i]
-            cont_2 = basis_or_data[j]
+            contracted_1 = basis_or_data[i]
+            contracted_2 = basis_or_data[j]
 
-            s, t = ST_sub_matrix_contracted(cont_1, proj_1, cont_2, proj_2)
+            guide_1 = contraction_guides[mu]
+            guide_2 = contraction_guides[nu]
+
+            s, t = ST_sub_matrix_contracted(contracted_1, proj_1, guide_1, contracted_2, proj_2, guide_2)
             S_contracted_matrix[mu][nu] = s
             T_contracted_matrix[mu][nu] = t
 
     return S_contracted_matrix, T_contracted_matrix
 
-# --- Contracted Coulomb nuclear energy ---
 
-def V_sub_matrix_contracted(contracted_basis_1: list[Primitive], contracted_basis_2: list[Primitive], c_mu: list[float], c_nu: list[float], charge, atom_position):
+def ST_sub_matrix_contracted(cont_1: Contracted, proj_1: NDArray[np.int64], guide_1: int, cont_2: Contracted, proj_2: NDArray[np.int64], guide_2: int) -> float:
+    """
+    Calculate the contracted overlap and kinetic energy matrix elements.
 
-    V_sub_matrix_uncontracted = calc_V_uncontracted(contracted_basis_1, contracted_basis_2, charge, atom_position)
+    Parameters
+    ----------
+    contracted_basis_1 : list[Primitive]
+        List of Primitive objects for the first contracted basis function.
+    contracted_basis_2 : list[Primitive]
+        List of Primitive objects for the second contracted basis function.
+    c_mu : list[float]
+        Contraction coefficients for the first contracted basis function.
+    c_nu : list[float]
+        Contraction coefficients for the second contracted basis function.
+    
+    Returns
+    -------
+    tuple
 
-    l_projections = project_dim(contracted_basis_1[0].angular_momentum)
+    """
+    c_mu = cont_1.c_coeff[guide_1]
+    c_nu = cont_2.c_coeff[guide_2]
 
-    dimension = len(contracted_basis_1) * l_projections
+    prim_mu = cont_1.primitives
+    prim_nu = cont_2.primitives
 
-    # print(f'Angular momentum is {contracted_basis_1[0].angular_momentum}')
-    # print(f'Dimension is {dimension}')
+    overlap = 0.0
+    kinetic = 0.0  
 
-    c_mu_extended = extend_contraction_coefficients(c_mu, l_projections)
-    c_nu_extended = extend_contraction_coefficients(c_nu, l_projections)
+    for i, prim_i in enumerate(prim_mu):
+        for j, prim_j in enumerate(prim_nu):
 
-    # print(S_sub_matrix_uncontracted[0])
-    # print(c_mu_extended)
-    # print(c_nu_extended)
+            S_ij = S_3D(prim_i, proj_1, prim_j, proj_2) # TODO: there is a bug for d 
+            T_ij = T_3D(prim_i, proj_1, prim_j, proj_2) 
 
-    return contracted_matrix_element(V_sub_matrix_uncontracted, c_mu_extended, c_nu_extended)
+            overlap += c_mu[i] * c_nu[j] * S_ij
+            kinetic += c_mu[i] * c_nu[j] * T_ij
 
-def V_contracted(n_primitives: list[int], primitives: list[list[Primitive]], contraction_coefficients: list[list[float]], nuclear_charge, position):
+    return overlap, kinetic
 
+################################################
+# ---   Contracted Coulomb nuclear energy   ---#
+################################################
+
+def V_contracted(
+        basis_or_data: Union[
+            List[Contracted],
+            Tuple[List[int], List[List[Primitive]], List[List[float]]]
+        ],
+        nuclear_charge, 
+        atom_position,
+        graph=False,
+) -> NDArray[np.float64]:
+    
+    if isinstance(basis_or_data, list) and all(isinstance(b, Contracted) for b in basis_or_data):
+        n_primitives = [b.n_primitives for b in basis_or_data]
+        primitives = [b.primitives for b in basis_or_data]
+        contraction_coefficients = [b.c_coeff for b in basis_or_data]
+    
+    elif isinstance(basis_or_data, tuple) and len(basis_or_data) == 3:
+        n_primitives, primitives, contraction_coefficients = basis_or_data
+    
+    else:
+        raise TypeError('Arguments for ST_contracted must be either a list of Contracted or a tuple')
+
+    # get the dimensions of each contracted basis. This is that s will be 1, p 3, d 6, ...
     l_dim = [project_dim(primitives[i][0].angular_momentum) for i in range(len(n_primitives))]
+    
+    # get the projections of each contracted basis. Same as before, because we will need them.
     l_projs = [project(primitives[i][0].angular_momentum) for i in range(len(n_primitives))]
 
-    l_projs = [item for sublist in l_projs for item in sublist]
+    # Previous is a list of lists, now it is a flat list, associated with a certain l_dim
+    l_projs = np.array([np.array(item) for sublist in l_projs for item in sublist])
 
-
-    #print(l_projs)
-
-    #print(f'ldim is {l_dim}')
+    # this takes space, but it is nice to have the matrix. can be later removed.
+    l_mu = np.array([sum(proj) for proj in l_projs], dtype=np.int64)
+    calculate_element = check_orthogonality(l_mu)
+    if graph:
+        plot_truth_matrix(calculate_element)
+    # same here
+    calculate_element = check_ortho_projection(l_projs, calculate_element)
+    if graph:
+        plot_truth_matrix(calculate_element, 'projection')
+    # The contracted matrix will be as large as the total number of projections. 
     size_mat = sum(l_dim)
 
-    #print(f'size is {size_mat}')
+    contraction_guides = [contracted.coeff_guide for contracted in basis_or_data]
+    contraction_guides = [item for sublist in contraction_guides for item in sublist]
 
     V_contracted_matrix = np.zeros([size_mat, size_mat])
 
-    #print(S_contracted_matrix)
-
+    # this function is a helper. Since we have expanded the dimension to the projection
+    # number, this function generates a list that maps each mu to the dimension. 
+    # for example with 1s, 2s, 2p, the map is [0, 1, 2, 2, 2] indicating that 
+    # first index corresponds to first contractedm second to second and last 
+    # three to the different projections of the third contracted. 
     prim_map = mu_to_primitive_map(l_dim)
 
-    # print(f'prim_map is {prim_map}\n\n\n')
-
-    # here we have implemented ALL selection rules. It can be improved but
+    # Start to do pairs. 
     for mu in range(size_mat):
         for nu in range(size_mat):
 
+            # Determine if evaluate element
+            if not calculate_element[mu,nu]:
+                continue
+
+            # If the ME has to be calculated, determine the primitive that it corresponds to
             i = prim_map[mu]
             j = prim_map[nu]
 
-            if primitives[i][0].angular_momentum != primitives[j][0].angular_momentum:
-                continue
+            # get what are the projections
+            proj_1 = np.array(l_projs[mu])
+            proj_2 = np.array(l_projs[nu])
 
-            p1 = np.array(l_projs[mu])
-            p2 = np.array(l_projs[nu])
+            contracted_1 = basis_or_data[i]
+            contracted_2 = basis_or_data[j]
 
-            sum_1 = sum(p1)
-            sum_2 = sum(p2)
+            guide_1 = contraction_guides[mu]
+            guide_2 = contraction_guides[nu]
 
-            # print(f'p1 is {p1}, p2 is {p2}')
-            # print(f'i is {i}, j is {j}')
-
-            scalar_product = np.dot(p1, p2)
-
-            # print(f'scalar product is {scalar_product}')
-            # print(f'sum_1 is {sum_1}, sum_2 is {sum_2}')
-
-            if scalar_product == 0 and not sum_1 == sum_2 == 0:
-                continue
-
-            else:
-                V_contracted_matrix[mu][nu] = V_sub_matrix_contracted(primitives[i], primitives[j], contraction_coefficients[i], contraction_coefficients[j], nuclear_charge, position)
-
-                # Same as before. Should work, but there must be a better way
-
-                V_contracted_matrix[mu][nu] /= l_dim[prim_map[mu]]
+            v = V_sub_matrix_contracted(contracted_1, proj_1, guide_1, contracted_2, proj_2, guide_2, nuclear_charge, atom_position)
+            V_contracted_matrix[mu][nu] = v
 
     return V_contracted_matrix
+
+def V_sub_matrix_contracted(cont_1: Contracted, proj_1: NDArray[np.int64], guide_1: int, cont_2: Contracted, proj_2: NDArray[np.int64], guide_2: int, charge, atom_position):
+
+    c_mu = cont_1.c_coeff[guide_1]
+    c_nu = cont_2.c_coeff[guide_2]
+
+    prim_mu = cont_1.primitives
+    prim_nu = cont_2.primitives
+
+    V = 0 
+
+    for i, prim_i in enumerate(prim_mu):
+        for j, prim_j in enumerate(prim_nu):
+
+            V_ij = h_ab_Z(prim_i, proj_1, prim_j, proj_2, 1, charge, atom_position) 
+
+            V += c_mu[i] * c_nu[j] * V_ij
+
+    return V
 

@@ -112,8 +112,8 @@ def S_1D(Ax: float, Bx: float, a: float, b: float, i: int, j: int) -> float:
     is not the same. For example an s function and a p function have 0 overlap
     due to orthogonality. 
     """
-    if i*j == 0 and i != j:
-        return 0
+    # if i*j == 0 and i != j:
+    #     return 0
     
     result = float(obara_saika_bottom_up(Ax, Bx, a, b, i, j)[i][j]) # TODO: something fishy here
 
