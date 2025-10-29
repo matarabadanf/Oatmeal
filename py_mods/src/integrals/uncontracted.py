@@ -1,5 +1,4 @@
 import numpy as np
-from py_mods.src.integrals.internal.coulomb_utils import h_ab_Z
 from py_mods.src.integrals.primitive import Primitive
 from py_mods.src.integrals.internal.ST_utils import S_1D, kinetic_energy_integrals
 

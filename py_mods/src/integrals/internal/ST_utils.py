@@ -245,3 +245,6 @@ def kinetic_energy_integrals(Ax: float, Bx: float, a: float, b: float, ii: int, 
     T_ij = kinetic_energy[ii][jj]
 
     return float(T_ij)
+
+if __name__ == '__main__':
+    pass 

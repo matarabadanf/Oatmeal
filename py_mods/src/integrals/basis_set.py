@@ -94,9 +94,6 @@ def normalize(basis: Primitive) -> None:
     norm = N_const(basis)
     basis.normalization_constant = norm
 
-def _norm_helper(l):
-    return l if l > 1 else 1
-
 def _reduced_projections(l):
     if l == 0:
         return [[0,0,0]]
@@ -109,28 +106,5 @@ def _reduced_projections(l):
     else:
         return []
 
-def _project_internal(l: int) -> list[list[int]]:
-    """
-    Return projections with total angular momentum l.
-
-
-    Parameters
-    ------
-    l : int
-        total angular momentum.
-
-    Returns
-    ------
-    projections : list[list[int]]
-        all possible projections with total angular momentum l.
-    """
-    if l == 0:
-        return [[0,0,0]]
-    elif l == 1:
-        return [[1,0,0], [0,1,0], [0,0,1]]
-    elif l == 2:
-        return [[2,0,0], [0,2,0], [0,0,2], [1,1,0], [0,1,1], [1,0,1]]
-    elif l == 3:
-        return [[3,0,0], [0,3,0], [0,0,3], [2,1,0], [0,2,1], [1,0,2], [2,0,1], [1,2,0], [0,1,2], [1,1,1]]
-    else:
-        return []
+if __name__ == '__main__':
+    pass 
