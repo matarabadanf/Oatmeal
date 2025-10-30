@@ -110,8 +110,9 @@ def RHF(
             if verbose:
                 print(f'{iter:5}     {E_iter:25.16f}     {Delta_E:25.16f}')
                 print(f'Convergence achieved after {iter} iterations. Final SCF energy = {E_iter}')
-
-            break
+                
+            E_RHF = E_iter
+            return converged, E_RHF, e_values, C_munu, P_new
         
         # Obtain G matrix from P and eris. Build Fock matrix
         G = calc_g_matrix(P_new, eri)

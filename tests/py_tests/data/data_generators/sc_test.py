@@ -13,9 +13,9 @@ eri = mol_Be.intor('int2e')
 
 # print(overlap)
 
-print(overlap[5][5:14])
+# print(overlap[5][5:14])
 
-plt.imshow(overlap, cmap='viridis', interpolation='nearest')
-plt.colorbar(label='Value')
-plt.title('Heatmap of Sc def2-SVP [5s,3p,2d,1f]')
-plt.show()
+# plt.imshow(overlap, cmap='viridis', interpolation='nearest')
+# plt.colorbar(label='Value')
+# plt.title('Heatmap of Sc def2-SVP [5s,3p,2d,1f]')
+# plt.show()

@@ -385,7 +385,7 @@ def calc_p_matrix_comp(
     l_matrix: NDArray[np.complex128], 
     r_matrix: NDArray[np.complex128], 
     n_electrons: int,
-    determinant: Optional[Union[NDArray[np.int32], Sequence[int]]] = None,
+    determinant: Optional[Union[NDArray[np.int32]]] = None,
     natural_occupation: bool = False,
 ) -> NDArray[np.complex128]:
     """
@@ -417,11 +417,10 @@ def calc_p_matrix_comp(
     if natural_occupation:
         n_occ = n_electrons // 2 
         P += 2 * np.einsum('mu,nu->mn', r_matrix[:, :n_occ], l_matrix[:, :n_occ])
-    else:
-        for mu in range(len(r_matrix)):
-            for nu in range(len(r_matrix)):
-                for a in range(len(r_matrix)):
-                    P[mu, nu] += 2 * r_matrix[mu, a] * l_matrix[nu, a] * kroeneker_delta(2, determinant[a])
+        return P 
+    
+    mask = (determinant == 2).astype(float) # is the fast way to check the delta instead
+    P = 2 * np.einsum('ma,na,a->mn', r_matrix, l_matrix, mask)
 
     return P
 
