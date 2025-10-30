@@ -67,3 +67,6 @@ Oatmeal.egg-info
 
 # make and cmake
 *build
+
+*eri*
+*trans.dat
