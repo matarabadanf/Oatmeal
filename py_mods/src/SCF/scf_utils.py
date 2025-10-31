@@ -379,6 +379,8 @@ def diagonalize_biorthogonal(F_prime: NDArray[np.complex128]):
 
     LFR = L_prime @ F_prime @ R_prime
 
+    assert is_diagonal(LFR), "LFR is not diagonal. Check."
+
     return e_values, C_prime, L_prime, R_prime, LFR
 
 def calc_p_matrix_comp(
@@ -386,7 +388,7 @@ def calc_p_matrix_comp(
     r_matrix: NDArray[np.complex128], 
     n_electrons: int,
     determinant: Optional[Union[NDArray[np.int32]]] = None,
-    natural_occupation: bool = False,
+    natural_occupation: bool = True,
 ) -> NDArray[np.complex128]:
     """
     Calculate density matrix from biorthonormal left/right MO coefficient matrices.
@@ -411,15 +413,21 @@ def calc_p_matrix_comp(
         Complex density matrix.
     """
     assert n_electrons % 2 == 0, 'This only works for RHF for now'
+
+    if determinant is not None:
+        natural_occupation == False
     
     P = np.zeros((len(r_matrix), len(r_matrix)), dtype=np.complex128)
 
+    # If no determinant is provided, just build it. 
     if natural_occupation:
         n_occ = n_electrons // 2 
-        P += 2 * np.einsum('mu,nu->mn', r_matrix[:, :n_occ], l_matrix[:, :n_occ])
-        return P 
+        determinant_conf = [2 for _ in (n_occ)]
+        determinant_pre = [0 for _ in (len(r_matrix)-n_occ)]
+        determinant = np.array(determinant_conf.extend(determinant_pre))
     
-    mask = (determinant == 2).astype(float) # is the fast way to check the delta instead
+    # build a mask that is the delta_ij
+    mask = (determinant == 2).astype(float) # the mask is a vector of 0 and 1 so it can be used in einsum
     P = 2 * np.einsum('ma,na,a->mn', r_matrix, l_matrix, mask)
 
     return P
