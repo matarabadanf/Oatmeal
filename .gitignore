@@ -63,3 +63,10 @@ dkms.conf
 .conda
 .pytest_cache
 Oatmeal.egg-info
+.mypy_cache
+
+# make and cmake
+*build
+
+*eri*
+*trans.dat
