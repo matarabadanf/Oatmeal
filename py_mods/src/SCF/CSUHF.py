@@ -1,5 +1,4 @@
 import numpy as np
-from py_mods.src.SCF.RHF import RHF
 from py_mods.src.SCF.scf_utils import (
     validate_determinant,
     transformation_matrix,
@@ -98,25 +97,29 @@ def CS_RHF(
     E_iter = 0+0j
     Delta_E = 0+0j
     converged = False
+    Error = 13
 
     if verbose:
-        print('-'*95)
-        print('|   Iter   |               E_iter                  |                   Delta_e                |')
-        print('-'*95)
+        print('-'*128)
+        print('|   Iter   |               E_iter                  |                       Delta_e                   |        norm(e_i)        |')
+        print('-'*128)
 
     # SCF loop
     for iter in range(max_iter):
-        if iter != 0 and equiv_matrix(P_new, P_old, threshold=threshold):
+        if iter != 0 and Error < threshold:
             converged = True
             if verbose:
-                print(f'{iter:5}     {E_iter:25.16f}     {Delta_E:25.16f}')
-                print(f'Convergence achieved after {iter} iterations. Final SCF energy = {E_iter}')
+                print(f'Convergence achieved after {iter-1} iterations. Final SCF energy = {E_iter}')
 
             break
         
         # Obtain G matrix from P and eris. Build Fock matrix
         G = calc_g_matrix_comp(P_new, eri_scaled)
         F = G + H_core
+
+        if iter > 0:
+            Error_vec = (S @ P_new @ F - F @ P_new @ S).flatten()
+            Error = np.sqrt(Error_vec @ Error_vec)
 
         # Obtain transformed Fock matrix 
         F_prime = X @ F @ X.T
@@ -141,7 +144,7 @@ def CS_RHF(
         Delta_E = E_iter - E_old
 
         if verbose:
-            print(f'{iter:5}     {E_iter:25.16f}     {Delta_E:25.16f}')
+            print(f'{iter:5}     {E_iter:25.16f}     {Delta_E:45.16f}     {Error:8.4E}')
 
     E_RHF = E_iter
 

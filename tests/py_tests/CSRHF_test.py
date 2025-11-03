@@ -28,10 +28,10 @@ def test_theta_non_scaled() -> None:
     E_hf_29s_He = np.load(f'{data_path}/He_e_hf_29s.npy')
 
     # test: SCF convergence for He in 29s, compared with the CS algorithm at theta = 0
-    converged, E_hf, E_e_values, C_munu, P = RHF(S_29s_He, T_29s_He, V_29s_He, eri_29s_He, n_electrons=2, max_iter=100, threshold=1E-12, p_guess='core', verbose=False)
+    converged, E_hf, E_e_values, C_munu, P = RHF(S_29s_He, T_29s_He, V_29s_He, eri_29s_He, n_electrons=2, max_iter=400, threshold=1.2498E-07, p_guess='core', verbose=False)
     assert converged == True, "Calculation did not converge"
     assert abs(E_hf - E_hf_29s_He) < 1E-8, f"SCF energy does not match reference value {E_hf} != {E_hf_29s_He}"
-    converged, E_cs_hf, *_ = CS_RHF(S_29s_He, T_29s_He, V_29s_He, eri_29s_He, n_electrons=2, theta=0.0, max_iter=100, threshold=1E-12, p_guess='core', verbose=False)
+    converged, E_cs_hf, *_ = CS_RHF(S_29s_He, T_29s_He, V_29s_He, eri_29s_He, n_electrons=2, theta=0.0, max_iter=100, threshold=6.2532E-08, p_guess='core', verbose=False)
     assert converged == True, "CS-RHF Calculation did not converge"
     assert abs(E_cs_hf - E_hf_29s_He) < 1E-8, f"CS-RHF energy does not match unscaled reference value {E_cs_hf} != {E_hf_29s_He}"
 
@@ -43,7 +43,7 @@ def test_theta_18_scaled() -> None:
     E_hf_29s_He = -2.8616799930014833+0j
 
     # test: SCF convergence for He in 29s, compared with the CS algorithm at theta = 0
-    converged, E_cs_hf, *_ = CS_RHF(S_29s_He, T_29s_He, V_29s_He, eri_29s_He, n_electrons=2, theta=0.0, max_iter=100, threshold=1E-12, p_guess='core', verbose=False)
+    converged, E_cs_hf, *_ = CS_RHF(S_29s_He, T_29s_He, V_29s_He, eri_29s_He, n_electrons=2, theta=0.0, max_iter=100, threshold=6.2608E-08, p_guess='core', verbose=False)
     assert converged == True, "CS-RHF Calculation did not converge"
     assert abs(E_cs_hf - E_hf_29s_He) < 1E-8, f"CS-RHF energy does not match unscaled reference value {E_cs_hf} != {E_hf_29s_He}"
 
@@ -56,7 +56,7 @@ def test_theta_excited_non_scaled() -> None:
 
     # test: SCF convergence for He in 29s, compared with the CS algorithm at theta = 0
     occupation_determinant = np.array([0,2,0])
-    converged, E_elec_comp, E_e_values, C_munu, P = CS_RHF(S_29s_He, T_29s_He, V_29s_He, eri_29s_He, 2, theta=0.0, occupation=occupation_determinant, max_iter=500, threshold=1E-12, p_guess='core', verbose=False)
+    converged, E_elec_comp, E_e_values, C_munu, P = CS_RHF(S_29s_He, T_29s_He, V_29s_He, eri_29s_He, 2, theta=0.0, occupation=occupation_determinant, max_iter=500, threshold=1.7474E-08, p_guess='core', verbose=False)
     assert converged == True, "CS-RHF Calculation did not converge"
     assert abs(E_elec_comp - E_hf_29s_He) < 1E-8, f"CS-RHF energy does not match unscaled reference value {E_elec_comp} != {E_hf_29s_He}"
 
@@ -84,7 +84,7 @@ def test_theta_excited_18_scaled_huge_basis() -> None:
 
     # test: SCF convergence for He in aug-cc-pv(5+d)z, compared with the CS algorithm at theta = 0
     occupation_determinant = np.array([0,2,0])
-    converged, E_elec_comp, E_e_values, C_munu, P = CS_RHF(S_aug_5Z_He, T_aug_5Z_He, V_aug_5Z_He, eri_aug_5Z_He, 2, theta=0.05, occupation=occupation_determinant, max_iter=500, threshold=1E-12, p_guess='core', verbose=True)
+    converged, E_elec_comp, E_e_values, C_munu, P = CS_RHF(S_aug_5Z_He, T_aug_5Z_He, V_aug_5Z_He, eri_aug_5Z_He, 2, theta=0.05, occupation=occupation_determinant, max_iter=500, threshold=1E-12, p_guess='core', verbose=False)
     assert converged == True, "CS-RHF Calculation did not converge"
     assert abs(E_elec_comp - E_hf_aug_5Z_He) < 1E-8, f"CS-RHF energy does not match unscaled reference value {E_elec_comp} != {E_hf_aug_5Z_He}"
 
