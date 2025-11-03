@@ -3,6 +3,13 @@ from numpy.typing import NDArray
 from typing import Literal, Tuple
 from py_mods.src.SCF.scf_utils import transformation_matrix, equiv_matrix, calc_g_matrix, calc_p_matrix, E_0
 
+def plot_map(matrix):
+    import matplotlib.pyplot as plt
+    plt.imshow(matrix, cmap="viridis", interpolation="nearest")
+    plt.colorbar(label="Value")
+    plt.title("Matrix Heatmap (Matplotlib)")
+    plt.show()
+
 def RHF(
     S: NDArray[np.float64],
     T: NDArray[np.float64], 
@@ -97,26 +104,29 @@ def RHF(
     E_iter = 0.
     Delta_E = 0.
     converged = False
+    Error = 13
 
     if verbose:
-        print('-'*70)
-        print('|   Iter   |           E_iter           |            Delta_e         |')
-        print('-'*70)
+        print('-'*83)
+        print('|   Iter   |           E_iter           |           Delta_e        |  Sum(Error)  |')
+        print('-'*83)
 
     # SCF loop
     for iter in range(max_iter):
-        if iter != 0 and equiv_matrix(P_new, P_old, threshold=threshold):
+        if iter != 0 and Error < threshold:
             converged = True
             if verbose:
-                print(f'{iter:5}     {E_iter:25.16f}     {Delta_E:25.16f}')
-                print(f'Convergence achieved after {iter} iterations. Final SCF energy = {E_iter}')
-                
-            E_RHF = E_iter
-            return converged, E_RHF, e_values, C_munu, P_new
+                print(f'Convergence achieved after {iter-1} iterations. Final SCF energy = {E_iter}.')
+
+            break
         
         # Obtain G matrix from P and eris. Build Fock matrix
         G = calc_g_matrix(P_new, eri)
         F = G + H_core
+
+        if iter > 0:
+            Error = S @ P_new @ F - F @ P_new @ S
+            Error = sum(sum(abs(Error)))
 
         # Obtain transformed Fock matrix 
         F_prime = X @ F @ X.T
@@ -136,8 +146,10 @@ def RHF(
         E_iter = E_0(P_new, H_core, F)
         Delta_E = E_iter - E_old
 
+        # print(sum(sum(abs(Error))))
+
         if verbose:
-            print(f'{iter:5}     {E_iter:25.16f}     {Delta_E:25.16f}')
+            print(f'{iter:5}     {E_iter:25.16f}     {Delta_E:25.16f}     {Error:8.4E}')
 
     E_RHF = E_iter
     return converged, E_RHF, e_values, C_munu, P_new
