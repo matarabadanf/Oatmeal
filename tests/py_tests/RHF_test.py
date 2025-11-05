@@ -60,6 +60,23 @@ def test_Be() -> None:
     assert converged, "Calculation did not converge"
     assert abs(E_hf - E_hf_ccpvdz_Be) < 1E-8, f"SCF energy does not match reference value {E_hf} != {E_hf_ccpvdz_Be}"
 
+def test_DIIS() -> None:
+    S_augccpvqz_HF    = np.loadtxt(f'{data_path}/HF_S_augccpvqz.dat')
+    T_augccpvqz_HF    = np.loadtxt(f'{data_path}/HF_kin_augccpvqz.dat')
+    V_augccpvqz_HF    = np.loadtxt(f'{data_path}/HF_vnuc_augccpvqz.dat')
+    eri_augccpvqz_HF  = np.load(f'{data_path}/HF_eri_augccpvqz.npy')
+    E_hf_augccpvqz_HF = np.load(f'{data_path}/HF_e_hf_augccpvqz.npy')
+
+    # test: DIIS 
+    converged, E_RHF, orbital_energies, C_munu, P = RHF(
+        S_augccpvqz_HF, T_augccpvqz_HF, V_augccpvqz_HF, eri_augccpvqz_HF, n_electrons=10, 
+        max_iter=100, threshold=1E-20, p_guess='core', verbose=True, 
+        DIIS_REQUESTED=True
+    )
+
+    assert converged, "Calculation did not converge"
+    assert abs(E_RHF - E_hf_augccpvqz_HF) < 1E-8, f"SCF energy does not match reference value {E_RHF} != {E_hf_augccpvqz_HF}"
+
 if __name__ == "__main__":
     pass
     
