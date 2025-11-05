@@ -1,7 +1,4 @@
 from Dev.DIIS import DIIS_RHF
-from py_mods.src.SCF.scf_utils import V_NN
-
-import numpy as np 
 from pyscf import gto, scf
 
 dist = 1.4 * 0.529177249
