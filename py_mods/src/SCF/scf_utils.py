@@ -264,7 +264,7 @@ def V_NN(
     units: Literal['Bohr', 'Angstrom'] = 'Bohr'
 ) -> float:
     """
-    Nuclear repulsion energy.
+    Nuclear repulsion energy. IN ANGSTROMS.
 
     Parameters
     ----------
@@ -280,8 +280,6 @@ def V_NN(
     V_NN : float
         Nuclear repulsion energy in Hartree.
     """
-    if units == 'Angstrom':
-        positions /= 0.529177249
 
     V_NN = 0.0
     n_atoms = len(positions)
@@ -290,6 +288,9 @@ def V_NN(
         for j in range(i + 1, n_atoms):
             R_ij = np.linalg.norm(positions[i] - positions[j])
             V_NN += (charges[i] * charges[j]) / R_ij
+    
+    if units == 'Angstrom':
+        V_NN *= 0.529177249
     
     return V_NN
 
