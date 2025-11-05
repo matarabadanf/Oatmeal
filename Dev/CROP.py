@@ -1,14 +1,7 @@
 import numpy as np
 from numpy.typing import NDArray
 from typing import Literal, Tuple
-from py_mods.src.SCF.scf_utils import transformation_matrix, calc_g_matrix, calc_p_matrix, E_0
-
-def plot_map(matrix):
-    import matplotlib.pyplot as plt
-    plt.imshow(matrix, cmap="viridis", interpolation="nearest")
-    plt.colorbar(label="Value")
-    plt.title("Matrix Heatmap (Matplotlib)")
-    plt.show()
+from py_mods.src.SCF.scf_utils import transformation_matrix, equiv_matrix, calc_g_matrix, calc_p_matrix, E_0
 
 def RHF(
     S: NDArray[np.float64],
@@ -20,9 +13,9 @@ def RHF(
     threshold: float = 1E-12, 
     p_guess: Literal['core', 'ones'] = 'core', 
     verbose: bool = False,
-    DIIS_MEM: int = 8,
-    DIIS_ITER_START: int = 8,
-    DIIS_REQUESTED: bool = True,
+    CROP_MEM: int = 5,
+    CROP_ITER_START: int = 5,
+    CROP_REQUESTED: bool = True,
 ) -> Tuple[bool, float, NDArray[np.float64], NDArray[np.float64], NDArray[np.float64]]:
     """
     Perform a RHF calculation.
@@ -52,12 +45,12 @@ def RHF(
         Initial density matrix guess.
     verbose : bool, optional
         If True, prints iterations.
-    DIIS_MEM : int, optional
-        Number of previous Fock matrices and residuals to store for DIIS.
-    DIIS_ITER_START : int, optional
-        Iteration number to start DIIS.
-    DIIS_REQUESTED : bool, optional
-        If True, enables DIIS after DIIS_ITER_START iterations.
+    CROP_MEM : int, optional
+        Number of previous Fock matrices and residuals to store for CROP.
+    CROP_ITER_START : int, optional
+        Iteration number to start CROP.
+    CROP_REQUESTED : bool, optional
+        If True, enables CROP after CROP_ITER_START iterations.
 
     Returns
     -------
@@ -94,12 +87,10 @@ def RHF(
 
     # initialize variables and lists
     E_prev = 0.
-    use_DIIS = False 
+    use_CROP = False 
     converged = False
     F_guess = []
     residuals = []
-
-    DIIS_ITER_START = max(DIIS_ITER_START, DIIS_MEM)
 
     if verbose:
         print('-'*83)
@@ -123,30 +114,34 @@ def RHF(
             converged = True
             break
 
-        # Save in memory guesses and residuals keeping size of DIIS space
+        # Save in memory guesses and residuals keeping size of CROP space
         F_guess.append(F)
         residuals.append(r)
 
-        if len(F_guess) > DIIS_MEM:
+        if len(F_guess) > CROP_MEM:
             F_guess.pop(0)
             residuals.pop(0)
 
         # Choose F for P_{n+1}
-        if not use_DIIS:
+        if not use_CROP:
             F_next = F 
         
-        elif use_DIIS:
-            F_next = DIIS_guess(residuals, F_guess)
+        elif use_CROP:
+            F_opt, r_opt = CROP_guess(residuals, F_guess)
+            F_guess[-1] = F_opt
+            residuals[-1] = r_opt  
+
+            F_next = F_opt # + r_opt # equation 32 Ettenhuber, r_opt should be here, but it diverges idk why
 
         # Calculate P_{n+1}
         P, C_munu, orbital_energies = calculate_P_next(F_next.reshape(X.shape), X, n_electrons)
 
         E_prev = E_RHF
     
-        # Check DIIS activation
-        if iter == DIIS_ITER_START and DIIS_REQUESTED:
-            use_DIIS = True 
-            print('-'*30,  '   STARTED DIIS   ', '-' *30)
+        # Check CROP activation
+        if iter == CROP_ITER_START and CROP_REQUESTED:
+            use_CROP = True 
+            print('-'*30,  '   STARTED CROP   ', '-' *30)
     
     return converged, E_RHF, orbital_energies, C_munu, P
 
@@ -229,9 +224,9 @@ def residual(F: NDArray[np.float64], P: NDArray[np.float64], S: NDArray[np.float
     """
     return S @ P @ F - F @ P @ S
 
-def DIIS_guess(residuals: NDArray[np.float64], F_guesses: NDArray[np.float64]) -> NDArray[np.float64]:
+def CROP_guess(residuals: NDArray[np.float64], F_guesses: NDArray[np.float64]) -> NDArray[np.float64]:
     """ 
-    Calculate the DIIS extrapolated Fock matrix.
+    Calculate the CROP extrapolated Fock matrix.
 
     Parameters
     ----------
@@ -262,11 +257,12 @@ def DIIS_guess(residuals: NDArray[np.float64], F_guesses: NDArray[np.float64]) -
     # solve the system of equations
     c = np.linalg.solve(B_matrix, solution)
 
-    F_DIIS = sum([c[i] * F_guesses[i] for i in range(len(c)-1)])
+    F_CROP = sum([c[i] * F_guesses[i] for i in range(len(c)-1)])
+    r_crop = sum([c[i] * residuals[i] for i in range(len(c)-1)])
 
-    return F_DIIS
+    return F_CROP, r_crop
 
-DIIS_RHF = RHF 
+CROP_RHF = RHF 
 
 if __name__ == "__main__":
     pass 

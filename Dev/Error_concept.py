@@ -1,9 +1,10 @@
+from Dev.CROP import CROP_RHF
 from Dev.DIIS import DIIS_RHF
 from pyscf import gto, scf
 
 dist = 1.4 * 0.529177249
 
-mol = gto.M(atom = f'H 0 0 0; F 1.1 0 0', spin=0, basis='aug-cc-PVqZ')
+mol = gto.M(atom = f'O 0 0 0; O 1.1 0 0; O 0 1.1 0', spin=0, basis='cc-PVqZ')
 
 T = mol.intor('int1e_kin')
 V = mol.intor('int1e_nuc')
@@ -18,7 +19,8 @@ e_elec = rhf.energy_elec()
 print(f"H energy calculated by pyscf = {pyscf_e}")
 
 # test : SCF convergence for H2 in STO-3G
-converged, E_RHF, orbital_energies, C_munu, P = DIIS_RHF(S, T, V, eri, n_electrons=10, max_iter=100, threshold=1E-20, p_guess='core', verbose=True, DIIS_REQUESTED=True)
+converged, E_RHF, orbital_energies, C_munu, P = DIIS_RHF(S, T, V, eri, n_electrons=24, max_iter=100, threshold=1E-16, p_guess='core', verbose=True, DIIS_REQUESTED=True, DIIS_MEM=3)
+converged, E_RHF, orbital_energies, C_munu, P = CROP_RHF(S, T, V, eri, n_electrons=24, max_iter=100, threshold=1E-16, p_guess='core', verbose=True, CROP_REQUESTED=True, CROP_MEM=3)
 
 print(f'Error with pyscf {E_RHF -  rhf.energy_elec()[0]}')
 
