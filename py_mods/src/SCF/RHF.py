@@ -20,17 +20,16 @@ def RHF(
     threshold: float = 1E-12, 
     p_guess: Literal['core', 'ones'] = 'core', 
     verbose: bool = False,
-    DIIS_MEM: int = 8,
-    DIIS_ITER_START: int = 8,
-    DIIS_REQUESTED: bool = True,
+    conv_type: Literal[None, 'DIIS', 'CROP'] = 'DIIS',
+    conv_MEM: int = 5,
+    conv_ITER_START: int = 5,
 ) -> Tuple[bool, float, NDArray[np.float64], NDArray[np.float64], NDArray[np.float64]]:
     """
     Perform a RHF calculation.
 
     Takes S, T, V and eri matrix elements and computes the RHF procedure. 
 
-    Implementation was done based on "Modern Quantum Chemistry" 
-    by Szabo and Ostlund.
+    Can use convergence assist algorithms DIIS and CROP^*
 
     Parameters
     ----------
@@ -52,12 +51,12 @@ def RHF(
         Initial density matrix guess.
     verbose : bool, optional
         If True, prints iterations.
-    DIIS_MEM : int, optional
-        Number of previous Fock matrices and residuals to store for DIIS.
-    DIIS_ITER_START : int, optional
-        Iteration number to start DIIS.
-    DIIS_REQUESTED : bool, optional
-        If True, enables DIIS after DIIS_ITER_START iterations.
+    conv_type : Literal[None, 'DIIS', 'CROP'], optional
+        Type of Convergence Algorithm to use. If None, no algorithm is used.
+    conv_MEM : int, optional
+        Number of previous Fock matrices and residuals to store for Convergence Algorithm.
+    conv_ITER_START : int, optional
+        Iteration number to start Convergence Algorithm.
 
     Returns
     -------
@@ -70,36 +69,42 @@ def RHF(
     
     Notes
     ------
-    The system bust be a closed shell: n_electrons must be even. This is asserted.
+    - The system bust be a closed shell: n_electrons must be even. This is asserted.
+    - Integrals must be passed and have the same dimensions. This is asserted.
 
-    Integrals must be passed and have the same dimensions. This is asserted.
+
+    - Implementation was done based on "Modern Quantum Chemistry" by Szabo and Ostlund.
+    - DIIS implementation was based on [Pulay](https://doi.org/10.1002/jcc.540030413).
+    - CROP implementation was based on [Ettenhuber, Jorgensen](https://doi.org/10.1021/ct501114q).
+
+    ^* CROP algorithm does not compute the new trial as t_opt + w_opt, as it breaks convergence here. However, the guesses stored are the opt ones. 
     """
     assert len(T) == len(V) == len(S), "Matrices T, V, S must have the same dimensions"
     assert n_electrons % 2 == 0, "RHF can only be closed-shell systems"
+    assert conv_type in [None, 'DIIS', 'CROP'], 'Convergence assist must be either None, DIIS, or CROP'
+
+    conv_REQUESTED = True if conv_type is not None else False
+    
+    conv_ITER_START = min(conv_ITER_START+1, conv_MEM)
 
     # Otain transformation matrix 
     dim = len(S)
     X = transformation_matrix(S)
-    # print(X)
 
-    # Guess initial density matrix
+    # Guess initial density matrix and Build core Hamiltonian
     if p_guess == 'core':
         P = np.zeros([dim, dim])
     elif p_guess == 'ones':
         P = np.ones([dim, dim])
     
-
-    # Build core Hamiltonian
     H_core = T + V 
 
     # initialize variables and lists
     E_prev = 0.
-    use_DIIS = False 
+    use_conv = False 
     converged = False
     F_guess = []
     residuals = []
-
-    DIIS_ITER_START = max(DIIS_ITER_START, DIIS_MEM)
 
     if verbose:
         print('-'*83)
@@ -123,30 +128,37 @@ def RHF(
             converged = True
             break
 
-        # Save in memory guesses and residuals keeping size of DIIS space
+        # Save in memory guesses and residuals keeping size of Convergence Algorithm space
         F_guess.append(F)
         residuals.append(r)
 
-        if len(F_guess) > DIIS_MEM:
+        if len(F_guess) > conv_MEM:
             F_guess.pop(0)
             residuals.pop(0)
 
         # Choose F for P_{n+1}
-        if not use_DIIS:
+        if not use_conv:
             F_next = F 
         
-        elif use_DIIS:
-            F_next = DIIS_guess(residuals, F_guess)
+        elif use_conv:
+            F_opt, r_opt = conv_guess(residuals, F_guess)
 
+            F_next = F_opt # Default is DIIS
+
+            if conv_type == 'CROP':
+                F_guess[-1] = F_opt
+                residuals[-1] = r_opt  
+                F_next = F_opt # + r_opt # equation 32 Ettenhuber, r_opt should be here, but it diverges idk why
+        
         # Calculate P_{n+1}
         P, C_munu, orbital_energies = calculate_P_next(F_next.reshape(X.shape), X, n_electrons)
 
         E_prev = E_RHF
     
-        # Check DIIS activation
-        if iter == DIIS_ITER_START and DIIS_REQUESTED:
-            use_DIIS = True 
-            print('-'*30,  '   STARTED DIIS   ', '-' *30)
+        # Check Convergence Algorithm activation
+        if iter == conv_ITER_START and conv_REQUESTED:
+            use_conv = True 
+            print('-'*30,  f'   STARTED {conv_type}  ', '-' *30)
     
     return converged, E_RHF, orbital_energies, C_munu, P
 
@@ -229,9 +241,9 @@ def residual(F: NDArray[np.float64], P: NDArray[np.float64], S: NDArray[np.float
     """
     return S @ P @ F - F @ P @ S
 
-def DIIS_guess(residuals: NDArray[np.float64], F_guesses: NDArray[np.float64]) -> NDArray[np.float64]:
+def conv_guess(residuals: NDArray[np.float64], F_guesses: NDArray[np.float64]) -> NDArray[np.float64]:
     """ 
-    Calculate the DIIS extrapolated Fock matrix.
+    Calculate the Convergence Algorithm extrapolated Fock matrix.
 
     Parameters
     ----------
@@ -262,11 +274,10 @@ def DIIS_guess(residuals: NDArray[np.float64], F_guesses: NDArray[np.float64]) -
     # solve the system of equations
     c = np.linalg.solve(B_matrix, solution)
 
-    F_DIIS = sum([c[i] * F_guesses[i] for i in range(len(c)-1)])
+    F_conv = sum([c[i] * F_guesses[i] for i in range(len(c)-1)])
+    r_conv = sum([c[i] * residuals[i] for i in range(len(c)-1)])
 
-    return F_DIIS
-
-DIIS_RHF = RHF 
+    return F_conv, r_conv
 
 if __name__ == "__main__":
     pass 
