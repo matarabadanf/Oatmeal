@@ -2,7 +2,7 @@ from pyscf import gto, scf
 import numpy as np
 
 
-mol_HF = gto.M(atom = f'H 0 0 0; F 1.1 0 0', spin=0, basis='aug-cc-PVqZ')
+mol_HF = gto.M(atom = f'H 0 0 0; F 1.1 0 0', spin=0, basis='aug-cc-PVtZ')
 
 kin = mol_HF.intor('int1e_kin')
 vnuc = mol_HF.intor('int1e_nuc')
