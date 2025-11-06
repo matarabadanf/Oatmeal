@@ -2,7 +2,6 @@ import numpy as np
 from py_mods.src.SCF.scf_utils import (
     validate_determinant,
     transformation_matrix,
-    equiv_matrix,
     calc_g_matrix_comp,
     calc_p_matrix_comp,
     E_0_comp,
@@ -136,7 +135,7 @@ def CS_RHF(
 
         # Build new density matrix
         P_old = np.copy(P_new)
-        P_new = calc_p_matrix_comp(L_munu.T, R_munu, n_electrons, determinant=det, natural_occupation=natural_occupation) # TODO: why do i have to transpose here??
+        P_new = calc_p_matrix_comp(L_munu.T, R_munu, n_electrons, determinant=det, natural_occupation=natural_occupation) 
 
         # Calculate HF energy
         E_old = E_iter

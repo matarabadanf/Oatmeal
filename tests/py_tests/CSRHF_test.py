@@ -1,5 +1,5 @@
 import numpy as np
-from py_mods.src.SCF.CSUHF import CS_RHF
+from py_mods.src.SCF.CSRHF import CS_RHF
 from py_mods.src.SCF.RHF import RHF
 from pathlib import Path
 
