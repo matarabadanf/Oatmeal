@@ -359,6 +359,8 @@ def theta_traj(max_theta, n_points, overlap, kin, vnuc, eri, nelec, occupation=-
         converged, E_elec, E_e_values, C_munu, P = CS_RHF(overlap, kin, vnuc, eri, nelec, th, occupation=occupation, max_iter=max_iter, threshold=threshold, p_guess=p_guess, verbose=verbose)
         if converged:
             energies.append(E_elec)
+        else:
+            print(f'Traj {th} did not converge.')
         if verbose and converged:
             print(f'Converged point at theta = {th:6.4f} : E = {E_elec:12.8f}') 
 

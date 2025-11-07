@@ -21,7 +21,7 @@ print(f"H energy calculated by pyscf = {pyscf_e}")
 # test : SCF convergence for H2 in STO-3G
 # converged, E_RHF, orbital_energies, C_munu, P = DIIS_RHF(S, T, V, eri, n_electrons=24, max_iter=10, threshold=1E-16, p_guess='core', verbose=True, DIIS_REQUESTED=False, DIIS_MEM=3)
 # converged, E_RHF, orbital_energies, C_munu, P = DIIS_RHF(S, T, V, eri, n_electrons=24, max_iter=100, threshold=1E-16, p_guess='core', verbose=True, DIIS_REQUESTED=True, DIIS_MEM=3)
-converged, E_RHF, orbital_energies, C_munu, P = CS_RHF(S, T, V, eri, n_electrons=10, theta=.1, max_iter=100, threshold=1E-12, p_guess='core', verbose=True, conv_MEM=3)
+converged, E_RHF, orbital_energies, C_munu, P = CS_RHF(S, T, V, eri, n_electrons=10, theta=.1, max_iter=100, threshold=1E-14, p_guess='core', verbose=True, conv_MEM=8)
 
 print(f'Error with pyscf {E_RHF -  rhf.energy_elec()[0]}')
 

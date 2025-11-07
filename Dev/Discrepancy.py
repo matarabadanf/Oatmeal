@@ -62,11 +62,16 @@ e_elec = rhf_He.energy_elec()
 occupation_determinant = np.array([0,2,0])
 
 # test : SCF convergence for H2 in STO-3G
-converged, E_RHF, orbital_energies, C_munu, P_1 =           Dev.CS_CROP.CS_RHF(S, T, V, eri, n_electrons=2, theta=.05, max_iter=100, threshold=1E-12,  occupation=occupation_determinant, p_guess='core', verbose=True, conv_MEM=3)
+converged, E_RHF, orbital_energies, C_munu, P_1 =           Dev.CS_CROP.CS_RHF(S, T, V, eri, n_electrons=2, theta=.05, max_iter=100, threshold=1E-12,  occupation=occupation_determinant, p_guess='core', verbose=True, conv_type='CROP')
 converged, E_RHF, orbital_energies, C_munu, P_2 = py_mods.src.SCF.CSRHF.CS_RHF(S, T, V, eri, n_electrons=2, theta=.05, max_iter=100, threshold=1E-12,  occupation=occupation_determinant, p_guess='core', verbose=True)
 
 plot_map(P_1.imag- P_2.imag)
 plot_map(P_1.real- P_2.real)
+
+traj_energies = Dev.CS_CROP.theta_traj(0.08, 9, S, T, V, eri, 2, max_iter=1000, threshold=1E-13, p_guess='core', verbose=False)
+traj_ener = np.array(traj_energies[1], dtype=complex)
+
+print(traj_ener)
 
 print(f'Error with pyscf {E_RHF -  rhf_He.energy_elec()[0]}')
 

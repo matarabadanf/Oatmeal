@@ -118,7 +118,7 @@ def CS_RHF(
 
         if iter > 0:
             Error_vec = (S @ P_new @ F - F @ P_new @ S).flatten()
-            Error = np.sqrt(Error_vec @ Error_vec)
+            Error = np.linalg.norm(Error_vec)
 
         # Obtain transformed Fock matrix 
         F_prime = X @ F @ X.T
