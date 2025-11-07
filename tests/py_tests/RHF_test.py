@@ -125,5 +125,5 @@ def test_CROP() -> None:
     assert abs(E_RHF - E_hf_augccpvqz_HF) < 1E-8, f"SCF energy does not match reference value {E_RHF} != {E_hf_augccpvqz_HF}"
 
 if __name__ == "__main__":
-    test_CROP()
+    pass
     
