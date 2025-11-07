@@ -126,6 +126,8 @@ def RHF(
         # Check convergence
         if iter > 1 and error < threshold:
             converged = True
+            if verbose:
+                print(f'Convergence achieved after {iter-1} iterations. Final SCF energy = {E_RHF:5}')
             break
 
         # Save in memory guesses and residuals keeping size of Convergence Algorithm space
