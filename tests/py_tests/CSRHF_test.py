@@ -85,10 +85,11 @@ def test_theta_excited_18_scaled_huge_basis() -> None:
 
     # test: SCF convergence for He in aug-cc-pv(5+d)z, compared with the CS algorithm at theta = 0
     occupation_determinant = np.array([0,2,0])
-    converged, E_elec_comp, E_e_values, C_munu, P = CS_RHF(S_aug_5Z_He, T_aug_5Z_He, V_aug_5Z_He, eri_aug_5Z_He, 2, theta=0.05, occupation=occupation_determinant, max_iter=500, threshold=1E-13, p_guess='core', verbose=False)
+    converged, E_elec_comp, E_e_values, C_munu, P = CS_RHF(S_aug_5Z_He, T_aug_5Z_He, V_aug_5Z_He, eri_aug_5Z_He, 2, theta=0.05, occupation=occupation_determinant, max_iter=500, threshold=1E-13, p_guess='core', verbose=True)
     assert converged == True, "CS-RHF Calculation did not converge"
     assert abs(E_elec_comp - E_hf_aug_5Z_He) < 1E-8, f"CS-RHF energy does not match unscaled reference value {E_elec_comp} != {E_hf_aug_5Z_He}"
 
 
 if __name__ == "__main__":
+    test_theta_excited_18_scaled_huge_basis()
     pass

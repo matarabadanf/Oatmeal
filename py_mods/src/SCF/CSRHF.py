@@ -8,7 +8,8 @@ from py_mods.src.SCF.scf_utils import (
     is_diagonal,
     guess_density,
     diagonalize_biorthogonal,
-    scale_integrals
+    scale_integrals,
+    equiv_matrix
 )
 
 from numpy.typing import NDArray

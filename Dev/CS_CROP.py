@@ -1,7 +1,7 @@
 import numpy as np
 from numpy.typing import NDArray
 from typing import Literal, Tuple, Union
-from py_mods.src.SCF.scf_utils import transformation_matrix, calc_g_matrix_comp, calc_p_matrix_comp, E_0_comp, guess_density, validate_determinant, scale_integrals, is_diagonal, diagonalize_biorthogonal
+from py_mods.src.SCF.scf_utils import transformation_matrix, calc_g_matrix_comp, calc_p_matrix_comp, E_0_comp, guess_density, validate_determinant, scale_integrals, is_diagonal, diagonalize_biorthogonal, equiv_matrix
 import matplotlib.pyplot as plt
 
 def CS_RHF(
@@ -52,7 +52,7 @@ def CS_RHF(
         Initial density guess.
     verbose : bool, optional
         If True print iteration progress.
-        conv_type : Literal[None, 'DIIS', 'CROP'], optional
+    conv_type : Literal[None, 'DIIS', 'CROP'], optional
         Type of Convergence Algorithm to use. If None, no algorithm is used.
     conv_MEM : int, optional
         Number of previous Fock matrices and residuals to store for Convergence Algorithm.
@@ -115,15 +115,15 @@ def CS_RHF(
     # SCF loop
     for iter in range(max_iter):
         # calculate F_n and r_n from P_n
-        F, r = calculate_F_and_r_comp(P, S, H_core, eri)
-        error = np.linalg.norm(r)
+        F, r = calculate_F_and_r_comp(P, S, H_core, eri_scaled)
+        error = np.linalg.norm(r.flatten())
         E_RHF = E_0_comp(P, H_core, F.reshape(H_core.shape))
         E_diff = E_RHF - E_prev
 
         if verbose:
             print(f'{iter:5}     {E_RHF:45.16f}     {E_diff:45.16f}     {error:8.4E}')
         # Check convergence
-        if iter > 1 and error < threshold+1j*threshold:
+        if iter > 1 and error < threshold:
             converged = True
             if verbose:
                 print(f'Convergence achieved after {iter} iterations. Final SCF energy = {E_RHF:5}')
@@ -150,16 +150,19 @@ def CS_RHF(
                 F_guess[-1] = F_opt
                 residuals[-1] = r_opt  
                 F_next = F_opt # + r_opt # equation 32 Ettenhuber, r_opt should be here, but it diverges idk why
+
+        P_old = np.copy(P)
         
         P, C_munu, orbital_energies = calculate_P_next(F_next.reshape(X.shape), X, n_electrons, det, natural_occupation)
+
 
         E_prev = E_RHF 
 
         # Check Convergence Algorithm activation
         if iter == conv_ITER_START and conv_REQUESTED:
             use_conv = True 
-            print('-'*30,  f'   STARTED {conv_type}  ', '-' *30)
-
+            if verbose:
+                print('-'*30,  f'   STARTED {conv_type}  ', '-' *30)
 
     return converged, E_RHF, orbital_energies, C_munu, P
 
@@ -288,46 +291,11 @@ def conv_guess(residuals: NDArray[np.float64], F_guesses: NDArray[np.float64]) -
 
     return F_conv, r_conv
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-def theta_traj(max_theta, n_points, overlap, kin, vnuc, eri, nelec, occupation=-1, max_iter=100, threshold=1E-12, p_guess='core', verbose=False):
+def theta_traj(max_theta, n_points, overlap, kin, vnuc, eri, nelec, occupation=-1, max_iter=100, threshold=1E-12, p_guess='core', verbose=False, 
+    conv_type: Literal[None, 'DIIS', 'CROP'] = 'DIIS',
+    conv_MEM: int = 5,
+    conv_ITER_START: int = 5,
+    ):
     """
     Sample CS_RHF energies along a theta trajectory.
 
@@ -345,6 +313,12 @@ def theta_traj(max_theta, n_points, overlap, kin, vnuc, eri, nelec, occupation=-
         Occupation vector or -1 for default.
     max_iter, threshold, p_guess, verbose : optional
         SCF control parameters forwarded to CS_RHF.
+    conv_type : Literal[None, 'DIIS', 'CROP'], optional
+        Type of Convergence Algorithm to use. If None, no algorithm is used.
+    conv_MEM : int, optional
+        Number of previous Fock matrices and residuals to store for Convergence Algorithm.
+    conv_ITER_START : int, optional
+        Iteration number to start Convergence Algorithm.
 
     Returns
     -------
@@ -356,7 +330,7 @@ def theta_traj(max_theta, n_points, overlap, kin, vnuc, eri, nelec, occupation=-
     thetas = np.linspace(0, max_theta, n_points)
     energies = []
     for th in thetas:
-        converged, E_elec, E_e_values, C_munu, P = CS_RHF(overlap, kin, vnuc, eri, nelec, th, occupation=occupation, max_iter=max_iter, threshold=threshold, p_guess=p_guess, verbose=verbose)
+        converged, E_elec, E_e_values, C_munu, P = CS_RHF(overlap, kin, vnuc, eri, nelec, th, occupation=occupation, max_iter=max_iter, threshold=threshold, p_guess=p_guess, verbose=verbose, conv_type=conv_type, conv_MEM=conv_MEM, conv_ITER_START=conv_ITER_START)
         if converged:
             energies.append(E_elec)
         else:
