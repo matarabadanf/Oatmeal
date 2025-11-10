@@ -2,8 +2,6 @@ import numpy as np
 from py_mods.src.SCF.CSRHF import CS_RHF, theta_traj
 from py_mods.src.SCF.RHF import RHF
 from pathlib import Path
-from pyscf import gto
-from py_mods.src.SCF.basis_utils import even_temp_uncontr_str
 
 data_path = Path(__file__).parent / "data"
 
@@ -102,17 +100,11 @@ def test_theta_excited_18_scaled_huge_basis() -> None:
 
 def test_qchem_21s() -> None:
     '''This test takes about "5.56s user 17.50s system 898% cpu 2.567 total" seconds with the current implementation'''
-    He_tempered_str = even_temp_uncontr_str('He', 'S', 7.668876968794860E-002, 1.9581497063588078, 21) # because this is the reference data 
 
-    mol_He_even= gto.M(atom = 'He 0 0 0', spin=0, charge=0,) # basis='aug-cc-pVqZ')
-
-    mol_He_even.basis = {'He': gto.basis.parse(He_tempered_str)}
-    mol_He_even.build()
-
-    T_even_H2 = mol_He_even.intor('int1e_kin')
-    V_even_H2 = mol_He_even.intor('int1e_nuc')
-    S_even_H2 = mol_He_even.intor('int1e_ovlp')
-    eri_even_H2 = mol_He_even.intor('int2e')
+    S_even_H2    = np.loadtxt(f'{data_path}/He_S_21s.dat')
+    T_even_H2    = np.loadtxt(f'{data_path}/He_kin_21s.dat')
+    V_even_H2    = np.loadtxt(f'{data_path}/He_vnuc_21s.dat')
+    eri_even_H2  = np.load(f'{data_path}/He_eri_21s.npy')
     
     max_theta = 0.08 # because we have this data for reference
     n_points = 9
