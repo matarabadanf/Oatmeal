@@ -19,6 +19,7 @@ def CS_RHF(
     conv_type: Literal[None, 'DIIS', 'CROP'] = 'DIIS',
     conv_MEM: int = 5,
     conv_ITER_START: int = 5,
+    diagnostics: bool = False,
 ) -> Tuple[bool, float, NDArray[np.complex128], NDArray[np.complex128], NDArray[np.complex128]]:
     """
     Perform a Complex Scaled RHF calculation.
@@ -65,7 +66,7 @@ def CS_RHF(
         - converged (bool): Convergence status.
         - E_RHF (float): Final RHF energy.
         - e_values (NDArray[np.float64][n, n]): Orbital energies.
-        - C_munu (NDArray[np.float64][n, n]): Molecular orbital coefficients.
+        - C_munu (NDArray[np.float64][n, n]): R Molecular orbital coefficients.
         - P (NDArray[np.float64][n, n]): Final density matrix.
 
     Notes
@@ -98,7 +99,7 @@ def CS_RHF(
     H_core = T_scaled + V_scaled
 
     # Guess initial density matrix
-    P = guess_density(dim, p_guess)
+    P_LR = guess_density(dim, p_guess)
 
     # initialize variables and lists
     E_prev = 0.+0.j
@@ -115,9 +116,9 @@ def CS_RHF(
     # SCF loop
     for iter in range(max_iter):
         # calculate F_n and r_n from P_n
-        F, r = calculate_F_and_r_comp(P, S, H_core, eri_scaled)
+        F, r = calculate_F_and_r_comp(P_LR, S, H_core, eri_scaled)
         error = np.linalg.norm(r.flatten())
-        E_RHF = E_0_comp(P, H_core, F.reshape(H_core.shape))
+        E_RHF = E_0_comp(P_LR, H_core, F.reshape(H_core.shape))
         E_diff = E_RHF - E_prev
 
         if verbose:
@@ -151,10 +152,9 @@ def CS_RHF(
                 residuals[-1] = r_opt  
                 F_next = F_opt # + r_opt # equation 32 Ettenhuber, r_opt should be here, but it diverges idk why
 
-        P_old = np.copy(P)
+        P_old = np.copy(P_LR)
         
-        P, C_munu, orbital_energies = calculate_P_next(F_next.reshape(X.shape), X, n_electrons, det, natural_occupation)
-
+        P_LR, C_munu, orbital_energies, L_munu, R_munu, P_RR = calculate_P_next(F_next.reshape(X.shape), X, n_electrons, det, natural_occupation, diagnostics)
 
         E_prev = E_RHF 
 
@@ -164,9 +164,21 @@ def CS_RHF(
             if verbose:
                 print('-'*30,  f'   STARTED {conv_type}  ', '-' *30)
 
-    return converged, E_RHF, orbital_energies, C_munu, P
+    if diagnostics:
+        E_RHF_LR = E_0_comp(P_LR, H_core, F.reshape(H_core.shape))
+        E_RHF_RR = E_0_comp(P_RR, H_core, F.reshape(H_core.shape))
+        print('\n')
+        print('-'*30,  f'   DIAGNOSTICS   ', '-' *30)
+        print(f'LR energy: {E_RHF_LR:.8f}')
+        print(f'RR energy: {E_RHF_RR:.8f}')
+        print(f'LR-RR E_diff: {E_RHF_LR-E_RHF_RR:.8f}')
+        print(f'\nMean P_LR-P_RR difference: {np.mean(P_LR.flatten()-P_RR.flatten()):.8E}')
+        print(f'Max  P_LR-P_RR difference: {np.max(P_LR.flatten()-P_RR.flatten()):.8E}')
 
-def calculate_P_next(F_0: NDArray[np.float64], X: NDArray[np.float64], n_electrons: int, det, natural_occ) -> Tuple[NDArray[np.float64], NDArray[np.float64], NDArray[np.float64]]:
+
+    return converged, E_RHF, orbital_energies, C_munu, P_LR, L_munu.T, R_munu, P_RR
+
+def calculate_P_next(F_0: NDArray[np.float64], X: NDArray[np.float64], n_electrons: int, det, natural_occ, diagnostics=False) -> Tuple[NDArray[np.float64], NDArray[np.float64], NDArray[np.float64]]:
     """
     Calculate the next density matrix P_{n+1} given Fock matrix F_n and transformation matrix X.
 
@@ -202,9 +214,14 @@ def calculate_P_next(F_0: NDArray[np.float64], X: NDArray[np.float64], n_electro
     R_munu = X @ R_prime
 
     # Build new density matrix
-    P_1 = calc_p_matrix_comp(L_munu.T, R_munu, n_electrons, determinant=det, natural_occupation=natural_occ) 
+    P_LR = calc_p_matrix_comp(L_munu.T, R_munu, n_electrons, determinant=det, natural_occupation=natural_occ)
 
-    return P_1, C_munu, e_values
+    if diagnostics:
+        P_RR = calc_p_matrix_comp(np.conj(R_munu), R_munu, n_electrons, determinant=det, natural_occupation=natural_occ)
+    else:
+        P_RR = P_LR
+    
+    return P_LR, C_munu, e_values, L_munu, R_munu, P_RR
 
 def calculate_F_and_r_comp(P: NDArray[np.float64], S: NDArray[np.float64], H_core: NDArray[np.float64], eri: NDArray[np.float64]) -> Tuple[NDArray[np.float64], NDArray[np.float64]]:
     """
@@ -330,7 +347,7 @@ def theta_traj(max_theta, n_points, overlap, kin, vnuc, eri, nelec, occupation=-
     thetas = np.linspace(0, max_theta, n_points)
     energies = []
     for th in thetas:
-        converged, E_elec, E_e_values, C_munu, P = CS_RHF(overlap, kin, vnuc, eri, nelec, th, occupation=occupation, max_iter=max_iter, threshold=threshold, p_guess=p_guess, verbose=verbose, conv_type=conv_type, conv_MEM=conv_MEM, conv_ITER_START=conv_ITER_START)
+        converged, E_elec, *_ = CS_RHF(overlap, kin, vnuc, eri, nelec, th, occupation=occupation, max_iter=max_iter, threshold=threshold, p_guess=p_guess, verbose=verbose, conv_type=conv_type, conv_MEM=conv_MEM, conv_ITER_START=conv_ITER_START)
         if converged:
             energies.append(E_elec)
         else:
