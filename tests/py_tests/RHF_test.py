@@ -19,7 +19,7 @@ def test_H2() -> None:
     nuc_nuc = V_NN(positions, np.array([1,1]), units='Bohr')
 
     # test : SCF convergence for H2 in STO-3G
-    converged, E_elec, E_e_values, C_munu, P = RHF(S_sto3g_H2, T_sto3g_H2, V_sto3g_H2, eri_sto3g_H2, n_electrons=2, max_iter=100, threshold=1E-14, p_guess='core', verbose=False)
+    converged, E_elec, *_ = RHF(S_sto3g_H2, T_sto3g_H2, V_sto3g_H2, eri_sto3g_H2, n_electrons=2, max_iter=100, threshold=1E-14, p_guess='core', verbose=False)
     assert converged, "Calculation did not converge"
     E_hf = E_elec + nuc_nuc
     assert abs(E_hf - E_hf_sto3g_H2) < 1E-6, f"SCF energy does not match reference value {E_hf} != {E_hf_sto3g_H2}"
@@ -32,7 +32,7 @@ def test_Li() -> None:
     E_hf_sto3g_li = np.load(f'{data_path}/Li_plus_e_hf_6-31g.npy')
 
     # test: SCF convergence for li in 6-31g
-    converged, E_hf, E_e_values, C_munu, P = RHF(S_sto3g_li, T_sto3g_li, V_sto3g_li, eri_sto3g_li, n_electrons=2, max_iter=100, threshold=1E-14, p_guess='core', verbose=False)
+    converged, E_hf, *_ = RHF(S_sto3g_li, T_sto3g_li, V_sto3g_li, eri_sto3g_li, n_electrons=2, max_iter=100, threshold=1E-14, p_guess='core', verbose=False)
     assert converged, "Calculation did not converge"
     assert abs(E_hf - E_hf_sto3g_li) < 1E-8, f"SCF energy does not match reference value {E_hf} != {E_hf_sto3g_li}"
 
@@ -44,7 +44,7 @@ def test_He() -> None:
     E_hf_ccpvdz_He = np.load(f'{data_path}/He_e_hf_ccpvdz.npy')
 
     # test: SCF convergence for He in ccpvdz
-    converged, E_hf, E_e_values, C_munu, P = RHF(S_ccpvdz_He, T_ccpvdz_He, V_ccpvdz_He, eri_ccpvdz_He, n_electrons=2, max_iter=100, threshold=1E-14, p_guess='core', verbose=False)
+    converged, E_hf, *_ = RHF(S_ccpvdz_He, T_ccpvdz_He, V_ccpvdz_He, eri_ccpvdz_He, n_electrons=2, max_iter=100, threshold=1E-14, p_guess='core', verbose=False)
     assert converged, "Calculation did not converge"
     assert abs(E_hf - E_hf_ccpvdz_He) < 1E-8, f"SCF energy does not match reference value {E_hf} != {E_hf_ccpvdz_He}"
 
@@ -56,25 +56,9 @@ def test_Be() -> None:
     E_hf_ccpvdz_Be = np.load(f'{data_path}/Be_e_hf_ccpvdz.npy')
 
     # test: SCF convergence for Be in ccpvdz
-    converged, E_hf, E_e_values, C_munu, P = RHF(S_ccpvdz_Be, T_ccpvdz_Be, V_ccpvdz_Be, eri_ccpvdz_Be, n_electrons=4, max_iter=100, threshold=1E-14, p_guess='core', verbose=False)
+    converged, E_hf, *_ = RHF(S_ccpvdz_Be, T_ccpvdz_Be, V_ccpvdz_Be, eri_ccpvdz_Be, n_electrons=4, max_iter=100, threshold=1E-14, p_guess='core', verbose=False)
     assert converged, "Calculation did not converge"
     assert abs(E_hf - E_hf_ccpvdz_Be) < 1E-8, f"SCF energy does not match reference value {E_hf} != {E_hf_ccpvdz_Be}"
-
-def test_DIIS() -> None:
-    S_augccpvqz_HF    = np.loadtxt(f'{data_path}/HF_S_augccpvqz.dat')
-    T_augccpvqz_HF    = np.loadtxt(f'{data_path}/HF_kin_augccpvqz.dat')
-    V_augccpvqz_HF    = np.loadtxt(f'{data_path}/HF_vnuc_augccpvqz.dat')
-    eri_augccpvqz_HF  = np.load(f'{data_path}/HF_eri_augccpvqz.npy')
-    E_hf_augccpvqz_HF = np.load(f'{data_path}/HF_e_hf_augccpvqz.npy')
-
-    # test: DIIS 
-    converged, E_RHF, orbital_energies, C_munu, P = RHF(
-        S_augccpvqz_HF, T_augccpvqz_HF, V_augccpvqz_HF, eri_augccpvqz_HF, n_electrons=10, 
-        max_iter=100, threshold=1E-20, p_guess='core', verbose=True, conv_type=None
-    )
-
-    assert converged, "Calculation did not converge"
-    assert abs(E_RHF - E_hf_augccpvqz_HF) < 1E-8, f"SCF energy does not match reference value {E_RHF} != {E_hf_augccpvqz_HF}"
 
 def test_no_conv() -> None:
     S_augccpvqz_HF    = np.loadtxt(f'{data_path}/HF_S_augccpvqz.dat')
@@ -84,7 +68,7 @@ def test_no_conv() -> None:
     E_hf_augccpvqz_HF = np.load(f'{data_path}/HF_e_hf_augccpvqz.npy')
 
     # test: DIIS 
-    converged, E_RHF, orbital_energies, C_munu, P = RHF(
+    converged, *_ = RHF(
         S_augccpvqz_HF, T_augccpvqz_HF, V_augccpvqz_HF, eri_augccpvqz_HF, n_electrons=10, 
         max_iter=100, threshold=1E-20, p_guess='core', verbose=True, conv_type=None
     )
@@ -100,7 +84,7 @@ def test_DIIS() -> None:
     E_hf_augccpvqz_HF = np.load(f'{data_path}/HF_e_hf_augccpvqz.npy')
 
     # test: DIIS 
-    converged, E_RHF, orbital_energies, C_munu, P = RHF(
+    converged, E_RHF, *_ = RHF(
         S_augccpvqz_HF, T_augccpvqz_HF, V_augccpvqz_HF, eri_augccpvqz_HF, n_electrons=10, 
         max_iter=100, threshold=1E-20, p_guess='core', verbose=True, conv_type='DIIS'
     )
@@ -116,7 +100,7 @@ def test_CROP() -> None:
     E_hf_augccpvqz_HF = np.load(f'{data_path}/HF_e_hf_augccpvqz.npy')
 
     # test: DIIS 
-    converged, E_RHF, orbital_energies, C_munu, P = RHF(
+    converged, E_RHF, *_ = RHF(
         S_augccpvqz_HF, T_augccpvqz_HF, V_augccpvqz_HF, eri_augccpvqz_HF, n_electrons=10, 
         max_iter=100, threshold=1E-20, p_guess='core', verbose=True, conv_type='CROP'
     )

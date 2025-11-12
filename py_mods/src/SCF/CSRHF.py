@@ -20,7 +20,7 @@ def CS_RHF(
     conv_MEM: int = 5,
     conv_ITER_START: int = 5,
     diagnostics: bool = False,
-) -> Tuple[bool, float, NDArray[np.complex128], NDArray[np.complex128], NDArray[np.complex128]]:
+) -> Tuple[bool, float, NDArray[np.complex128], NDArray[np.complex128], NDArray[np.complex128], NDArray[np.complex128], NDArray[np.complex128], NDArray[np.complex128]]:
     """
     Perform a Complex Scaled RHF calculation.
 
@@ -59,6 +59,8 @@ def CS_RHF(
         Number of previous Fock matrices and residuals to store for Convergence Algorithm.
     conv_ITER_START : int, optional
         Iteration number to start Convergence Algorithm.
+    diagnostics : bool, optional
+        If True, print L-R eigenvector diagnostics at the end of the calculation.
 
     Returns
     -------
@@ -67,7 +69,10 @@ def CS_RHF(
         - E_RHF (float): Final RHF energy.
         - e_values (NDArray[np.float64][n, n]): Orbital energies.
         - C_munu (NDArray[np.float64][n, n]): R Molecular orbital coefficients.
-        - P (NDArray[np.float64][n, n]): Final density matrix.
+        - P_LR (NDArray[np.float64][n, n]): Final density matrix.
+        - L_munu (NDArray[np.float64][n, n]): L Molecular orbital coefficients.
+        - R_munu (NDArray[np.float64][n, n]): R Molecular orbital coefficients.
+        - P_RR (NDArray[np.float64][n, n]): Final RR density matrix.
 
     Notes
     ------

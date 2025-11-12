@@ -281,7 +281,7 @@ def V_NN(
         Nuclear repulsion energy in Hartree.
     """
 
-    V_NN = 0.0
+    V_NN: float = 0.0
     n_atoms = len(positions)
 
     for i in range(n_atoms):
@@ -292,7 +292,7 @@ def V_NN(
     if units == 'Angstrom':
         V_NN *= 0.529177249
     
-    return V_NN
+    return float(V_NN)
 
 
 # --- Complex SCF Helper Functions ---
@@ -423,8 +423,8 @@ def calc_p_matrix_comp(
     # If no determinant is provided, just build it. 
     if natural_occupation:
         n_occ = n_electrons // 2 
-        determinant_conf = [2 for _ in (n_occ)]
-        determinant_pre = [0 for _ in (len(r_matrix)-n_occ)]
+        determinant_conf = [2 for _ in range(n_occ)]
+        determinant_pre = [0 for _ in range(len(r_matrix)-n_occ)]
         determinant = np.array(determinant_conf.extend(determinant_pre))
     
     # build a mask that is the delta_ij
