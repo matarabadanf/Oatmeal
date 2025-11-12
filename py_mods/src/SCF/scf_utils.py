@@ -185,6 +185,116 @@ def validate_determinant(
 
     return determinant.astype(np.int32), natural_occupation
 
+
+def validate_unrestricted_determinant(
+    n_electrons: int,
+    determinants: Union[int, Tuple[NDArray[np.int32], NDArray[np.int32]], None],
+    expected_dim: int,
+    multiplicity: int,
+) -> Tuple[NDArray[np.int32], NDArray[np.int32], bool]:
+    """
+    Validate or construct an occupation-number determinant.
+
+    Parameters
+    ----------
+    n_electrons : int
+        Total number of electrons.
+    determinants : int or Tuple[NDArray[np.int32], NDArray[np.int32]] or None
+        If -1 (or None) build a default RHF occupation vector (2,2,...,0).
+        First component of provided Tuple will be the alpha occupation, second the beta. 
+        If an ndarray is provided it must sum to n_electrons.
+    expected_dim : int
+        Expected length of the determinant vector; arrays shorter are padded with zeros.
+    multiplicity : int
+        Number of unpaired electrons.
+
+    Returns
+    -------
+    alpha_det: NDArray[np.int32]
+        Validated (and possibly padded) occupation vector with dtype int32.
+    beta_det: NDArray[np.int32]
+        Validated (and possibly padded) occupation vector with dtype int32.
+    natural_occupation : bool
+        True if determinant was constructed as the natural (UHF) occupation.
+    
+    Notes
+    -----
+    - When constructing automaticly the determinant, default is to occupy first the alpha orbitals
+    """
+    natural_occupation = True
+
+    if determinants is None:
+        determinants = -1
+
+    if isinstance(determinants, int):
+        if determinants == -1:
+            alpha_det = np.zeros([expected_dim], dtype=np.int32)
+            beta_det = np.zeros([expected_dim], dtype=np.int32)     
+
+            for i in range(int((n_electrons-multiplicity) // 2)):
+                alpha_det[i] = beta_det[i] = 1 
+            
+            occupied = int(n_electrons-multiplicity) // 2
+            unoccupied = n_electrons - occupied*2
+
+            for i in range(unoccupied):
+                alpha_det[(n_electrons-multiplicity)//2 + i] = 1 
+
+            # assert n_electrons == sum(alpha_det) + sum(beta_det)
+            # assert check_unpaired(alpha_det, beta_det, multiplicity), "Mismatch in multiplicity and occupations"
+            
+            return alpha_det.astype(np.int32), beta_det.astype(np.int32), natural_occupation
+        else:
+            raise TypeError('determinant must be -1, None or a numpy array of occupations')
+
+    if not isinstance(determinants, list):
+        raise TypeError('determinant must be a list or tuple of np.NDArrays when not -1/None')
+
+    natural_occupation = False
+    if determinant.dtype.kind not in ('i', 'u'):
+        determinant = determinant.astype(np.int32)
+
+    if int(np.sum(determinant)) != n_electrons:
+        raise ValueError(f'determinant sum ({int(np.sum(determinant))}) != n_electrons ({n_electrons})')
+
+    if len(determinant) != expected_dim:
+        new_occ = np.zeros(expected_dim, dtype=np.int32)
+        for i, oc in enumerate(determinant):
+            if i >= expected_dim:
+                break
+            new_occ[i] = int(oc)
+        determinant = new_occ
+
+    return alpha_det.astype(np.int32), beta_det.astype(np.int32), natural_occupation
+
+def check_unpaired(
+    alpha_det: NDArray[np.int32],
+    beta_det: NDArray[np.int32],
+    multiplicity: int
+) -> bool:
+    """
+    Check that the number of unpaired electrons in the determinants matches the multiplicity.
+
+    Parameters
+    ----------
+    alpha_det : NDArray[np.int32]
+        Alpha occupation vector.
+    beta_det : NDArray[np.int32]
+        Beta occupation vector.
+    multiplicity : int
+        Expected multiplicity (number of unpaired electrons + 1).
+
+    Returns
+    -------
+    is_valid : bool
+        True if the number of unpaired electrons matches given determinants.
+    """
+
+    total_occ = alpha_det + beta_det
+    mult_det = total_occ % 2 
+
+    return True if sum(mult_det) == multiplicity else False 
+
 def calc_p_matrix(
     C_matrix: NDArray[np.float64], 
     n_electrons: int
@@ -344,6 +454,7 @@ def guess_density(dim: int, method: Literal['core', 'ones']) -> NDArray[np.compl
 
     return P_guess
 
+
 def diagonalize_biorthogonal(F_prime: NDArray[np.complex128]):
     """
     Diagonalize a (generally non-Hermitian) transformed Fock matrix F'.
@@ -413,7 +524,7 @@ def calc_p_matrix_comp(
     P : NDArray[np.complex128], shape (n, n)
         Complex density matrix.
     """
-    assert n_electrons % 2 == 0, 'This only works for RHF for now'
+    # assert n_electrons % 2 == 0, 'This only works for RHF for now'
 
     if determinant is not None:
         natural_occupation == False
@@ -425,11 +536,11 @@ def calc_p_matrix_comp(
         n_occ = n_electrons // 2 
         determinant_conf = [2 for _ in range(n_occ)]
         determinant_pre = [0 for _ in range(len(r_matrix)-n_occ)]
-        determinant = np.array(determinant_conf.extend(determinant_pre))
+        determinant = np.array(determinant_conf + determinant_pre)
     
     # build a mask that is the delta_ij
     mask = (determinant == 2).astype(float) # the mask is a vector of 0 and 1 so it can be used in einsum
-    P = 2 * np.einsum('ma,na,a->mn', r_matrix, l_matrix, mask)
+    P =  2 * np.einsum('ma,na,a->mn', r_matrix, l_matrix, mask)
 
     return P
 
@@ -482,3 +593,10 @@ def E_0_comp(
     """
     return np.sum(P * (H_core + F)) * 0.5
 
+def E_0_unrestricted_comp(P_alpha, P_beta, H_core, F_alpha, F_beta):
+
+    E_elec = 0.5 * (
+        np.sum(P_alpha * (H_core + F_alpha)) +
+        np.sum(P_beta * (H_core + F_beta))
+    )
+    return E_elec

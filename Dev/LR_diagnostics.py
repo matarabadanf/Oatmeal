@@ -1,9 +1,6 @@
-from py_mods.src.SCF.basis_utils import even_temp_uncontr_str
-from py_mods.src.SCF.scf_utils import transformation_matrix
-from pyscf import gto, scf, ao2mo
+from pyscf import gto, scf
 import numpy as np 
-
-He_tempered_str = even_temp_uncontr_str('He', 'S', 7.668876968794860E-002, 1.9581497063588078, 29)
+from py_mods.src.SCF.CSRHF import CS_RHF
 
 mol_He= gto.M(atom = 'He 0 0 0', spin=0, charge=0, basis='aug-cc-pvqz') # basis='aug-cc-pVqZ')
 
@@ -21,7 +18,7 @@ orb = rhf_He.mo_coeff
 # get the two-electron integrals as a numpy array
 ref_eri = mol_He.ao2mo(orb)
 
-from py_mods.src.SCF.CSRHF import CS_RHF
+
 nelec = 2
 theta = 0.0
 
