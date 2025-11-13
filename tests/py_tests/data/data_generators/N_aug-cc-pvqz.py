@@ -4,7 +4,7 @@ from pathlib import Path
 
 data_path = Path(__file__).parent.parent
 
-mol_He = gto.M(atom = 'He 0 0 0', spin=0, charge=0, basis='ccpvdz')
+mol_He = gto.M(atom = 'N 0 0 0', spin=1, charge=0, basis='cc-pvqz')
 
 kin = mol_He.intor('int1e_kin')
 vnuc = mol_He.intor('int1e_nuc')
@@ -16,12 +16,12 @@ eri = mol_He.intor('int2e')
 # print(vnuc)
 # print(eri)
 
-np.savetxt(f'{data_path}/He_kin_ccpvdz.dat', kin)
-np.savetxt(f'{data_path}/He_vnuc_ccpvdz.dat', vnuc)
-np.savetxt(f'{data_path}/He_S_ccpvdz.dat', overlap)
-np.save(f'{data_path}/He_eri_ccpvdz.npy', eri) # cannot He savetxt, has to He np binary
+np.savetxt(f'{data_path}/N_kin_cc-pvqz.dat', kin)
+np.savetxt(f'{data_path}/N_vnuc_cc-pvqz.dat', vnuc)
+np.savetxt(f'{data_path}/N_S_cc-pvqz.dat', overlap)
+np.save(f'{data_path}/N_eri_cc-pvqz.npy', eri) # cannot He savetxt, has to He np binary
 
-rhf_He = scf.RHF(mol_He)
+rhf_He = scf.UHF(mol_He)
 # rhf_He.init_guess = 'hcore'
 # rhf_He.max_cycle = 0
 
@@ -31,4 +31,4 @@ e_elec = rhf_He.energy_elec()
 print(e_He, e_elec, rhf_He.cycles)
 # print(rhf_He.mo_coeff)
 
-np.save(f'{data_path}/He_e_hf_ccpvdz', e_He)
+np.save(f'{data_path}/N_e_hf_cc-pvqz', e_He)

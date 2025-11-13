@@ -1,6 +1,8 @@
-
 from pyscf import gto, scf
 import numpy as np
+from pathlib import Path
+
+data_path = Path(__file__).parent.parent
 
 mol_He= gto.M(atom = 'He 0 0 0', spin=0, charge=0,) # basis='aug-cc-pVqZ')
 
@@ -53,10 +55,10 @@ eri = mol_He.intor('int2e')
 # print(vnuc)
 # print(eri)
 
-np.savetxt('../He_kin_aug-cc-pv(5+d)z.dat', kin)
-np.savetxt('../He_vnuc_aug-cc-pv(5+d)z.dat', vnuc)
-np.savetxt('../He_S_aug-cc-pv(5+d)z.dat', overlap)
-np.save('../He_eri_aug-cc-pv(5+d)z.npy', eri) # cannot He savetxt, has to He np binary
+np.savetxt(f'{data_path}/He_kin_aug-cc-pv(5+d)z.dat', kin)
+np.savetxt(f'{data_path}/He_vnuc_aug-cc-pv(5+d)z.dat', vnuc)
+np.savetxt(f'{data_path}/He_S_aug-cc-pv(5+d)z.dat', overlap)
+np.save(f'{data_path}/He_eri_aug-cc-pv(5+d)z.npy', eri) # cannot He savetxt, has to He np binary
 
 rhf_He = scf.RHF(mol_He)
 # rhf_He.init_guess = 'hcore'
@@ -68,4 +70,4 @@ e_elec = rhf_He.energy_elec()
 print(e_He, e_elec, rhf_He.cycles)
 # print(rhf_He.mo_coeff)
 
-np.save('../He_e_hf_aug-cc-pv(5+d)z', e_He)
+np.save(f'{data_path}/He_e_hf_aug-cc-pv(5+d)z', e_He)
