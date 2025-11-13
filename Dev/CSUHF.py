@@ -1,3 +1,4 @@
+from ast import iter_child_nodes
 import numpy as np
 from numpy.typing import NDArray
 from typing import Literal, Tuple, Union
@@ -19,7 +20,7 @@ def CS_UHF(
     verbose: bool = False,
     conv_type: Literal[None, 'DIIS', 'CROP'] = 'DIIS',
     conv_MEM: int = 8,
-    conv_ITER_START: int = 8,
+    conv_ITER_START: int = 12,
     diagnostics: bool = False,
 ) -> Tuple[bool, float, NDArray[np.complex128], NDArray[np.complex128], NDArray[np.complex128], NDArray[np.complex128], NDArray[np.complex128], NDArray[np.complex128]]:
     """
@@ -94,7 +95,7 @@ def CS_UHF(
 
     # setup
     conv_REQUESTED = True if conv_type is not None else False
-    conv_ITER_START = min(conv_ITER_START+1, conv_MEM)
+    conv_ITER_START = min(conv_ITER_START+1, conv_MEM) if conv_MEM >= conv_ITER_START else  max(conv_ITER_START+1, conv_MEM)
 
     # obtain the occupations
     dim = len(S)
@@ -110,16 +111,18 @@ def CS_UHF(
     X = transformation_matrix(S) + 0j
 
     # rescaling the integrals
-    # T_scaled, V_scaled, eri_scaled = scale_integrals(T, V, eri, theta)
-    # H_core = T_scaled + V_scaled
-    H_core = T + V 
+    T_scaled, V_scaled, eri_scaled = scale_integrals(T, V, eri, theta)
+    H_core = T_scaled + V_scaled
+    # H_core = T + V 
 
     # Guess initial density matrix
     P_LR_alph = guess_density(dim, p_guess)
     P_LR_beta = np.copy(P_LR_alph)
 
-    # P_LR_alph, _, _, _ = calculate_P_next(H_core.flatten(), X, alpha_elec, det_alpha, diagnostics)
-    # P_LR_beta, _, _, _ = calculate_P_next(H_core.flatten(), X, beta_elec, det_beta, diagnostics)
+    P_LR_alph, _, _, _ = calculate_P_next(H_core.flatten(), X, alpha_elec, det_alpha, diagnostics)
+    P_LR_beta, _, _, _ = calculate_P_next(H_core.flatten(), X,  beta_elec, det_beta, diagnostics)
+
+    P_LR_alph_0 = P_LR_alph
 
     # initialize variables and lists
     E_prev = 0.+0.j
@@ -130,6 +133,8 @@ def CS_UHF(
     residuals_alph = []
     residuals_beta = []
 
+    mem_iter = max_iter
+    conv_thresh = 1E-4
 
     if verbose:
         print('-'*128)
@@ -139,12 +144,12 @@ def CS_UHF(
     # SCF loop
     for iter in range(max_iter):
         # calculate F_n and r_n from P_n
-        F_alph, r_alph, F_beta, r_beta = calculate_F_and_r_comp(P_LR_alph, P_LR_beta, S, H_core, eri)
+        F_alph, r_alph, F_beta, r_beta = calculate_F_and_r_comp(P_LR_alph, P_LR_beta, S, H_core, eri_scaled)
 
         error_alph = np.linalg.norm(r_alph.flatten())
         error_beta = np.linalg.norm(r_beta.flatten())
 
-        error = error_alph # max(error_alph, error_beta)
+        error = max(error_alph, error_beta)
 
         E_UHF = E_0_unrestricted_comp(P_LR_alph, P_LR_beta, H_core, F_alph.reshape(H_core.shape), F_beta.reshape(H_core.shape))
 
@@ -161,10 +166,11 @@ def CS_UHF(
             break
 
         # Save in memory guesses and residuals keeping size of Convergence Algorithm space
-        F_guess_alph.append(F_alph)
-        F_guess_beta.append(F_beta)
-        residuals_alph.append(r_alph)
-        residuals_beta.append(r_beta)
+
+        F_guess_alph.append(F_alph )
+        F_guess_beta.append(F_beta )
+        residuals_alph.append(r_alph )
+        residuals_beta.append(r_beta )
 
         if len(F_guess_alph) > conv_MEM:
             F_guess_alph.pop(0)
@@ -178,34 +184,40 @@ def CS_UHF(
             F_next_beta = F_beta 
         
         elif use_conv:
-            F_opt_alph, r_opt_alpha = conv_guess(residuals_alph, F_guess_alph)
-            F_opt_beta, r_opt_beta  = conv_guess(residuals_beta, F_guess_beta)
+            try:
+                F_opt_alph, r_opt_alpha = conv_guess(residuals_alph, F_guess_alph)
+                F_opt_beta, r_opt_beta  = conv_guess(residuals_beta, F_guess_beta)
 
-            # Default is DIIS
-            F_next_alph = F_opt_alph
-            F_next_beta = F_opt_beta             
+                # Default is DIIS
+                F_next_alph = F_opt_alph
+                F_next_beta = F_opt_beta             
 
-            if conv_type == 'CROP':
-                F_guess_alph[-1] = F_opt_alph
-                F_guess_beta[-1] = F_opt_beta
-                residuals_alph[-1] = r_opt_alpha
-                residuals_beta[-1] = r_opt_beta
+                if conv_type == 'CROP':
+                    F_guess_alph[-1] = F_opt_alph 
+                    F_guess_beta[-1] = F_opt_beta 
+                    residuals_alph[-1] = r_opt_alpha
+                    residuals_beta[-1] = r_opt_beta 
 
-                # + r_opt # equation 32 Ettenhuber, r_opt should be here, but it diverges idk why
+                    # + r_opt # equation 32 Ettenhuber, r_opt should be here, but it diverges idk why
 
-                F_next_alph = F_opt_alph + r_opt_alpha
-                F_next_beta = F_opt_beta + r_opt_beta
+                    F_next_alph = F_opt_alph # + r_opt_alpha
+                    F_next_beta = F_opt_beta # + r_opt_beta
+            except np.linalg.LinAlgError:
+                print('!!!!!!!!!!!!!!!! CONVERGENCE ACCELERATION CAUSED A SINGULAR MATRIX. REVERTING TO STANDARD SCF !!!!!!!!!!!!!!!')
+                use_conv = False 
 
         
         P_LR_alph, R_alph, L_alph, e_alph = calculate_P_next(F_next_alph, X, alpha_elec, det_alpha, diagnostics)
         P_LR_beta, R_beta, L_beta, e_beta = calculate_P_next(F_next_beta, X,  beta_elec, det_beta,  diagnostics)
         
         P_total = P_LR_alph + P_LR_beta
+        P_minus = P_LR_alph - P_LR_beta
 
+        
         E_prev = E_UHF
 
         # Check Convergence Algorithm activation
-        if iter == conv_ITER_START and conv_REQUESTED:
+        if iter == conv_ITER_START and conv_REQUESTED: #  and error < conv_thresh and not use_conv:
             use_conv = True 
             if verbose:
                 print('-'*30,  f'   STARTED {conv_type}  ', '-' *30)
@@ -220,9 +232,9 @@ def CS_UHF(
     #     print(f'LR-RR E_diff: {E_RHF_LR-E_RHF_RR:.8f}')
     #     print(f'\nMean P_LR-P_RR difference: {np.mean(P_LR.flatten()-P_RR.flatten()):.8E}')
     #     print(f'Max  P_LR-P_RR difference: {np.max(P_LR.flatten()-P_RR.flatten()):.8E}')
+    P_orthogonal = X @ P_total @ X.T
 
-
-    return converged, E_UHF, e_alph# , orbital_energies, C_munu, L_munu.T, R_munu, P_RR
+    return converged, E_UHF, e_alph, e_beta, P_LR_alph, P_LR_beta, P_LR_alph_0, P_orthogonal# , orbital_energies, C_munu, L_munu.T, R_munu, P_RR
 
 def calculate_P_next(F_alpha: NDArray[np.float64], X: NDArray[np.float64], n_electrons: int, det, diagnostics=False) -> Tuple[NDArray[np.float64], NDArray[np.float64], NDArray[np.float64]]:
     """
@@ -254,16 +266,14 @@ def calculate_P_next(F_alpha: NDArray[np.float64], X: NDArray[np.float64], n_ele
 
     e_values, C_prime, L_prime, R_prime, LFR = diagonalize_biorthogonal(F_prime)
 
-    sort_idx = np.argsort(e_values.real)
-    e_values = e_values[sort_idx]
-    C_prime = C_prime[:, sort_idx]
-    L_prime = L_prime[:, sort_idx]
-    R_prime = R_prime[:, sort_idx]
-    LFR = LFR[sort_idx][:, sort_idx] if LFR is not None else LFR
+    # sort_idx = np.argsort(e_values.real)
+    # e_values = e_values[sort_idx]
+    # C_prime = C_prime[:, sort_idx]
+    # L_prime = L_prime[:, sort_idx]
+    # R_prime = R_prime[:, sort_idx]
+    # LFR = LFR[sort_idx][:, sort_idx] if LFR is not None else LFR
 
     assert is_diagonal(LFR), "Matrix product L' @ F' @ R' is not diagonal"
-
-    
 
     # Obtain untransformed MO coefficients
     C_munu = X @ C_prime
@@ -274,7 +284,6 @@ def calculate_P_next(F_alpha: NDArray[np.float64], X: NDArray[np.float64], n_ele
 
     mask = (det == 1).astype(float)
     P_spin = np.einsum('ma, a, an -> mn', R_munu, mask, L_munu)
-
 
     return P_spin, R_munu, L_munu, e_values
 

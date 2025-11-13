@@ -240,8 +240,8 @@ def validate_unrestricted_determinant(
             for i in range(unoccupied):
                 alpha_det[(n_electrons-multiplicity)//2 + i] = 1 
 
-            # assert n_electrons == sum(alpha_det) + sum(beta_det)
-            # assert check_unpaired(alpha_det, beta_det, multiplicity), "Mismatch in multiplicity and occupations"
+            assert n_electrons == sum(alpha_det) + sum(beta_det)
+            assert check_unpaired(alpha_det, beta_det, multiplicity), "Mismatch in multiplicity and occupations"
             
             return alpha_det.astype(np.int32), beta_det.astype(np.int32), natural_occupation
         else:
@@ -251,20 +251,19 @@ def validate_unrestricted_determinant(
         raise TypeError('determinant must be a list or tuple of np.NDArrays when not -1/None')
 
     natural_occupation = False
-    if determinant.dtype.kind not in ('i', 'u'):
-        determinant = determinant.astype(np.int32)
+    if determinants[0].dtype.kind not in ('i', 'u'):
+        determinants[0] = determinants[0].astype(np.int32)
+        determinants[1] = determinants[1].astype(np.int32)
 
-    if int(np.sum(determinant)) != n_electrons:
-        raise ValueError(f'determinant sum ({int(np.sum(determinant))}) != n_electrons ({n_electrons})')
+    alpha_det = np.zeros(expected_dim, dtype=np.int32)
+    beta_det = np.zeros(expected_dim, dtype=np.int32)
 
-    if len(determinant) != expected_dim:
-        new_occ = np.zeros(expected_dim, dtype=np.int32)
-        for i, oc in enumerate(determinant):
-            if i >= expected_dim:
-                break
-            new_occ[i] = int(oc)
-        determinant = new_occ
+    alpha_det[:len(determinants[0])] = determinants[0]
+    beta_det[:len(determinants[1])] = determinants[1]
 
+    assert n_electrons == sum(alpha_det) + sum(beta_det), f"Mismatch in occupation ({sum(alpha_det) + sum(beta_det)}) and number of electrons ({n_electrons})"
+    assert check_unpaired(alpha_det, beta_det, multiplicity), f"Mismatch in multiplicity ({multiplicity}) and occupations"
+    
     return alpha_det.astype(np.int32), beta_det.astype(np.int32), natural_occupation
 
 def check_unpaired(
