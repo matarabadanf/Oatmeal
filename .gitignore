@@ -70,5 +70,8 @@ Oatmeal.egg-info
 
 *eri*
 *trans.dat
+tests/py_tests/data/*.dat
+*.npy
+
 
 *DS_store
