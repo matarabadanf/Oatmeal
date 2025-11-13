@@ -1,9 +1,11 @@
 import numpy as np
 from py_mods.src.SCF.CSRHF import CS_RHF, theta_traj
+from Dev.CSUHF import UHF_theta_traj
 from py_mods.src.SCF.RHF import RHF
 from pathlib import Path
 
 data_path = Path(__file__).parent / "data"
+qchem_path = data_path / 'qchem'
 
 def load_traj(filename):
     with open(filename) as f:
@@ -99,7 +101,7 @@ def test_theta_excited_18_scaled_huge_basis() -> None:
     assert abs(E_elec_comp - E_hf_aug_5Z_He) < 1E-8, f"CS-RHF energy does not match unscaled reference value {E_elec_comp} != {E_hf_aug_5Z_He}"
 
 def test_qchem_21s() -> None:
-    '''This test takes about "5.56s user 17.50s system 898% cpu 2.567 total" seconds with the current implementation'''
+    '''1.62s user 1.69s system 312% cpu 1.057 total'''
 
     S_even_H2    = np.loadtxt(f'{data_path}/He_S_21s.dat')
     T_even_H2    = np.loadtxt(f'{data_path}/He_kin_21s.dat')
@@ -109,18 +111,27 @@ def test_qchem_21s() -> None:
     max_theta = 0.08 # because we have this data for reference
     n_points = 9
 
-    w, k = load_traj(f'{data_path}/He_1s2_eventemp_qchem.dat')
-    w, k2 = load_traj(f'{data_path}/He_2s2_eventemp_qchem.dat')
+    w, k = load_traj(f'{qchem_path}/He_1s2_eventemp_qchem.dat')
+    w, k2 = load_traj(f'{qchem_path}/He_2s2_eventemp_qchem.dat')
 
     # test: SCF convergence for He in aug-cc-pv(5+d)z, compared with the CS algorithm at theta = 0
     traj_energies = theta_traj(max_theta, n_points, S_even_H2, T_even_H2, V_even_H2, eri_even_H2, 2, max_iter=1000, threshold=2E-10, p_guess='core', verbose=False, conv_type='CROP')
     assert  np.mean(traj_energies[1]-k) < 1E-8+1E-8j, f'Mean error is {np.mean(traj_energies-k) }'
     
+    traj_energies = UHF_theta_traj(max_theta, n_points, S_even_H2, T_even_H2, V_even_H2, eri_even_H2, 2, max_iter=1000, threshold=2E-10, p_guess='core', verbose=False, conv_type='CROP')
+    assert  np.mean(traj_energies[1]-k) < 1E-8+1E-8j, f'Mean error is {np.mean(traj_energies-k) }'
+    
     max_theta = 0.40 # because we have this data for reference
     n_points = 41
 
+    occupations = [np.array([0,1]), np.array([0,1])]
+
     traj_energies = theta_traj(max_theta, n_points, S_even_H2, T_even_H2, V_even_H2, eri_even_H2, 2, occupation=np.array([0,2,0]) ,max_iter=400, threshold=1E-10, p_guess='core', verbose=False)
     assert  np.mean(traj_energies[1]-k2) < 1E-8+1E-8j, f'Mean error is {np.mean(traj_energies-k)} for the 2s2'
+    
+    traj_energies = UHF_theta_traj(max_theta, n_points, S_even_H2, T_even_H2, V_even_H2, eri_even_H2, 2, occupation=occupations, max_iter=1000, threshold=1E-10, p_guess='core', verbose=False, conv_type='CROP')
+    assert  np.mean(traj_energies[1]-k2) < 1E-8+1E-8j, f'Mean error is {np.mean(traj_energies-k) }'
+
 
 def test_qchem_huge() -> None:
     '''This test takes about "5.56s user 17.50s system 898% cpu 2.567 total" seconds with the current implementation'''
@@ -132,8 +143,8 @@ def test_qchem_huge() -> None:
     max_theta = 0.08 # because we have this data for reference
     n_points = 9
 
-    w, k = load_traj(f'{data_path}/He_1s2_augqz_qchem.dat')
-    w, k2 = load_traj(f'{data_path}/He_2s2_augqz_qchem.dat')
+    w, k = load_traj(f'{qchem_path}/He_1s2_augqz_qchem.dat')
+    w, k2 = load_traj(f'{qchem_path}/He_2s2_augqz_qchem.dat')
 
     # test: SCF convergence for He in aug-cc-pv(5+d)z, compared with the CS algorithm at theta = 0
     traj_energies = theta_traj(max_theta, n_points, S_aug_5Z_He, T_aug_5Z_He, V_aug_5Z_He, eri_aug_5Z_He, 2, max_iter=1000, threshold=2E-10, p_guess='core', verbose=False, conv_type='CROP')
@@ -147,4 +158,5 @@ def test_qchem_huge() -> None:
 
 
 if __name__ == "__main__":
+    test_qchem_huge()
     pass

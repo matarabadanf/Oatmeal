@@ -229,7 +229,7 @@ def validate_unrestricted_determinant(
     if isinstance(determinants, int):
         if determinants == -1:
             alpha_det = np.zeros([expected_dim], dtype=np.int32)
-            beta_det = np.zeros([expected_dim], dtype=np.int32)     
+            beta_det  = np.zeros([expected_dim], dtype=np.int32)     
 
             for i in range(int((n_electrons-multiplicity) // 2)):
                 alpha_det[i] = beta_det[i] = 1 
@@ -241,7 +241,7 @@ def validate_unrestricted_determinant(
                 alpha_det[(n_electrons-multiplicity)//2 + i] = 1 
 
             assert n_electrons == sum(alpha_det) + sum(beta_det)
-            assert check_unpaired(alpha_det, beta_det, multiplicity), "Mismatch in multiplicity and occupations"
+            assert check_unpaired(alpha_det, beta_det, multiplicity)[0], f"Mismatch in multiplicity {multiplicity} and occupations {check_unpaired(alpha_det, beta_det, multiplicity)[1]}"
             
             return alpha_det.astype(np.int32), beta_det.astype(np.int32), natural_occupation
         else:
@@ -262,7 +262,7 @@ def validate_unrestricted_determinant(
     beta_det[:len(determinants[1])] = determinants[1]
 
     assert n_electrons == sum(alpha_det) + sum(beta_det), f"Mismatch in occupation ({sum(alpha_det) + sum(beta_det)}) and number of electrons ({n_electrons})"
-    assert check_unpaired(alpha_det, beta_det, multiplicity), f"Mismatch in multiplicity ({multiplicity}) and occupations"
+    assert check_unpaired(alpha_det, beta_det, multiplicity)[0], f"Mismatch in multiplicity {multiplicity} and occupations {check_unpaired(alpha_det, beta_det, multiplicity)[1]}"
     
     return alpha_det.astype(np.int32), beta_det.astype(np.int32), natural_occupation
 
@@ -292,7 +292,9 @@ def check_unpaired(
     total_occ = alpha_det + beta_det
     mult_det = total_occ % 2 
 
-    return True if sum(mult_det) == multiplicity else False 
+    valid = True if sum(mult_det) == multiplicity else False 
+
+    return valid, sum(mult_det)
 
 def calc_p_matrix(
     C_matrix: NDArray[np.float64], 

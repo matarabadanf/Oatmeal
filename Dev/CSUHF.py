@@ -1,4 +1,3 @@
-from ast import iter_child_nodes
 import numpy as np
 from numpy.typing import NDArray
 from typing import Literal, Tuple, Union
@@ -11,7 +10,7 @@ def CS_UHF(
     V: NDArray[np.float64], 
     eri: NDArray[np.float64], 
     n_electrons: int, 
-    mult: int = 1,
+    mult: Union[None, int] = None,
     theta: float = 0.,
     occupation: Union[int, NDArray[np.int32], None] = None,
     max_iter: int = 100, 
@@ -90,21 +89,25 @@ def CS_UHF(
     """
     assert len(T) == len(V) == len(S), "Matrices T, V, S must have the same dimensions"
     # assert n_electrons % 2 != 0, "For closed-shell calculations use RHF routine."
-    assert (n_electrons - mult) % 2 != 1, f"It is not possible to have {mult} unpaired electrons with {n_electrons} electrons."
     assert conv_type in [None, 'DIIS', 'CROP'], 'Convergence assist must be either None, DIIS, or CROP'
 
     # setup
     conv_REQUESTED = True if conv_type is not None else False
     conv_ITER_START = min(conv_ITER_START+1, conv_MEM) if conv_MEM >= conv_ITER_START else  max(conv_ITER_START+1, conv_MEM)
-
+    
+    if mult is None:
+        mult = int(0) if n_electrons % 2 == 0 else int(1) 
+    assert (n_electrons - mult) % 2 != 1, f"It is not possible to have {mult} unpaired electrons with {n_electrons} electrons."
+    
     # obtain the occupations
     dim = len(S)
     det_alpha, det_beta, natural_occ = validate_unrestricted_determinant(n_electrons, occupation, dim, mult)
 
     alpha_elec = sum(det_alpha)
     beta_elec = sum(det_beta)
-    print('Alpha occupation: ', det_alpha)
-    print('Beta  occupation: ', det_beta)
+    if verbose or diagnostics:
+        print('Alpha occupation: ', det_alpha)
+        print('Beta  occupation: ', det_beta)
 
     # Otain transformation matrix and validate occupation determinant
     dim = len(S)
@@ -113,14 +116,13 @@ def CS_UHF(
     # rescaling the integrals
     T_scaled, V_scaled, eri_scaled = scale_integrals(T, V, eri, theta)
     H_core = T_scaled + V_scaled
-    # H_core = T + V 
 
     # Guess initial density matrix
     P_LR_alph = guess_density(dim, p_guess)
     P_LR_beta = np.copy(P_LR_alph)
 
-    P_LR_alph, _, _, _ = calculate_P_next(H_core.flatten(), X, alpha_elec, det_alpha, diagnostics)
-    P_LR_beta, _, _, _ = calculate_P_next(H_core.flatten(), X,  beta_elec, det_beta, diagnostics)
+    # P_LR_alph, _, _, _ = calculate_P_next(H_core.flatten(), X, alpha_elec, det_alpha, diagnostics)
+    # P_LR_beta, _, _, _ = calculate_P_next(H_core.flatten(), X,  beta_elec, det_beta, diagnostics)
 
     P_LR_alph_0 = P_LR_alph
 
@@ -482,7 +484,7 @@ def UHF_theta_traj(max_theta, n_points, overlap, kin, vnuc, eri, nelec, occupati
     thetas = np.linspace(0, max_theta, n_points)
     energies = []
     for th in thetas:
-        converged, E_elec, *_ = CS_UHF(overlap, kin, vnuc, eri, nelec, th, occupation=occupation, max_iter=max_iter, threshold=threshold, p_guess=p_guess, verbose=verbose, conv_type=conv_type, conv_MEM=conv_MEM, conv_ITER_START=conv_ITER_START)
+        converged, E_elec, *_ = CS_UHF(overlap, kin, vnuc, eri, nelec, theta=th, occupation=occupation, max_iter=max_iter, threshold=threshold, p_guess=p_guess, verbose=verbose, conv_type=conv_type, conv_MEM=conv_MEM, conv_ITER_START=conv_ITER_START)
         if converged:
             energies.append(E_elec)
         else:
