@@ -41,6 +41,8 @@ def test_Cl() -> None:
     assert abs(E_hf.real - E_hf_aug_cc_pvqz_Cl) < 1E-8, f"SCF energy does not match reference value {E_hf.real} != {E_hf_aug_cc_pvqz_Cl}"
 
 if __name__ == "__main__":
+    test_N()
+    test_B()
     test_Cl()
     pass
     

@@ -129,7 +129,7 @@ def test_qchem_21s() -> None:
     traj_energies = theta_traj(max_theta, n_points, S_even_H2, T_even_H2, V_even_H2, eri_even_H2, 2, occupation=np.array([0,2,0]) ,max_iter=400, threshold=1E-10, p_guess='core', verbose=False)
     assert  np.mean(traj_energies[1]-k2) < 1E-8+1E-8j, f'Mean error is {np.mean(traj_energies-k)} for the 2s2'
     
-    traj_energies = UHF_theta_traj(max_theta, n_points, S_even_H2, T_even_H2, V_even_H2, eri_even_H2, 2, occupation=occupations, max_iter=1000, threshold=1E-10, p_guess='core', verbose=False, conv_type='CROP')
+    traj_energies = UHF_theta_traj(max_theta, n_points, S_even_H2, T_even_H2, V_even_H2, eri_even_H2, 2, occupation=occupations, max_iter=1000, threshold=1E-10, p_guess='core', verbose=True, conv_type='CROP')
     assert  np.mean(traj_energies[1]-k2) < 1E-8+1E-8j, f'Mean error is {np.mean(traj_energies-k) }'
 
 
@@ -158,5 +158,5 @@ def test_qchem_huge() -> None:
 
 
 if __name__ == "__main__":
-    test_qchem_huge()
+    test_qchem_21s()
     pass

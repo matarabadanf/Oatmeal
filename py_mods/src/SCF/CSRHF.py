@@ -132,7 +132,7 @@ def CS_RHF(
         if iter > 1 and error < threshold:
             converged = True
             if verbose:
-                print(f'Convergence achieved after {iter} iterations. Final SCF energy = {E_RHF:5}')
+                print(f'Convergence achieved after {iter} iterations.\n\n:: Final SCF energy = {E_RHF:5}\n\nFinal SCF energy in parseable format\n%% {E_RHF.real:.14E} {E_RHF.imag:.14E} {theta:.6f}')
             break
 
         # Save in memory guesses and residuals keeping size of Convergence Algorithm space

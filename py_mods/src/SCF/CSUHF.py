@@ -106,7 +106,7 @@ def CS_UHF(
     alpha_elec = sum(det_alpha)
     beta_elec = sum(det_beta)
     if verbose or diagnostics:
-        print('Alpha occupation: ', det_alpha)
+        print('\n\nAlpha occupation: ', det_alpha)
         print('Beta  occupation: ', det_beta)
 
     # Otain transformation matrix and validate occupation determinant
@@ -164,7 +164,7 @@ def CS_UHF(
         if iter > 1 and error < threshold:
             converged = True
             if verbose:
-                print(f'Convergence achieved after {iter} iterations. Final SCF energy = {E_UHF:5}')
+                print(f'Convergence achieved after {iter} iterations.\n\n:: Final SCF energy = {E_UHF:5}\n\nFinal SCF energy in parseable format\n%% {E_UHF.real:.14E} {E_UHF.imag:.14E} {theta:.6f}')
             break
 
         # Save in memory guesses and residuals keeping size of Convergence Algorithm space
@@ -235,6 +235,8 @@ def CS_UHF(
     #     print(f'\nMean P_LR-P_RR difference: {np.mean(P_LR.flatten()-P_RR.flatten()):.8E}')
     #     print(f'Max  P_LR-P_RR difference: {np.max(P_LR.flatten()-P_RR.flatten()):.8E}')
     P_orthogonal = X @ P_total @ X.T
+
+    calculate_s2_expectation(P_LR_alph, P_LR_beta, S, verbose)
 
     return converged, E_UHF, e_alph, e_beta, P_LR_alph, P_LR_beta, P_LR_alph_0, P_orthogonal# , orbital_energies, C_munu, L_munu.T, R_munu, P_RR
 
@@ -443,6 +445,58 @@ def diagonalize_biorthogonal(F_prime: NDArray[np.complex128]):
     return e_values, C_prime, L_prime, R_prime, LFR
 
 
+def calculate_s2_expectation(P_alpha, P_beta, S, verbose=False):
+    """
+    Calculate the expectation value of S^2 for a UHF wavefunction.
+
+    Calculated using <S^2> = S_z^2 + S_z + N_beta - Tr(P_alpha @ S @ P_beta @ S)
+
+    Parameters
+    ----------
+    P_alpha : NDArray, shape (n,n)
+    Alpha density matrix
+    P_beta : NDArray, shape (n,n)
+    Beta density matrix
+    S : NDArray, shape (n,n)
+    Overlap matrix
+
+    Returns
+    -------
+    s2 : float
+    <S^2> expectation value
+
+    s_z : float
+    S_z value
+    spin_contamination : float
+
+    Amount of spin contamination (deviation from exact value)
+    """
+
+    # Calculate number of electrons
+    N_alpha = np.trace(P_alpha @ S).real
+    N_beta  = np.trace(P_beta @ S).real
+
+    # Calculate S_z
+    S_z = (N_alpha - N_beta) / 2
+
+    # Calculate <S^2>
+    overlap_term = np.trace(P_alpha @ S @ P_beta @ S).real
+    s2 = S_z * (S_z + 1) + N_beta - overlap_term
+
+    # Expected value for pure spin state
+    s2_exact = S_z * (S_z + 1)
+    spin_contamination = s2 - s2_exact
+
+    if verbose:
+        print(f"\n---------------  Spin Diagnostics  ---------------")
+        print(f"N_alpha = {int(N_alpha):6d}")
+        print(f"N_beta  = {int(N_beta):6d}")
+        print(f"S_z = {S_z:.4f}")
+        print(f"<S^2> = {s2:.6f}")
+        print(f"<S^2>_exact = {s2_exact:.4f}")
+        print(f"Spin contamination = {spin_contamination:.6f}")
+
+    return s2, S_z, spin_contamination
 
 
 def UHF_theta_traj(max_theta, n_points, overlap, kin, vnuc, eri, nelec, occupation=-1, max_iter=100, threshold=1E-12, p_guess='core', verbose=False, 
