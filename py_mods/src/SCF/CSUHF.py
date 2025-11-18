@@ -211,6 +211,7 @@ def CS_UHF(
         
         P_LR_alph, R_alph, L_alph, e_alph = calculate_P_next(F_next_alph, X, alpha_elec, det_alpha, diagnostics)
         P_LR_beta, R_beta, L_beta, e_beta = calculate_P_next(F_next_beta, X,  beta_elec, det_beta,  diagnostics)
+
         
         P_total = P_LR_alph + P_LR_beta
         P_minus = P_LR_alph - P_LR_beta
@@ -237,6 +238,11 @@ def CS_UHF(
     P_orthogonal = X @ P_total @ X.T
 
     calculate_s2_expectation(P_LR_alph, P_LR_beta, S, verbose)
+
+    print('\n\n\n\n')
+    print(e_alph.real)
+    print(e_beta.real)
+    print('\n\n\n\n')
 
     return converged, E_UHF, e_alph, e_beta, P_LR_alph, P_LR_beta, P_LR_alph_0, P_orthogonal# , orbital_energies, C_munu, L_munu.T, R_munu, P_RR
 
