@@ -424,6 +424,5 @@ def plot_theta_orbital_energies(energies, theta, xrange=[0,0]):
     plt.show()
 
 
-
 if __name__ == "__main__":
     pass 

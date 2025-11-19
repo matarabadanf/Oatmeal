@@ -1,7 +1,7 @@
 import numpy as np
 from py_mods.src.SCF.CSRHF import CS_RHF, theta_traj
 from Dev.CSUHF import UHF_theta_traj, CS_UHF_ContextClass
-from py_mods.src.SCF.CSUHF import UHF_theta_traj as UHF_theta_old_traj
+from py_mods.src.SCF.CSUHF import UHF_theta_traj as UHF_theta_traj_legacy
 from py_mods.src.SCF.RHF import RHF
 from pathlib import Path
 
@@ -132,12 +132,12 @@ def test_qchem_21s() -> None:
     traj_energies = theta_traj(max_theta, n_points, S_even_H2, T_even_H2, V_even_H2, eri_even_H2, 2, occupation=np.array([0,2,0]) ,max_iter=400, threshold=1E-10, p_guess='core', verbose=False)
     assert  np.mean(traj_energies[1]-k2) < 1E-8+1E-8j, f'Mean error is {np.mean(traj_energies-k)} for the 2s2'
 
-    H2_excited_context = CS_UHF_ContextClass(S_even_H2, T_even_H2, V_even_H2, eri_even_H2, 2, occupation=occupations, max_iter=1000, threshold=1E-10, p_guess='core', verbose=True, conv_type='CROP')
+    H2_excited_context = CS_UHF_ContextClass(S_even_H2, T_even_H2, V_even_H2, eri_even_H2, 2, mult=0, occupation=occupations, max_iter=1000, threshold=1E-10, p_guess='core', conv_type='CROP')
 
-    traj_energies = UHF_theta_traj(max_theta, n_points, H2_context)
-    traj_energies = UHF_theta_old_traj(max_theta, n_points, S_even_H2, T_even_H2, V_even_H2, eri_even_H2, 2, occupation=occupations, max_iter=1000, threshold=1E-10, p_guess='core', verbose=True, conv_type='CROP')
-    print(traj_energies)
-    assert  np.mean(traj_energies[1]-k2) < 1E-8+1E-8j, f'Mean error is {np.mean(traj_energies-k2) }'
+    traj_energies = UHF_theta_traj(max_theta, n_points, H2_excited_context)
+    # traj_energies = UHF_theta_traj_legacy(max_theta, n_points, S_even_H2, T_even_H2, V_even_H2, eri_even_H2, 2, occupation=occupations, max_iter=1000, threshold=1E-10, p_guess='core', verbose=True, conv_type='CROP')
+    # print(traj_energies[1])
+    assert np.mean(traj_energies[1]-k2) < 1E-8+1E-8j, f'Mean error is {np.mean(traj_energies-k2) }'
 
 
 def test_qchem_huge() -> None:

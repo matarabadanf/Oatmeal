@@ -28,4 +28,7 @@ Li_context.diagnostics = True
 Li_UHF_results = CS_UHF(Li_context)
 
 plot_map(Li_UHF_results.P_diff.real)
+
+if __name__ == '__main__':
+    pass
  
