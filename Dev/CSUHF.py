@@ -2,11 +2,10 @@ from re import A
 import numpy as np
 from numpy.typing import NDArray
 from typing import Literal, Tuple, Union
-from py_mods.src.SCF.scf_utils import transformation_matrix, guess_density, validate_unrestricted_determinant, scale_integrals, is_diagonal, E_0_comp
+from py_mods.src.SCF.scf_utils import transformation_matrix, guess_density, validate_unrestricted_determinant, scale_integrals, is_diagonal
 from Dev.CSRHF import CS_RHF
 import matplotlib.pyplot as plt
 from dataclasses import dataclass
-from py_mods.src.SCF.RHF import plot_map
 
 @dataclass
 class CS_UHF_ContextClass:
@@ -164,7 +163,7 @@ def CS_UHF(context: CS_UHF_ContextClass) -> CS_UHF_ResultsClass:
     Perform a Complex Scaled RHF calculation.
 
     Takes overlap, kinetic, nuclear attraction and two-electron integrals,
-    applies complex scaling by angle `theta` and runs an RHF-like SCF loop
+    applies complex scaling by angle `theta` and runs an UHF loop
     using biorthogonal diagonalization.
 
     Parameters
@@ -175,7 +174,7 @@ def CS_UHF(context: CS_UHF_ContextClass) -> CS_UHF_ResultsClass:
     Returns
     -------
     CS_UHF_Results
-        Results object containing convergence status, energy, density matrices, orbital energies, and L/R eigenvectors.
+        Results object. For complete description of parameters see definition. 
 
     Notes
     ------
@@ -203,7 +202,7 @@ def CS_UHF(context: CS_UHF_ContextClass) -> CS_UHF_ResultsClass:
     
     # obtain the occupations
     dim = len(context.S)
-    det_alpha, det_beta, natural_occ = validate_unrestricted_determinant( context.n_electrons, context.occupation, dim, context.mult)
+    det_alpha, det_beta, _ = validate_unrestricted_determinant( context.n_electrons, context.occupation, dim, context.mult)
 
     alpha_elec = sum(det_alpha)
     context.n_alpha_initial = alpha_elec
@@ -350,7 +349,7 @@ def CS_UHF(context: CS_UHF_ContextClass) -> CS_UHF_ResultsClass:
                 print('-'*30,  f'   STARTED {context.conv_type}  ', '-' *30)
 
 
-    LR_diagnostics = LR_diagnostic(P_LR_alph, P_LR_beta, P_RR_alph, P_RR_beta, H_core, F_alph, F_beta, context.verbose)
+    LR_diagnostics = UHF_LR_diagnostic(P_LR_alph, P_LR_beta, P_RR_alph, P_RR_beta, H_core, F_alph, F_beta, context.verbose)
     S_diagnostics = calculate_s2_expectation(P_LR_alph, P_LR_beta, context.S, context.verbose)
 
     n_alpha = np.trace(P_LR_alph.real @ context.S)
@@ -560,7 +559,7 @@ def diagonalize_biorthogonal(F_prime: NDArray[np.complex128]):
 
     return e_values, C_prime, L_prime, R_prime, LFR
 
-def LR_diagnostic(P_LR_alph, P_LR_beta, P_RR_alph, P_RR_beta, H_core, F_alph, F_beta, verbose=False):
+def UHF_LR_diagnostic(P_LR_alph, P_LR_beta, P_RR_alph, P_RR_beta, H_core, F_alph, F_beta, verbose=False):
     E_RHF_LR = E_0_unrestricted_comp(P_LR_alph, P_LR_beta, H_core, F_alph.reshape(H_core.shape), F_beta.reshape(H_core.shape))
     E_RHF_RR = E_0_unrestricted_comp(P_RR_alph, P_RR_beta, H_core, F_alph.reshape(H_core.shape), F_beta.reshape(H_core.shape))
     mean_LR_alpha = np.mean(P_LR_alph.flatten()-P_RR_alph.flatten())
