@@ -1,35 +1,17 @@
 import numpy as np
 from numpy.typing import NDArray
 from typing import Literal, Tuple, Union
+from py_mods.src.SCF.CSRHF import CS_RHF, CS_RHF_ContextClass
 from py_mods.src.SCF.scf_utils import transformation_matrix, guess_density, validate_unrestricted_determinant, scale_integrals, is_diagonal
 import matplotlib.pyplot as plt
+from dataclasses import dataclass
 
-def CS_UHF(
-    S: NDArray[np.float64],
-    T: NDArray[np.float64], 
-    V: NDArray[np.float64], 
-    eri: NDArray[np.float64], 
-    n_electrons: int, 
-    mult: Union[None, int] = None,
-    theta: float = 0.,
-    occupation: Union[int, NDArray[np.int32], None] = None,
-    max_iter: int = 100, 
-    threshold: float = 1E-12, 
-    p_guess: Literal['core', 'ones'] = 'core', 
-    verbose: bool = False,
-    conv_type: Literal[None, 'DIIS', 'CROP'] = 'DIIS',
-    conv_MEM: int = 8,
-    conv_ITER_START: int = 12,
-    diagnostics: bool = False,
-) -> Tuple[bool, float, NDArray[np.complex128], NDArray[np.complex128], NDArray[np.complex128], NDArray[np.complex128], NDArray[np.complex128], NDArray[np.complex128]]:
+@dataclass
+class CS_UHF_ContextClass:
     """
-    Perform a Complex Scaled RHF calculation.
+    Context class for CS_UHF calculations.
 
-    Takes overlap, kinetic, nuclear attraction and two-electron integrals,
-    applies complex scaling by angle `theta` and runs an RHF-like SCF loop
-    using biorthogonal diagonalization.
-
-    Parameters
+    Attributes
     ----------
     S : NDArray[np.float64], shape (n, n)
         Overlap matrix.
@@ -50,8 +32,14 @@ def CS_UHF(
         Maximum SCF iterations.
     threshold : float, optional
         Convergence threshold for density matrix difference.
-    p_guess : {'core', 'ones'}, optional
-        Initial density guess.
+    p_guess : Literal['core', 'ones', 'RHF', 'IMPORB'], optional
+        Type of initial guess for density matrix.
+    guess_MAX_ITER : int or None, optional
+        If p_guess is 'RHF', number of iterations to run the preliminary RHF calculation.
+    INPORB : NDArray[np.float64] or None, optional
+        If p_guess is 'INPORB', the initial guess orbitals.
+    break_symm : bool, optional
+        If True, breaks the symmetry of the initial guess density matrix.
     verbose : bool, optional
         If True print iteration progress.
     conv_type : Literal[None, 'DIIS', 'CROP'], optional
@@ -60,20 +48,132 @@ def CS_UHF(
         Number of previous Fock matrices and residuals to store for Convergence Algorithm.
     conv_ITER_START : int, optional
         Iteration number to start Convergence Algorithm.
-    diagnostics : bool, optional
-        If True, print L-R eigenvector diagnostics at the end of the calculation.
+
+    Notes
+    -----
+    - Symmety is broken by zeroing the beta density matrix in the occupied space. 
+    - Breaking symmetry only makes sense when the guess is not zeros.
+    """
+    # Required 
+    S: NDArray[np.float64]
+    T: NDArray[np.float64]
+    V: NDArray[np.float64]
+    eri: NDArray[np.float64]
+    n_electrons: int
+
+    # Optional 
+    mult: Union[None, int] = None
+    theta: float = 0.
+    occupation: Union[int, NDArray[np.int32], None] = None
+    max_iter: int = 100
+    threshold: float = 1E-12
+    p_guess: Literal['core', 'ones', 'RHF', 'IMPORB'] = 'core'
+    guess_MAX_ITER: Union[int, None] = None
+    INPORB: Union[NDArray[np.float64], NDArray[np.complex128], None] = None
+    break_symm: bool = False
+    verbose: bool = False
+    conv_type: Literal[None, 'DIIS', 'CROP'] = 'DIIS'
+    conv_MEM: int = 8
+    conv_ITER_START: int = 12
+
+@dataclass
+class _UHF_LR_DiagnosticsClass(object):
+    E_RHF_LR: np.complex128
+    E_RHF_RR: np.complex128
+    mean_LR_alpha: np.complex128
+    max_LR_alpha: np.complex128
+    mean_LR_beta: np.complex128
+    max_LR_beta: np.complex128
+
+@dataclass
+class _UHF_SpinDiagnosticsClass(object):
+    N_alpha: int
+    N_beta: int
+    s2: float
+    S_z: float
+    spin_contamination: float
+
+
+@dataclass
+class CS_UHF_ResultsClass(object):
+    """ 
+    Results class for CS_UHF calculations.
+
+    Attributes
+    ----------
+    context : CS_UHF_ContextClass
+        Context object used for the calculation.
+    converged : bool
+        Wether SCF calculation converged.
+    E_UHF : float
+        Final UHF energy.
+    e_alph : NDArray[np.complex128], shape (n,)
+        Alpha orbital energies.
+    e_beta : NDArray[np.complex128], shape (n,)
+        Beta orbital energies.
+    X : NDArray[np.complex128], shape (n, n)
+        Transformation matrix.
+    P_guess_alpha: NDArray[np.complex128], shape (n, n)
+        Initial alpha density matrix guess.
+    P_guess_beta: NDArray[np.complex128], shape (n, n)
+        Initial beta density matrix guess.
+    P_LR_alph : NDArray[np.complex128], shape (n, n)
+        Alpha density matrix.
+    P_LR_beta : NDArray[np.complex128], shape (n, n)
+        Beta density matrix.
+    P_total : NDArray[np.complex128], shape (n, n)
+        Total density matrix.
+    P_diff : NDArray[np.complex128], shape (n, n)
+        Spin density matrix (P_alpha - P_beta).
+    L_alpha : NDArray[np.complex128], shape (n, n)
+        Left eigenvector matrix for alpha spin.
+    R_alpha : NDArray[np.complex128], shape (n, n)
+        Right eigenvector matrix for alpha spin.
+    L_beta : NDArray[np.complex128], shape (n, n)
+        Left eigenvector matrix for beta spin.
+    R_beta : NDArray[np.complex128], shape (n, n)
+        Right eigenvector matrix for beta spin.
+    """
+    context: CS_UHF_ContextClass
+    converged: bool
+    E_UHF: float
+    e_alpha: NDArray[np.complex128]
+    e_beta: NDArray[np.complex128]
+    n_alpha: float
+    n_beta: float
+    X: NDArray[np.complex128]
+    P_guess_alpha: NDArray[np.complex128]
+    P_guess_beta: NDArray[np.complex128]
+    P_LR_alpha: NDArray[np.complex128]
+    P_LR_beta: NDArray[np.complex128]
+    P_total: NDArray[np.complex128]
+    P_diff: NDArray[np.complex128]
+    L_alpha: NDArray[np.complex128]
+    R_alpha: NDArray[np.complex128]
+    L_beta: NDArray[np.complex128]
+    R_beta: NDArray[np.complex128]
+    LR_diagnostics: _UHF_LR_DiagnosticsClass
+    S_diagnostics: _UHF_SpinDiagnosticsClass
+    error: float
+    iterations: int
+
+def CS_UHF(context: CS_UHF_ContextClass) -> CS_UHF_ResultsClass:
+    """
+    Perform a Complex Scaled RHF calculation.
+
+    Takes overlap, kinetic, nuclear attraction and two-electron integrals,
+    applies complex scaling by angle `theta` and runs an UHF loop
+    using biorthogonal diagonalization.
+
+    Parameters
+    ----------
+    context : CS_UHF_Context
+        Context object containing all parameters for the calculation.
 
     Returns
     -------
-    Tuple containing:
-        - converged (bool): Convergence status.
-        - E_RHF (float): Final RHF energy.
-        - e_values (NDArray[np.float64][n, n]): Orbital energies.
-        - C_munu (NDArray[np.float64][n, n]): R Molecular orbital coefficients.
-        - P_LR (NDArray[np.float64][n, n]): Final density matrix.
-        - L_munu (NDArray[np.float64][n, n]): L Molecular orbital coefficients.
-        - R_munu (NDArray[np.float64][n, n]): R Molecular orbital coefficients.
-        - P_RR (NDArray[np.float64][n, n]): Final RR density matrix.
+    CS_UHF_Results
+        Results object. For complete description of parameters see definition. 
 
     Notes
     ------
@@ -87,44 +187,70 @@ def CS_UHF(
 
     ^* CROP algorithm does not compute the new trial as t_opt + w_opt, as it breaks convergence here.
     """
-    assert len(T) == len(V) == len(S), "Matrices T, V, S must have the same dimensions"
+    assert len(context.T) == len(context.V) == len(context.S), "Matrices T, V, S must have the same dimensions"
     # assert n_electrons % 2 != 0, "For closed-shell calculations use RHF routine."
-    assert conv_type in [None, 'DIIS', 'CROP'], 'Convergence assist must be either None, DIIS, or CROP'
+    assert context.conv_type in [None, 'DIIS', 'CROP'], 'Convergence assist must be either None, DIIS, or CROP'
 
     # setup
-    conv_REQUESTED = True if conv_type is not None else False
-    conv_ITER_START = min(conv_ITER_START+1, conv_MEM) if conv_MEM >= conv_ITER_START else  max(conv_ITER_START+1, conv_MEM)
+    conv_REQUESTED = True if  context.conv_type is not None else False
+    conv_ITER_START = min(context.conv_ITER_START+1,  context.conv_MEM) if  context.conv_MEM >= context.conv_ITER_START else  max(context.conv_ITER_START+1,  context.conv_MEM)
     
-    if mult is None:
-        mult = int(0) if n_electrons % 2 == 0 else int(1) 
-    assert (n_electrons - mult) % 2 != 1, f"It is not possible to have {mult} unpaired electrons with {n_electrons} electrons."
+    if context.mult is None:
+        context.mult = int(0) if  context.n_electrons % 2 == 0 else int(1) 
+    assert (context.n_electrons - context.mult) % 2 != 1, f"It is not possible to have {context.mult} unpaired electrons with { context.n_electrons} electrons."
     
     # obtain the occupations
-    dim = len(S)
-    det_alpha, det_beta, natural_occ = validate_unrestricted_determinant(n_electrons, occupation, dim, mult)
+    dim = len(context.S)
+    det_alpha, det_beta, _ = validate_unrestricted_determinant( context.n_electrons, context.occupation, dim, context.mult)
 
     alpha_elec = sum(det_alpha)
+    context.n_alpha_initial = alpha_elec
+    context.alpha_occ = det_alpha
     beta_elec = sum(det_beta)
-    if verbose or diagnostics:
+    context.n_beta_initial = beta_elec
+    context.beta_occ = det_beta
+
+    if context.verbose:
         print('\n\nAlpha occupation: ', det_alpha)
         print('Beta  occupation: ', det_beta)
 
     # Otain transformation matrix and validate occupation determinant
-    dim = len(S)
-    X = transformation_matrix(S) + 0j
+    dim = len(context.S)
+    X = transformation_matrix(context.S) + 0j
 
     # rescaling the integrals
-    T_scaled, V_scaled, eri_scaled = scale_integrals(T, V, eri, theta)
+    T_scaled, V_scaled, eri_scaled = scale_integrals(context.T, context.V, context.eri, context.theta)
     H_core = T_scaled + V_scaled
 
     # Guess initial density matrix
-    P_LR_alph = guess_density(dim, p_guess)
+    if context.p_guess == 'RHF':
+        elec_pre = context.n_electrons if context.n_electrons % 2 == 0 else context.n_electrons-1 
+        if isinstance(context.guess_MAX_ITER, int):
+            guess_iter = context.guess_MAX_ITER
+        else: 
+            guess_iter = 12
+            guess_context = CS_RHF_ContextClass(context.S, context.T, context.V, context.eri, n_electrons=elec_pre, theta=0, max_iter=guess_iter, threshold=1E-14, p_guess='core', verbose=False)
+            guess_scf = CS_RHF(guess_context)
+            P_LR_alph = guess_scf.P_LR
+
+
+    elif context.p_guess == 'INPORB':
+        assert context.INPORB is not None, 'Empty INPORB alpha for guess'
+
+        assert isinstance(context.INPORB, np.array) and context.INPORB.shape == X.shape, f'Wrong type ({type(context.INPORB)}) or dimensions ({context.INPORB.shape}) of import guess orbitals, expexted {type(X)} and {X.shape}'
+        P_LR_alph = np.copy(context.INPORB) 
+
+    else: 
+        P_LR_alph = guess_density(dim, context.p_guess)
+    
+    # P_LR_alph *= context.S # this leads to a closer guess to the PySCF one
     P_LR_beta = np.copy(P_LR_alph)
+    
+    if context.break_symm: #note that breaking symmetry will only make sense when the guess is not zeros
+        P_LR_beta[:context.n_electrons, :context.n_electrons] = 0
 
-    # P_LR_alph, _, _, _ = calculate_P_next(H_core.flatten(), X, alpha_elec, det_alpha, diagnostics)
-    # P_LR_beta, _, _, _ = calculate_P_next(H_core.flatten(), X,  beta_elec, det_beta, diagnostics)
-
-    P_LR_alph_0 = P_LR_alph
+    P_guess_alpha = np.copy(P_LR_alph)
+    P_guess_beta = np.copy(P_LR_beta)
 
     # initialize variables and lists
     E_prev = 0.+0.j
@@ -135,18 +261,18 @@ def CS_UHF(
     residuals_alph = []
     residuals_beta = []
 
-    mem_iter = max_iter
+    mem_iter = context.max_iter
     conv_thresh = 1E-4
 
-    if verbose:
+    if context.verbose:
         print('-'*128)
         print('|   Iter   |               E_iter                  |                       Delta_e                   |        norm(e_i)        |')
         print('-'*128)
 
     # SCF loop
-    for iter in range(max_iter):
+    for iteration in range(context.max_iter):
         # calculate F_n and r_n from P_n
-        F_alph, r_alph, F_beta, r_beta = calculate_F_and_r_comp(P_LR_alph, P_LR_beta, S, H_core, eri_scaled)
+        F_alph, r_alph, F_beta, r_beta = calculate_F_and_r_comp(P_LR_alph, P_LR_beta, context.S, H_core, eri_scaled)
 
         error_alph = np.linalg.norm(r_alph.flatten())
         error_beta = np.linalg.norm(r_beta.flatten())
@@ -157,24 +283,24 @@ def CS_UHF(
 
         E_diff = E_UHF - E_prev
 
-        if verbose:
-            print(f'{iter:5}     {E_UHF:45.16f}     {E_diff:45.16f}     {error:8.4E}')
+        if context.verbose:
+            print(f'{iteration:5}     {E_UHF:45.16f}     {E_diff:45.16f}     {error:8.4E}')
 
         # Check convergence
-        if iter > 1 and error < threshold:
+        if iteration > 5 and error < context.threshold:
             converged = True
-            if verbose:
-                print(f'Convergence achieved after {iter} iterations.\n\n:: Final SCF energy = {E_UHF:5}\n\nFinal SCF energy in parseable format\n%% {E_UHF.real:.14E} {E_UHF.imag:.14E} {theta:.6f}')
+            if context.verbose:
+                print(f'Convergence achieved after {iteration} iterations.\n\n:: Final SCF energy = {E_UHF:5}\n\nFinal SCF energy in parseable format\n%% {E_UHF.real:.14E} {E_UHF.imag:.14E} {context.theta:.6f}')
             break
 
         # Save in memory guesses and residuals keeping size of Convergence Algorithm space
 
-        F_guess_alph.append(F_alph )
-        F_guess_beta.append(F_beta )
-        residuals_alph.append(r_alph )
-        residuals_beta.append(r_beta )
+        F_guess_alph.append(F_alph)
+        F_guess_beta.append(F_beta)
+        residuals_alph.append(r_alph)
+        residuals_beta.append(r_beta)
 
-        if len(F_guess_alph) > conv_MEM:
+        if len(F_guess_alph) > context.conv_MEM:
             F_guess_alph.pop(0)
             F_guess_beta.pop(0)
             residuals_alph.pop(0)
@@ -194,7 +320,7 @@ def CS_UHF(
                 F_next_alph = F_opt_alph
                 F_next_beta = F_opt_beta             
 
-                if conv_type == 'CROP':
+                if context.conv_type == 'CROP':
                     F_guess_alph[-1] = F_opt_alph 
                     F_guess_beta[-1] = F_opt_beta 
                     residuals_alph[-1] = r_opt_alpha
@@ -205,48 +331,39 @@ def CS_UHF(
                     F_next_alph = F_opt_alph # + r_opt_alpha
                     F_next_beta = F_opt_beta # + r_opt_beta
             except np.linalg.LinAlgError:
-                print('!!!!!!!!!!!!!!!! CONVERGENCE ACCELERATION CAUSED A SINGULAR MATRIX. REVERTING TO STANDARD SCF !!!!!!!!!!!!!!!')
+                if context.verbose:
+                    print('!!!!!!!!!!!!!!!! CONVERGENCE ACCELERATION CAUSED A SINGULAR MATRIX. REVERTING TO STANDARD SCF !!!!!!!!!!!!!!!')
                 use_conv = False 
 
         
-        P_LR_alph, R_alph, L_alph, e_alph = calculate_P_next(F_next_alph, X, alpha_elec, det_alpha, diagnostics)
-        P_LR_beta, R_beta, L_beta, e_beta = calculate_P_next(F_next_beta, X,  beta_elec, det_beta,  diagnostics)
+        P_LR_alph, R_alph, L_alph, e_alph, P_RR_alph = calculate_P_next(F_next_alph, X, alpha_elec, det_alpha)
+        P_LR_beta, R_beta, L_beta, e_beta, P_RR_beta = calculate_P_next(F_next_beta, X,  beta_elec, det_beta)
 
-        
         P_total = P_LR_alph + P_LR_beta
-        P_minus = P_LR_alph - P_LR_beta
+        P_diff = P_LR_alph - P_LR_beta
 
-        
         E_prev = E_UHF
 
         # Check Convergence Algorithm activation
-        if iter == conv_ITER_START and conv_REQUESTED: #  and error < conv_thresh and not use_conv:
+        if iteration == conv_ITER_START and conv_REQUESTED: #  and error < conv_thresh and not use_conv:
             use_conv = True 
-            if verbose:
-                print('-'*30,  f'   STARTED {conv_type}  ', '-' *30)
+            if context.verbose:
+                print('-'*30,  f'   STARTED {context.conv_type}  ', '-' *30)
 
-    # if diagnostics:
-    #     E_RHF_LR = E_0_comp(P_LR, H_core, F.reshape(H_core.shape))
-    #     E_RHF_RR = E_0_comp(P_RR, H_core, F.reshape(H_core.shape))
-    #     print('\n')
-    #     print('-'*30,  f'   DIAGNOSTICS   ', '-' *30)
-    #     print(f'LR energy: {E_RHF_LR:.8f}')
-    #     print(f'RR energy: {E_RHF_RR:.8f}')
-    #     print(f'LR-RR E_diff: {E_RHF_LR-E_RHF_RR:.8f}')
-    #     print(f'\nMean P_LR-P_RR difference: {np.mean(P_LR.flatten()-P_RR.flatten()):.8E}')
-    #     print(f'Max  P_LR-P_RR difference: {np.max(P_LR.flatten()-P_RR.flatten()):.8E}')
-    P_orthogonal = X @ P_total @ X.T
 
-    calculate_s2_expectation(P_LR_alph, P_LR_beta, S, verbose)
+    LR_diagnostics = UHF_LR_diagnostic(P_LR_alph, P_LR_beta, P_RR_alph, P_RR_beta, H_core, F_alph, F_beta, context.verbose)
+    S_diagnostics = calculate_s2_expectation(P_LR_alph, P_LR_beta, context.S, context.verbose)
 
-    print('\n\n\n\n')
-    print(e_alph.real)
-    print(e_beta.real)
-    print('\n\n\n\n')
+    n_alpha = np.trace(P_LR_alph.real @ context.S)
+    n_beta  = np.trace(P_LR_beta.real @ context.S)
 
-    return converged, E_UHF, e_alph, e_beta, P_LR_alph, P_LR_beta, P_LR_alph_0, P_orthogonal# , orbital_energies, C_munu, L_munu.T, R_munu, P_RR
+    assert abs(n_alpha + n_beta - context.n_electrons) < 1E-10, 'Number of electrons was not conserved in the calculation'
 
-def calculate_P_next(F_alpha: NDArray[np.float64], X: NDArray[np.float64], n_electrons: int, det, diagnostics=False) -> Tuple[NDArray[np.float64], NDArray[np.float64], NDArray[np.float64]]:
+    ResultClass = CS_UHF_ResultsClass(context, converged, E_UHF, e_alph, e_beta, n_alpha, n_beta, X, P_guess_alpha, P_guess_beta, P_LR_alph, P_LR_beta, P_total, P_diff, L_alph, R_alph, L_beta, R_beta, LR_diagnostics, S_diagnostics, error, iteration)
+
+    return ResultClass
+
+def calculate_P_next(F_alpha: NDArray[np.float64], X: NDArray[np.float64], n_electrons: int, det) -> Tuple[NDArray[np.float64], NDArray[np.float64], NDArray[np.float64]]:
     """
     Calculate the next density matrix P_{n+1} given Fock matrix F_n and transformation matrix X.
 
@@ -276,13 +393,6 @@ def calculate_P_next(F_alpha: NDArray[np.float64], X: NDArray[np.float64], n_ele
 
     e_values, C_prime, L_prime, R_prime, LFR = diagonalize_biorthogonal(F_prime)
 
-    # sort_idx = np.argsort(e_values.real)
-    # e_values = e_values[sort_idx]
-    # C_prime = C_prime[:, sort_idx]
-    # L_prime = L_prime[:, sort_idx]
-    # R_prime = R_prime[:, sort_idx]
-    # LFR = LFR[sort_idx][:, sort_idx] if LFR is not None else LFR
-
     assert is_diagonal(LFR), "Matrix product L' @ F' @ R' is not diagonal"
 
     # Obtain untransformed MO coefficients
@@ -291,11 +401,12 @@ def calculate_P_next(F_alpha: NDArray[np.float64], X: NDArray[np.float64], n_ele
     R_munu = X @ R_prime
 
     # Build new density matrix
-
     mask = (det == 1).astype(float)
-    P_spin = np.einsum('ma, a, an -> mn', R_munu, mask, L_munu)
+    P_LR = np.einsum('ma, a, an -> mn', R_munu, mask, L_munu)
+    P_RR = np.einsum('ma, a, an -> mn', R_munu, mask, R_munu)
 
-    return P_spin, R_munu, L_munu, e_values
+
+    return P_LR, R_munu, L_munu, e_values, P_RR
 
 def calculate_F_and_r_comp(P_alpha: NDArray[np.float64], P_beta, S: NDArray[np.float64], H_core: NDArray[np.float64], eri: NDArray[np.float64]) -> Tuple[NDArray[np.float64], NDArray[np.float64]]:
     """
@@ -450,6 +561,27 @@ def diagonalize_biorthogonal(F_prime: NDArray[np.complex128]):
 
     return e_values, C_prime, L_prime, R_prime, LFR
 
+def UHF_LR_diagnostic(P_LR_alph, P_LR_beta, P_RR_alph, P_RR_beta, H_core, F_alph, F_beta, verbose=False):
+    E_RHF_LR = E_0_unrestricted_comp(P_LR_alph, P_LR_beta, H_core, F_alph.reshape(H_core.shape), F_beta.reshape(H_core.shape))
+    E_RHF_RR = E_0_unrestricted_comp(P_RR_alph, P_RR_beta, H_core, F_alph.reshape(H_core.shape), F_beta.reshape(H_core.shape))
+    mean_LR_alpha = np.mean(P_LR_alph.flatten()-P_RR_alph.flatten())
+    max_LR_alpha = np.max(P_LR_alph.flatten()-P_RR_alph.flatten())
+    mean_LR_beta = np.mean(P_LR_beta.flatten()-P_RR_beta.flatten())
+    max_LR_beta = np.max(P_LR_beta.flatten()-P_RR_beta.flatten())
+
+    if verbose:
+        print('\n')
+        print('-'*30,  f'   LR DIAGNOSTICS   ', '-' *30)
+        print(f'LR energy (Normal LR for both alpha and beta): {E_RHF_LR:.8f}')
+        print(f'RR energy (Using  RR for both alpha and beta): {E_RHF_RR:.8f}')
+        print(f'LR-RR E_diff: {E_RHF_LR-E_RHF_RR:.8f}')
+        print(f'\nMean Alpha P_LR-P_RR difference: {mean_LR_alpha:16.8E}')
+        print(f'Max  Alpha P_LR-P_RR difference: {max_LR_alpha:16.8E}')
+        print(f'\nMean Beta  P_LR-P_RR difference: {mean_LR_beta:16.8E}')
+        print(f'Max  Beta  P_LR-P_RR difference: {max_LR_beta:16.8E}')
+    
+    return _UHF_LR_DiagnosticsClass(E_RHF_LR, E_RHF_RR, mean_LR_alpha, max_LR_alpha, mean_LR_beta, max_LR_beta)
+
 
 def calculate_s2_expectation(P_alpha, P_beta, S, verbose=False):
     """
@@ -479,8 +611,8 @@ def calculate_s2_expectation(P_alpha, P_beta, S, verbose=False):
     """
 
     # Calculate number of electrons
-    N_alpha = np.trace(P_alpha @ S).real
-    N_beta  = np.trace(P_beta @ S).real
+    N_alpha = np.trace(P_alpha.real @ S)
+    N_beta  = np.trace(P_beta.real @ S)
 
     # Calculate S_z
     S_z = (N_alpha - N_beta) / 2
@@ -495,21 +627,17 @@ def calculate_s2_expectation(P_alpha, P_beta, S, verbose=False):
 
     if verbose:
         print(f"\n---------------  Spin Diagnostics  ---------------")
-        print(f"N_alpha = {int(N_alpha):6d}")
-        print(f"N_beta  = {int(N_beta):6d}")
+        print(f"N_alpha = {(N_alpha):6f}")
+        print(f"N_beta  = {(N_beta):6f}")
         print(f"S_z = {S_z:.4f}")
         print(f"<S^2> = {s2:.6f}")
         print(f"<S^2>_exact = {s2_exact:.4f}")
         print(f"Spin contamination = {spin_contamination:.6f}")
 
-    return s2, S_z, spin_contamination
+    return _UHF_SpinDiagnosticsClass(N_alpha, N_beta, s2, S_z, spin_contamination)
 
 
-def UHF_theta_traj(max_theta, n_points, overlap, kin, vnuc, eri, nelec, occupation=-1, max_iter=100, threshold=1E-12, p_guess='core', verbose=False, 
-    conv_type: Literal[None, 'DIIS', 'CROP'] = 'DIIS',
-    conv_MEM: int = 5,
-    conv_ITER_START: int = 5,
-    ):
+def UHF_theta_traj(max_theta, n_points, context: CS_UHF_ContextClass):
     """
     Sample CS_RHF energies along a theta trajectory.
 
@@ -544,14 +672,16 @@ def UHF_theta_traj(max_theta, n_points, overlap, kin, vnuc, eri, nelec, occupati
     thetas = np.linspace(0, max_theta, n_points)
     energies = []
     for th in thetas:
-        converged, E_elec, *_ = CS_UHF(overlap, kin, vnuc, eri, nelec, theta=th, occupation=occupation, max_iter=max_iter, threshold=threshold, p_guess=p_guess, verbose=verbose, conv_type=conv_type, conv_MEM=conv_MEM, conv_ITER_START=conv_ITER_START)
-        if converged:
-            energies.append(E_elec)
+        context.theta = th
+        result = CS_UHF(context)
+        if result.converged:
+            energies.append(result.E_UHF)
         else:
             print(f'Traj {th} did not converge.')
-        if verbose and converged:
-            print(f'Converged point at theta = {th:6.4f} : E = {E_elec:12.8f}') 
+        if context.verbose and result.converged:
+            print(f'Converged point at theta = {th:6.4f} : E = {result.E_UHF:12.8f}') 
 
     return thetas, energies
+
 if __name__ == "__main__":
     pass

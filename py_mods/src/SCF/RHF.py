@@ -3,11 +3,14 @@ from numpy.typing import NDArray
 from typing import Literal, Tuple
 from py_mods.src.SCF.scf_utils import transformation_matrix, calc_g_matrix, calc_p_matrix, E_0
 
-def plot_map(matrix, range=None):
+def plot_map(matrix, range=None, title=None):
     import matplotlib.pyplot as plt
     plt.imshow(matrix, cmap="viridis", interpolation="nearest")
     plt.colorbar(label="Value")
-    plt.title("Matrix Heatmap (Matplotlib)")
+    if not isinstance(title, str):
+        plt.title("Matrix Heatmap")
+    else:
+        plt.title(title)
     if range is not None: 
         plt.xlim(range[0])
         plt.ylim(range[1])
@@ -163,7 +166,8 @@ def RHF(
         # Check Convergence Algorithm activation
         if iter == conv_ITER_START and conv_REQUESTED:
             use_conv = True 
-            print('-'*30,  f'   STARTED {conv_type}  ', '-' *30)
+            if verbose:
+                print('-'*30,  f'   STARTED {conv_type}  ', '-' *30)
     
     return converged, E_RHF, orbital_energies, C_munu, P
 

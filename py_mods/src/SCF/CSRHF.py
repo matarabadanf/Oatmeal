@@ -3,32 +3,14 @@ from numpy.typing import NDArray
 from typing import Literal, Tuple, Union
 from py_mods.src.SCF.scf_utils import transformation_matrix, calc_g_matrix_comp, calc_p_matrix_comp, E_0_comp, guess_density, validate_determinant, scale_integrals, is_diagonal, diagonalize_biorthogonal, equiv_matrix
 import matplotlib.pyplot as plt
+from dataclasses import dataclass
 
-def CS_RHF(
-    S: NDArray[np.float64],
-    T: NDArray[np.float64], 
-    V: NDArray[np.float64], 
-    eri: NDArray[np.float64], 
-    n_electrons: int, 
-    theta: float,
-    occupation: Union[int, NDArray[np.int32], None] = None,
-    max_iter: int = 100, 
-    threshold: float = 1E-12, 
-    p_guess: Literal['core', 'ones'] = 'core', 
-    verbose: bool = False,
-    conv_type: Literal[None, 'DIIS', 'CROP'] = 'DIIS',
-    conv_MEM: int = 5,
-    conv_ITER_START: int = 5,
-    diagnostics: bool = False,
-) -> Tuple[bool, float, NDArray[np.complex128], NDArray[np.complex128], NDArray[np.complex128], NDArray[np.complex128], NDArray[np.complex128], NDArray[np.complex128]]:
+@dataclass
+class CS_RHF_ContextClass:
     """
-    Perform a Complex Scaled RHF calculation.
+    Context class for CS_UHF calculations.
 
-    Takes overlap, kinetic, nuclear attraction and two-electron integrals,
-    applies complex scaling by angle `theta` and runs an RHF-like SCF loop
-    using biorthogonal diagonalization.
-
-    Parameters
+    Attributes
     ----------
     S : NDArray[np.float64], shape (n, n)
         Overlap matrix.
@@ -49,8 +31,14 @@ def CS_RHF(
         Maximum SCF iterations.
     threshold : float, optional
         Convergence threshold for density matrix difference.
-    p_guess : {'core', 'ones'}, optional
-        Initial density guess.
+    p_guess : Literal['core', 'ones', 'RHF', 'IMPORB'], optional
+        Type of initial guess for density matrix.
+    guess_MAX_ITER : int or None, optional
+        If p_guess is 'RHF', number of iterations to run the preliminary RHF calculation.
+    INPORB : NDArray[np.float64] or None, optional
+        If p_guess is 'INPORB', the initial guess orbitals.
+    break_symm : bool, optional
+        If True, breaks the symmetry of the initial guess density matrix.
     verbose : bool, optional
         If True print iteration progress.
     conv_type : Literal[None, 'DIIS', 'CROP'], optional
@@ -59,20 +47,106 @@ def CS_RHF(
         Number of previous Fock matrices and residuals to store for Convergence Algorithm.
     conv_ITER_START : int, optional
         Iteration number to start Convergence Algorithm.
-    diagnostics : bool, optional
-        If True, print L-R eigenvector diagnostics at the end of the calculation.
+
+    Notes
+    -----
+    - Symmety is broken by zeroing the beta density matrix in the occupied space. 
+    - Breaking symmetry only makes sense when the guess is not zeros.
+    """
+    # Required 
+    S: NDArray[np.float64]
+    T: NDArray[np.float64]
+    V: NDArray[np.float64]
+    eri: NDArray[np.float64]
+    n_electrons: int
+
+    # Optional 
+    theta: float = 0.
+    occupation: Union[int, NDArray[np.int32], None] = None
+    max_iter: int = 100
+    threshold: float = 1E-12
+    p_guess: Literal['core', 'ones', 'IMPORB'] = 'core'
+    guess_MAX_ITER: Union[int, None] = None
+    INPORB: Union[NDArray[np.float64], NDArray[np.complex128], None] = None
+    verbose: bool = False
+    conv_type: Literal[None, 'DIIS', 'CROP'] = 'DIIS'
+    conv_MEM: int = 8
+    conv_ITER_START: int = 12
+
+@dataclass
+class _RHF_LR_DiagnosticsClass(object):
+    E_RHF_LR: np.complex128
+    E_RHF_RR: np.complex128
+    mean_LR: np.complex128
+    max_LR: np.complex128
+
+@dataclass
+class CS_RHF_ResultsClass(object):
+    """
+    Results class for CS_RHF calculations.
+
+    Attributes
+    ----------
+    context : CS_RHF_ContextClass
+        Context object used for the calculation.
+    converged : bool
+        Whether the SCF calculation converged.
+    E_RHF : complex
+        Final RHF energy.
+    e_orb : NDArray[np.complex128], shape (n,)
+        Orbital energies.
+    n_elec : int
+        Number of electrons.
+    X : NDArray[np.complex128], shape (n, n)
+        Transformation matrix.
+    P_guess : NDArray[np.complex128], shape (n, n)
+        Initial density matrix guess.
+    P_LR : NDArray[np.complex128], shape (n, n)
+        Final LR density matrix.
+    R_munu : NDArray[np.complex128], shape (n, n)
+        Right molecular orbital coefficients.
+    L_munu : NDArray[np.complex128], shape (n, n)
+        Left molecular orbital coefficients.
+    LR_diagnostics : _RHF_LR_DiagnosticsClass
+        Diagnostics comparing LR and RR densities/energies.
+    error : float
+        Final residual norm.
+    iterations : int
+        Number of SCF iterations performed.
+    """
+    context: CS_RHF_ContextClass
+    converged: bool
+    E_RHF: float
+    e_orb: NDArray[np.complex128]
+    n_elec: float
+    X: NDArray[np.complex128]
+    P_guess: NDArray[np.complex128]
+    P_LR: NDArray[np.complex128]
+    R_munu: NDArray[np.complex128]
+    L_munu: NDArray[np.complex128]
+    LR_diagnostics: _RHF_LR_DiagnosticsClass
+    error: float
+    iterations: int
+
+
+def CS_RHF(ctx: CS_RHF_ContextClass) -> CS_RHF_ResultsClass:
+    """
+    Perform a Complex Scaled RHF calculation.
+
+    Takes overlap, kinetic, nuclear attraction and two-electron integrals,
+    applies complex scaling by angle `theta` and runs an RHF-like SCF loop
+    using biorthogonal diagonalization.
+
+    Parameters
+    ----------
+    context : CS_RHF_ContextClass
+        Context object containing parameters and integrals.
 
     Returns
     -------
-    Tuple containing:
-        - converged (bool): Convergence status.
-        - E_RHF (float): Final RHF energy.
-        - e_values (NDArray[np.float64][n, n]): Orbital energies.
-        - C_munu (NDArray[np.float64][n, n]): R Molecular orbital coefficients.
-        - P_LR (NDArray[np.float64][n, n]): Final density matrix.
-        - L_munu (NDArray[np.float64][n, n]): L Molecular orbital coefficients.
-        - R_munu (NDArray[np.float64][n, n]): R Molecular orbital coefficients.
-        - P_RR (NDArray[np.float64][n, n]): Final RR density matrix.
+    CS_RHF_ResultsClass
+        Results object containing convergence status, final energy, orbital energies,
+        density matrices, molecular orbital coefficients, and diagnostics.
 
     Notes
     ------
@@ -86,6 +160,23 @@ def CS_RHF(
 
     ^* CROP algorithm does not compute the new trial as t_opt + w_opt, as it breaks convergence here.
     """
+    # unpacking. Easiest to maintain compatibility. 
+    S = ctx.S
+    T = ctx.T
+    V = ctx.V
+    eri = ctx.eri
+    n_electrons = ctx.n_electrons
+    theta = ctx.theta
+    occupation = ctx.occupation
+    max_iter = ctx.max_iter
+    threshold = ctx.threshold
+    p_guess = ctx.p_guess
+    verbose = ctx.verbose
+    conv_type = ctx.conv_type
+    conv_MEM = ctx.conv_MEM
+    conv_ITER_START = ctx.conv_ITER_START
+    diagnostics = getattr(ctx, "diagnostics", False)
+
     assert len(T) == len(V) == len(S), "Matrices T, V, S must have the same dimensions"
     assert n_electrons % 2 == 0, "RHF can only be closed-shell systems"
     assert conv_type in [None, 'DIIS', 'CROP'], 'Convergence assist must be either None, DIIS, or CROP'
@@ -148,14 +239,20 @@ def CS_RHF(
             F_next = F 
         
         elif use_conv:
-            F_opt, r_opt = conv_guess(residuals, F_guess)
+            try:
+                F_opt, r_opt = conv_guess(residuals, F_guess)
 
-            F_next = F_opt # Default is DIIS
+                F_next = F_opt # Default is DIIS
 
-            if conv_type == 'CROP':
-                F_guess[-1] = F_opt
-                residuals[-1] = r_opt  
-                F_next = F_opt # + r_opt # equation 32 Ettenhuber, r_opt should be here, but it diverges idk why
+                if conv_type == 'CROP':
+                    F_guess[-1] = F_opt
+                    residuals[-1] = r_opt  
+                    F_next = F_opt # + r_opt # equation 32 Ettenhuber, r_opt should be here, but it diverges idk why
+
+            except np.linalg.LinAlgError:
+                if verbose:
+                    print('!!!!!!!!!!!!!!!! CONVERGENCE ACCELERATION CAUSED A SINGULAR MATRIX. REVERTING TO STANDARD SCF !!!!!!!!!!!!!!!')
+                use_conv = False 
 
         P_old = np.copy(P_LR)
         
@@ -168,20 +265,26 @@ def CS_RHF(
             use_conv = True 
             if verbose:
                 print('-'*30,  f'   STARTED {conv_type}  ', '-' *30)
+    
+    LR_diagnostics = lr_diagonstics(P_LR, P_RR, H_core, F, verbose)
 
-    if diagnostics:
-        E_RHF_LR = E_0_comp(P_LR, H_core, F.reshape(H_core.shape))
-        E_RHF_RR = E_0_comp(P_RR, H_core, F.reshape(H_core.shape))
-        print('\n')
-        print('-'*30,  f'   DIAGNOSTICS   ', '-' *30)
-        print(f'LR energy: {E_RHF_LR:.8f}')
-        print(f'RR energy: {E_RHF_RR:.8f}')
-        print(f'LR-RR E_diff: {E_RHF_LR-E_RHF_RR:.8f}')
-        print(f'\nMean P_LR-P_RR difference: {np.mean(P_LR.flatten()-P_RR.flatten()):.8E}')
-        print(f'Max  P_LR-P_RR difference: {np.max(P_LR.flatten()-P_RR.flatten()):.8E}')
+    ResultClass = CS_RHF_ResultsClass(
+        context=ctx,
+        converged=converged,
+        E_RHF=E_RHF,
+        e_orb=orbital_energies,
+        n_elec=n_electrons,
+        X=X,
+        P_guess=P_old,
+        P_LR=P_LR,
+        R_munu=R_munu,
+        L_munu=L_munu,
+        LR_diagnostics=LR_diagnostics,
+        error=error,
+        iterations=iter
+    )
 
-
-    return converged, E_RHF, orbital_energies, C_munu, P_LR, L_munu.T, R_munu, P_RR
+    return ResultClass
 
 def calculate_P_next(F_0: NDArray[np.float64], X: NDArray[np.float64], n_electrons: int, det, natural_occ, diagnostics=False) -> Tuple[NDArray[np.float64], NDArray[np.float64], NDArray[np.float64]]:
     """
@@ -313,11 +416,30 @@ def conv_guess(residuals: NDArray[np.float64], F_guesses: NDArray[np.float64]) -
 
     return F_conv, r_conv
 
-def theta_traj(max_theta, n_points, overlap, kin, vnuc, eri, nelec, occupation=-1, max_iter=100, threshold=1E-12, p_guess='core', verbose=False, 
-    conv_type: Literal[None, 'DIIS', 'CROP'] = 'DIIS',
-    conv_MEM: int = 5,
-    conv_ITER_START: int = 5,
-    ):
+def lr_diagonstics(P_LR, P_RR, H_core, F, verbose)->_RHF_LR_DiagnosticsClass:
+    E_RHF_LR = E_0_comp(P_LR, H_core, F.reshape(H_core.shape))
+    E_RHF_RR = E_0_comp(P_RR, H_core, F.reshape(H_core.shape))
+
+    if verbose:
+        print('\n')
+        print('-'*30,  f'   DIAGNOSTICS   ', '-' *30)
+        print(f'LR energy: {E_RHF_LR:.8f}')
+        print(f'RR energy: {E_RHF_RR:.8f}')
+        print(f'LR-RR E_diff: {E_RHF_LR-E_RHF_RR:.8f}')
+        print(f'\nMean P_LR-P_RR difference: {np.mean(P_LR.flatten()-P_RR.flatten()):.8E}')
+        print(f'Max  P_LR-P_RR difference: {np.max(P_LR.flatten()-P_RR.flatten()):.8E}')
+
+
+    LR_diagnostics = _RHF_LR_DiagnosticsClass(
+        E_RHF_LR=E_RHF_LR,
+        E_RHF_RR=E_RHF_RR,
+        mean_LR=np.mean(P_LR.flatten()-P_RR.flatten()),
+        max_LR=np.max(P_LR.flatten()-P_RR.flatten())
+    )
+
+    return LR_diagnostics
+
+def RHF_theta_traj(max_theta, n_points, cxt: CS_RHF_ContextClass):
     """
     Sample CS_RHF energies along a theta trajectory.
 
@@ -352,15 +474,16 @@ def theta_traj(max_theta, n_points, overlap, kin, vnuc, eri, nelec, occupation=-
     thetas = np.linspace(0, max_theta, n_points)
     energies = []
     for th in thetas:
-        converged, E_elec, *_ = CS_RHF(overlap, kin, vnuc, eri, nelec, th, occupation=occupation, max_iter=max_iter, threshold=threshold, p_guess=p_guess, verbose=verbose, conv_type=conv_type, conv_MEM=conv_MEM, conv_ITER_START=conv_ITER_START)
-        if converged:
-            energies.append(E_elec)
+        cxt.theta = th
+        res = CS_RHF(cxt)
+        if res.converged:
+            energies.append(res.E_RHF)
         else:
             print(f'Traj {th} did not converge.')
-        if verbose and converged:
-            print(f'Converged point at theta = {th:6.4f} : E = {E_elec:12.8f}') 
+        if cxt.verbose and res.converged:
+            print(f'Converged point at theta = {th:6.4f} : E = {res.E_RHF:12.8f}') 
 
-    return thetas, energies
+    return thetas, np.array(energies, dtype=np.complex128)
 
 def plot_theta_traj(energies):
     """
@@ -422,7 +545,6 @@ def plot_theta_orbital_energies(energies, theta, xrange=[0,0]):
 
     plt.grid(True, alpha=0.3)
     plt.show()
-
 
 
 if __name__ == "__main__":

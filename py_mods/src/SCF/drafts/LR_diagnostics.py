@@ -65,3 +65,6 @@ converged, E_elec_comp, E_e_values, R_munu_prime, P, L_munu, R_munu, P_RR = CS_R
 # print("\n (vv|oo) == (oo|vv):")
 # print(mo_eri[3,0,3,0])
 # print(mo_eri[0,3,0,3])
+
+if __name__ == '__main__':
+    pass
