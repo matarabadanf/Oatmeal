@@ -1,9 +1,8 @@
-from re import A
 import numpy as np
 from numpy.typing import NDArray
 from typing import Literal, Tuple, Union
+from py_mods.src.SCF.CSRHF import CS_RHF, CS_RHF_ContextClass
 from py_mods.src.SCF.scf_utils import transformation_matrix, guess_density, validate_unrestricted_determinant, scale_integrals, is_diagonal
-from Dev.CSRHF import CS_RHF
 import matplotlib.pyplot as plt
 from dataclasses import dataclass
 
@@ -229,8 +228,10 @@ def CS_UHF(context: CS_UHF_ContextClass) -> CS_UHF_ResultsClass:
         if isinstance(context.guess_MAX_ITER, int):
             guess_iter = context.guess_MAX_ITER
         else: 
-            guess_iter = 8
-        _, _, _, _, P_LR_alph, *_ = CS_RHF(context.S, context.T, context.V, context.eri, n_electrons=elec_pre, theta=0, max_iter=guess_iter, threshold=1E-14, p_guess='core', verbose=False)
+            guess_iter = 12
+            guess_context = CS_RHF_ContextClass(context.S, context.T, context.V, context.eri, n_electrons=elec_pre, theta=0, max_iter=guess_iter, threshold=1E-14, p_guess='core', verbose=False)
+            guess_scf = CS_RHF(guess_context)
+            P_LR_alph = guess_scf.P_LR
 
 
     elif context.p_guess == 'INPORB':
@@ -330,7 +331,8 @@ def CS_UHF(context: CS_UHF_ContextClass) -> CS_UHF_ResultsClass:
                     F_next_alph = F_opt_alph # + r_opt_alpha
                     F_next_beta = F_opt_beta # + r_opt_beta
             except np.linalg.LinAlgError:
-                print('!!!!!!!!!!!!!!!! CONVERGENCE ACCELERATION CAUSED A SINGULAR MATRIX. REVERTING TO STANDARD SCF !!!!!!!!!!!!!!!')
+                if context.verbose:
+                    print('!!!!!!!!!!!!!!!! CONVERGENCE ACCELERATION CAUSED A SINGULAR MATRIX. REVERTING TO STANDARD SCF !!!!!!!!!!!!!!!')
                 use_conv = False 
 
         

@@ -1,8 +1,6 @@
 import numpy as np
-from Dev.CSUHF import UHF_theta_traj, CS_UHF_ContextClass
-from Dev.CSRHF import CS_RHF as CS_RHF_new
-from Dev.CSRHF import RHF_theta_traj, CS_RHF_ContextClass
-from py_mods.src.SCF.CSUHF import UHF_theta_traj as UHF_theta_traj_legacy
+from py_mods.src.SCF.CSRHF import CS_RHF, RHF_theta_traj, CS_RHF_ContextClass
+from py_mods.src.SCF.CSUHF import UHF_theta_traj, CS_UHF_ContextClass
 from py_mods.src.SCF.RHF import RHF
 from pathlib import Path
 
@@ -43,7 +41,7 @@ def test_theta_zero() -> None:
         verbose=False
     )
 
-    Li_results = CS_RHF_new(Li_cxt)
+    Li_results = CS_RHF(Li_cxt)
     assert converged, "CS-RHF Calculation did not converge"
     assert abs(Li_results.E_RHF - E_hf_sto3g_li) < 1E-8, f"CS-RHF energy does not match unscaled reference value {Li_results.E_RHF} != {E_hf_sto3g_li}"
 
@@ -71,7 +69,7 @@ def test_theta_non_scaled() -> None:
         verbose=False
     )
 
-    even_s29_res = CS_RHF_new(even_s29_ctx)
+    even_s29_res = CS_RHF(even_s29_ctx)
     assert even_s29_res.converged == True, "CS-RHF Calculation did not converge"
     assert abs(even_s29_res.E_RHF - E_hf_29s_He) < 1E-8, f"CS-RHF energy does not match unscaled reference value {even_s29_res.E_RHF} != {E_hf_29s_He}"
 
@@ -97,7 +95,7 @@ def test_theta_18_scaled() -> None:
 
     He_29s_context.theta = 0.18
     # test: SCF convergence for He in 29s, compared with the CS algorithm at theta = 0
-    He_29s_res = CS_RHF_new(He_29s_context)
+    He_29s_res = CS_RHF(He_29s_context)
     assert He_29s_res.converged == True, "CS-RHF Calculation did not converge"
     assert abs(He_29s_res.E_RHF - E_hf_29s_He) < 1E-8, f"CS-RHF energy does not match unscaled reference value {He_29s_res.E_RHF} != {E_hf_29s_He}"
 
@@ -123,7 +121,7 @@ def test_theta_excited_non_scaled() -> None:
     He_29s_2s2.occupation = np.array([0,2,0])
 
     # test: SCF convergence for He in 29s, compared with the CS algorithm at theta = 0
-    He_29s_2s2_results = CS_RHF_new(He_29s_2s2)
+    He_29s_2s2_results = CS_RHF(He_29s_2s2)
     assert He_29s_2s2_results.converged == True, "CS-RHF Calculation did not converge"
     assert abs(He_29s_2s2_results.E_RHF - E_hf_29s_He) < 1E-8, f"CS-RHF energy does not match unscaled reference value {He_29s_2s2_results.E_RHF} != {E_hf_29s_He}"
 
@@ -150,7 +148,7 @@ def test_theta_excited_non_scaled_huge_basis() -> None:
     He_29s_2s2.occupation = np.array([0,2,0])
 
     # test: excited SCF convergence for He in aug-cc-pv(5+d)z
-    He_29s_2s2_results = CS_RHF_new(He_29s_2s2)
+    He_29s_2s2_results = CS_RHF(He_29s_2s2)
     assert He_29s_2s2_results.converged == True, "CS-RHF Calculation did not converge"
     assert abs(He_29s_2s2_results.E_RHF - E_hf_aug_5Z_He) < 1E-8, f"CS-RHF energy does not match unscaled reference value {He_29s_2s2_results.E_RHF} != {E_hf_aug_5Z_He}"
 
@@ -178,7 +176,7 @@ def test_theta_excited_18_scaled_huge_basis() -> None:
     He_29s_2s2.theta=0.05   
 
     # test: excited SCF convergence for He in aug-cc-pv(5+d)z with theta = 0.05
-    He_29s_2s2_results = CS_RHF_new(He_29s_2s2)
+    He_29s_2s2_results = CS_RHF(He_29s_2s2)
     assert He_29s_2s2_results.converged == True, "CS-RHF Calculation did not converge"
     assert abs(He_29s_2s2_results.E_RHF - E_hf_aug_5Z_He) < 1E-8, f"CS-RHF energy does not match unscaled reference value {He_29s_2s2_results.E_RHF} != {E_hf_aug_5Z_He}"
 

@@ -239,14 +239,20 @@ def CS_RHF(ctx: CS_RHF_ContextClass) -> CS_RHF_ResultsClass:
             F_next = F 
         
         elif use_conv:
-            F_opt, r_opt = conv_guess(residuals, F_guess)
+            try:
+                F_opt, r_opt = conv_guess(residuals, F_guess)
 
-            F_next = F_opt # Default is DIIS
+                F_next = F_opt # Default is DIIS
 
-            if conv_type == 'CROP':
-                F_guess[-1] = F_opt
-                residuals[-1] = r_opt  
-                F_next = F_opt # + r_opt # equation 32 Ettenhuber, r_opt should be here, but it diverges idk why
+                if conv_type == 'CROP':
+                    F_guess[-1] = F_opt
+                    residuals[-1] = r_opt  
+                    F_next = F_opt # + r_opt # equation 32 Ettenhuber, r_opt should be here, but it diverges idk why
+
+            except np.linalg.LinAlgError:
+                if verbose:
+                    print('!!!!!!!!!!!!!!!! CONVERGENCE ACCELERATION CAUSED A SINGULAR MATRIX. REVERTING TO STANDARD SCF !!!!!!!!!!!!!!!')
+                use_conv = False 
 
         P_old = np.copy(P_LR)
         

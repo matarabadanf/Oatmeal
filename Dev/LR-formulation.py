@@ -1,6 +1,6 @@
 from pyscf import gto, scf
 import numpy as np 
-from Dev.CSUHF import CS_UHF_ContextClass, CS_UHF
+from Dev.CSUHF_dev import CS_UHF_ContextClass, CS_UHF
 
 mol_He= gto.M(atom = 'He 0 0 0', spin=0, charge=0, basis='aug-cc-pvqz') # basis='aug-cc-pVqZ')
 
