@@ -1,7 +1,7 @@
 from pyscf import gto, scf
 import numpy as np
 from pathlib import Path
-from Dev.CSUHF_dev import CS_UHF_ContextClass, CS_UHF
+from py_mods.src.SCF.CSUHF import CS_UHF_ContextClass, CS_UHF
 from py_mods.src.SCF.RHF import plot_map
 
 data_path = Path(__file__).parent.parent
