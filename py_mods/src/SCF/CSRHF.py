@@ -360,7 +360,7 @@ def theta_traj(max_theta, n_points, overlap, kin, vnuc, eri, nelec, occupation=-
         if verbose and converged:
             print(f'Converged point at theta = {th:6.4f} : E = {E_elec:12.8f}') 
 
-    return thetas, energies
+    return thetas, np.array(energies, dtype=np.complex128)
 
 def plot_theta_traj(energies):
     """

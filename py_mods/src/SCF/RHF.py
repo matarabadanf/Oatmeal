@@ -166,7 +166,8 @@ def RHF(
         # Check Convergence Algorithm activation
         if iter == conv_ITER_START and conv_REQUESTED:
             use_conv = True 
-            print('-'*30,  f'   STARTED {conv_type}  ', '-' *30)
+            if verbose:
+                print('-'*30,  f'   STARTED {conv_type}  ', '-' *30)
     
     return converged, E_RHF, orbital_energies, C_munu, P
 
