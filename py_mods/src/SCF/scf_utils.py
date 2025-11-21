@@ -481,18 +481,23 @@ def diagonalize_biorthogonal(F_prime: NDArray[np.complex128]):
     LFR : NDArray[np.complex128], shape (n, n)
         Product L_prime @ F_prime @ R_prime, should be diagonal.
     """
-    e_values, C_prime = np.linalg.eig(F_prime)
 
+    e_values, C_prime = np.linalg.eig(F_prime)
+    
     idx = e_values.argsort()
     e_values = e_values[idx]
     C_prime = C_prime[:, idx]
-    R_prime = np.copy(C_prime)
+    C_prime, _ = np.linalg.qr(C_prime)
 
+    R_prime = np.copy(C_prime)
     L_prime = np.linalg.inv(C_prime)
 
     LFR = L_prime @ F_prime @ R_prime
 
     assert is_diagonal(LFR), "LFR is not diagonal. Check."
+    assert is_diagonal(L_prime @ R_prime)
+    # print(np.conj(C_prime.T) @ C_prime)
+    
 
     return e_values, C_prime, L_prime, R_prime, LFR
 
