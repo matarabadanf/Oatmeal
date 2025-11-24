@@ -482,6 +482,20 @@ def diagonalize_biorthogonal(F_prime: NDArray[np.complex128], complex=False):
         Product L_prime @ F_prime @ R_prime, should be diagonal.
     """
 
+    print(f'F prime is normal: {np.allclose(F_prime @ F_prime.conj().T, F_prime.conj().T @ F_prime)}')
+
+    print(repr(F_prime))
+
+    T, U = scipy.linalg.schur(F_prime)
+
+    e_values = scipy.linalg.eigvals(T)
+
+    R_prime = C_prime = U 
+    L_prime = U.conj().T
+
+    LFR = L_prime @ F_prime @ R_prime
+
+    # assert is_diagonal(LFR, 1E-5), "LFR is not diagonal in schur. Check."
 
     return _diagonalize_biorthogonal_nonherm(F_prime)
     
@@ -490,7 +504,7 @@ def diagonalize_biorthogonal(F_prime: NDArray[np.complex128], complex=False):
 def _diagonalize_biorthogonal_nonherm(F_prime: NDArray[np.complex128]):
     """
     Diagonalize a non-hermitian matrix. 
-    
+
     Looking into that. 
 
     Parameters
