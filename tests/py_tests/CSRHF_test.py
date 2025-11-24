@@ -1,5 +1,6 @@
 import numpy as np
-from py_mods.src.SCF.CSRHF import CS_RHF, RHF_theta_traj, CS_RHF_ContextClass
+# from py_mods.src.SCF.CSRHF import CS_RHF, RHF_theta_traj, CS_RHF_ContextClass
+from Dev.CSRHF_dev import CS_RHF, RHF_theta_traj, CS_RHF_ContextClass
 from py_mods.src.SCF.CSUHF import UHF_theta_traj, CS_UHF_ContextClass
 from py_mods.src.SCF.RHF import RHF
 from pathlib import Path
@@ -255,5 +256,5 @@ def test_qchem_huge() -> None:
     assert np.mean(traj_cls_ener[1]-k2) < 1E-8+1E-8j, f'Mean error is {np.mean(traj_cls_ener-k) }'
 
 if __name__ == "__main__":
-    test_qchem_huge()
+    test_theta_non_scaled()
     pass

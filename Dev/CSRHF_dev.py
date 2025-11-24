@@ -211,13 +211,14 @@ def CS_RHF(ctx: CS_RHF_ContextClass) -> CS_RHF_ResultsClass:
 
     if verbose:
         print('-'*128)
-        print('|   Iter   |               E_iter                  |                       Delta_e                   |        norm(e_i)        |')
+        print('|   Iter     |                   E_iter                      |                   Delta_e                   |      norm(e_i)      |')
         print('-'*128)
 
     # SCF loop
     for iter in range(max_iter):
         # calculate F_n and r_n from P_n
         F, r = calculate_F_and_r_comp(P_LR, S, H_core, eri_scaled)
+        # print(f'Normal condition: {np.allclose(F.conj().T @ F, F @ F.conj().T)}')
         error = np.linalg.norm(r.flatten())
         E_RHF = E_0_comp(P_LR, H_core, F.reshape(H_core.shape))
         E_diff = E_RHF - E_prev
@@ -261,7 +262,7 @@ def CS_RHF(ctx: CS_RHF_ContextClass) -> CS_RHF_ResultsClass:
 
         P_old = np.copy(P_LR)
         
-        P_LR, C_munu, orbital_energies, L_munu, R_munu, P_RR, C_prime = calculate_P_next(F_next.reshape(X.shape), X, n_electrons, det, natural_occupation)
+        P_LR, C_munu, orbital_energies, L_munu, R_munu, P_RR, C_prime = calculate_P_next(F_next.reshape(X.shape), X, n_electrons, det, theta, natural_occupation)
 
         E_prev = E_RHF 
 
@@ -293,7 +294,7 @@ def CS_RHF(ctx: CS_RHF_ContextClass) -> CS_RHF_ResultsClass:
 
     return ResultClass
 
-def calculate_P_next(F_0: NDArray[np.float64], X: NDArray[np.float64], n_electrons: int, det, natural_occ) -> Tuple[NDArray[np.float64], NDArray[np.float64], NDArray[np.float64]]:
+def calculate_P_next(F_0: NDArray[np.float64], X: NDArray[np.float64], n_electrons: int, det, theta, natural_occ) -> Tuple[NDArray[np.float64], NDArray[np.float64], NDArray[np.float64]]:
     """
     Calculate the next density matrix P_{n+1} given Fock matrix F_n and transformation matrix X.
 
@@ -319,7 +320,9 @@ def calculate_P_next(F_0: NDArray[np.float64], X: NDArray[np.float64], n_electro
     """
     F_prime = X @ F_0 @ X.T
 
-    e_values, C_prime, L_prime, R_prime, LFR = diagonalize_biorthogonal(F_prime)
+    complex = False if theta == 0. else True
+
+    e_values, C_prime, L_prime, R_prime, LFR = diagonalize_biorthogonal(F_prime, complex)
 
     assert is_diagonal(LFR), "Matrix product L' @ F' @ R' is not diagonal" 
     # print(f'C_munu @ C_munu = {np.conj(C_prime.T) @ C_prime}')
@@ -445,8 +448,10 @@ def lr_diagonstics(P_LR: NDArray[np.complex128], P_RR: NDArray[np.complex128], L
         print(f'LR-RR E_diff: {E_RHF_LR-E_RHF_RR:.8f}')
         print(f'\nMean P_LR-P_RR difference: {np.mean(P_LR.flatten()-P_RR.flatten()):.8E}')
         print(f'Max  P_LR-P_RR difference: {np.max(P_LR.flatten()-P_RR.flatten()):.8E}')
-        print(f'\nP  hermiticity diagnostic (P_LR / P_RR): {P_frobenius_norm}')
-        print(f'\nLR hermiticity diagnostic (L_mn / R_mn): {LR_frobenius_norm}')
+        print(f'Mean C_LR-C_RR difference: {np.mean(LR_diff):.8E}')
+        print(f'Max  C_LR-C_RR difference: {np.max(LR_diff):.8E}')
+        print(f'\nP_LR hermiticity diagnostic (P_LR / P_RR): {P_frobenius_norm}')
+        print(f'\nC_LR hermiticity diagnostic (L_mn / R_mn): {LR_frobenius_norm}')
 
 
     LR_diagnostics = _RHF_LR_DiagnosticsClass(

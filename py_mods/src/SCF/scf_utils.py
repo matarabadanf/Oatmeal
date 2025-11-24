@@ -1,6 +1,7 @@
 import numpy as np
 from numpy.typing import NDArray
 from typing import Literal, Optional, Union, Tuple, Sequence
+import scipy
 
 # --- Linalg Utilities ---
 
@@ -456,12 +457,11 @@ def guess_density(dim: int, method: Literal['core', 'ones']) -> NDArray[np.compl
     return P_guess
 
 
-def diagonalize_biorthogonal(F_prime: NDArray[np.complex128]):
+def diagonalize_biorthogonal(F_prime: NDArray[np.complex128], complex=False):
     """
-    Diagonalize a (generally non-Hermitian) transformed Fock matrix F'.
+    Diagonalize a matrix using LR solution.
 
-    Uses numpy.linalg.eig to obtain right eigenvectors; constructs left
-    eigenvectors as the inverse of the right eigenvector matrix.
+    Uses numpy.linalg.eig to obtain right eigenvectors. Obtains L as as the inverse of R.
 
     Parameters
     ----------
@@ -482,22 +482,47 @@ def diagonalize_biorthogonal(F_prime: NDArray[np.complex128]):
         Product L_prime @ F_prime @ R_prime, should be diagonal.
     """
 
-    e_values, C_prime = np.linalg.eig(F_prime)
+
+    return _diagonalize_biorthogonal_nonherm(F_prime)
     
+    return e_values, C_prime, L_prime, R_prime, LFR
+
+def _diagonalize_biorthogonal_nonherm(F_prime: NDArray[np.complex128]):
+    """
+    Diagonalize a non-hermitian matrix. 
+    
+    Looking into that. 
+
+    Parameters
+    ----------
+    F_prime : NDArray[np.complex128], shape (n, n)
+        Transformed Fock matrix to diagonalize.
+
+    Returns
+    -------
+    e_values : NDArray[np.complex128], shape (n,)
+        Eigenvalues (orbital energies), sorted ascending.
+    C_prime : NDArray[np.complex128], shape (n, n)
+        Right eigenvector matrix whose columns are eigenvectors.
+    L_prime : NDArray[np.complex128], shape (n, n)
+        Left eigenvector matrix.
+    R_prime : NDArray[np.complex128], shape (n, n)
+        Copy of C_prime (right eigenvectors).
+    LFR : NDArray[np.complex128], shape (n, n)
+        Product L_prime @ F_prime @ R_prime, should be diagonal.
+    """
+    e_values, C_prime = np.linalg.eig(F_prime)
+
     idx = e_values.argsort()
     e_values = e_values[idx]
     C_prime = C_prime[:, idx]
-    C_prime, _ = np.linalg.qr(C_prime)
-
     R_prime = np.copy(C_prime)
+
     L_prime = np.linalg.inv(C_prime)
 
     LFR = L_prime @ F_prime @ R_prime
 
     assert is_diagonal(LFR), "LFR is not diagonal. Check."
-    assert is_diagonal(L_prime @ R_prime)
-    # print(np.conj(C_prime.T) @ C_prime)
-    
 
     return e_values, C_prime, L_prime, R_prime, LFR
 
