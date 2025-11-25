@@ -264,6 +264,12 @@ def CS_RHF(ctx: CS_RHF_ContextClass) -> CS_RHF_ResultsClass:
         
         P_LR, C_munu, orbital_energies, L_munu, R_munu, P_RR, C_prime = calculate_P_next(F_next.reshape(X.shape), X, n_electrons, det, theta, natural_occupation)
 
+        if theta == 0.:
+            P_LR.imag = 0 
+            L_munu.imag = 0 
+            R_munu.imag = 0 
+            P_RR.imag = 0 
+
         E_prev = E_RHF 
 
         # Check Convergence Algorithm activation
@@ -320,11 +326,17 @@ def calculate_P_next(F_0: NDArray[np.float64], X: NDArray[np.float64], n_electro
     """
     F_prime = X @ F_0 @ X.T
 
-    complex = False if theta == 0. else True
+    normal = True if np.allclose(F_prime @ F_prime.conj().T, F_prime.conj().T @ F_prime) and theta == 0. else False
 
-    e_values, C_prime, L_prime, R_prime, LFR = diagonalize_biorthogonal(F_prime, complex)
+    unscaled = True if theta == 0. else False
 
-    # assert is_diagonal(LFR), "Matrix product L' @ F' @ R' is not diagonal" 
+    e_values, C_prime, L_prime, R_prime, LFR = diagonalize_biorthogonal(F_prime)
+
+    # if normal:
+    #     plot_map(LFR.real)
+    #     assert is_diagonal(LFR, 1E-5), "LFR is not diagonal in schur. Check."
+    # else:
+    assert is_diagonal(LFR), "Matrix product L' @ F' @ R' is not diagonal" 
     # print(f'C_munu @ C_munu = {np.conj(C_prime.T) @ C_prime}')
 
     # Obtain untransformed MO coefficients

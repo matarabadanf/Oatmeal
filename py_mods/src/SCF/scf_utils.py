@@ -457,7 +457,7 @@ def guess_density(dim: int, method: Literal['core', 'ones']) -> NDArray[np.compl
     return P_guess
 
 
-def diagonalize_biorthogonal(F_prime: NDArray[np.complex128], complex=False):
+def diagonalize_biorthogonal(F_prime: NDArray[np.complex128], normal=False, unscaled=False):
     """
     Diagonalize a matrix using LR solution.
 
@@ -482,9 +482,15 @@ def diagonalize_biorthogonal(F_prime: NDArray[np.complex128], complex=False):
         Product L_prime @ F_prime @ R_prime, should be diagonal.
     """
 
-    print(f'F prime is normal: {np.allclose(F_prime @ F_prime.conj().T, F_prime.conj().T @ F_prime)}')
 
-    print(repr(F_prime))
+    # assert is_diagonal(LFR, 1E-5), "LFR is not diagonal in schur. Check."
+    if unscaled:
+        _diagonalize_qr(F_prime)
+
+    elif not normal:
+        return _diagonalize_biorthogonal_nonherm(F_prime)
+        # print(f'F prime is normal: {normal}')
+    # print(repr(F_prime))
 
     T, U = scipy.linalg.schur(F_prime)
 
@@ -495,10 +501,42 @@ def diagonalize_biorthogonal(F_prime: NDArray[np.complex128], complex=False):
 
     LFR = L_prime @ F_prime @ R_prime
 
-    # assert is_diagonal(LFR, 1E-5), "LFR is not diagonal in schur. Check."
+    return e_values, C_prime, L_prime, R_prime, LFR
 
-    return _diagonalize_biorthogonal_nonherm(F_prime)
-    
+def _diagonalize_qr(F_prime: NDArray[np.complex128]):
+    """
+    Diagonalize a non-hermitian matrix using the QR algorithm.
+
+    Parameters
+    ----------
+    F_prime : NDArray[np.complex128], shape (n, n)
+        Transformed Fock matrix to diagonalize.
+
+    Returns
+    -------
+    e_values : NDArray[np.complex128], shape (n,)
+        Eigenvalues (orbital energies), sorted ascending.
+    C_prime : NDArray[np.complex128], shape (n, n)
+        Right eigenvector matrix whose columns are eigenvectors.
+    L_prime : NDArray[np.complex128], shape (n, n)
+        Left eigenvector matrix.
+    R_prime : NDArray[np.complex128], shape (n, n)
+        Copy of C_prime (right eigenvectors).
+    LFR : NDArray[np.complex128], shape (n, n)
+        Product L_prime @ F_prime @ R_prime, should be diagonal.
+    """
+    e_values, C_prime = np.linalg.eig(F_prime)
+
+    idx = e_values.argsort()
+    e_values = e_values[idx]
+    C_prime, _ = np.linalg.qr(C_prime[:, idx])
+    R_prime = np.copy(C_prime)
+
+    L_prime = np.linalg.inv(C_prime)
+
+    LFR = L_prime @ F_prime @ R_prime
+    assert is_diagonal(LFR), "LFR is not diagonal. Check."
+
     return e_values, C_prime, L_prime, R_prime, LFR
 
 def _diagonalize_biorthogonal_nonherm(F_prime: NDArray[np.complex128]):

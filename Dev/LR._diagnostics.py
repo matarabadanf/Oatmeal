@@ -2,7 +2,7 @@ from pyscf import gto, scf
 import numpy as np 
 from Dev.CSRHF_dev import CS_RHF_ContextClass, CS_RHF
 import matplotlib.pyplot as plt 
-from py_mods.src.SCF.RHF import plot_map
+from py_mods.src.SCF.plot_utilities import plot_map
 
 n_elec = [2,2,4,4,6,6,8,8,10,10]
 elements = ['H', 'He', 'Li', 'Be', 'B', 'C', 'N', 'O', 'F', 'Ne']
@@ -26,7 +26,7 @@ for element, n_elec, charge in zip(elements, n_elec, charges):
     eri = mol_He.intor('int2e')
 
     # prepare UHF calculation
-    H2_context = CS_RHF_ContextClass(overlap, kin, vnuc, eri, n_electrons=n_elec, verbose=True)
+    H2_context = CS_RHF_ContextClass(overlap, kin, vnuc, eri, n_electrons=n_elec, verbose=True, conv_ITER_START=8)
     H2_context.theta = 0
     # unscaled calculations
     print(f'\n\n\n Case 1s2 {element} {basis}, theta = 0')
@@ -47,6 +47,14 @@ for element, n_elec, charge in zip(elements, n_elec, charges):
         LR_diags_cs.append(one_s2_theta1.LR_diagnostics.LR_herm)
         ediffs_cs.append(one_s2_theta1.LR_diagnostics.E_RHF_LR-one_s2_theta0.LR_diagnostics.E_RHF_RR)
 
+
+x = one_s2_theta1.X
+F_fin = one_s2_theta1.F_final.reshape(x.shape)
+
+f_prime_final = x @ F_fin @ x 
+commutator = f_prime_final.conj().T @ f_prime_final - f_prime_final @ f_prime_final.conj().T
+
+plot_map(matrix=commutator)
 
 ediffs_ns = np.array(ediffs_ns, dtype=np.complex128)
 ediffs_cs = np.array(ediffs_cs, dtype=np.complex128)
