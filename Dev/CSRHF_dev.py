@@ -437,9 +437,10 @@ def conv_guess(residuals: NDArray[np.float64], F_guesses: NDArray[np.float64]) -
 
 def lr_diagonstics(P_LR: NDArray[np.complex128], P_RR: NDArray[np.complex128], L_munu: NDArray[np.complex128], R_munu: NDArray[np.complex128], X, H_core: NDArray[np.complex128], F: NDArray[np.complex128], n_elec, verbose:bool = False)->_RHF_LR_DiagnosticsClass:
     E_RHF_LR = E_0_comp(P_LR, H_core, F.reshape(H_core.shape))
-    E_RHF_RR = E_0_comp(P_RR, H_core, F.reshape(H_core.shape))
+    E_RHF_RR = E_0_comp(P_LR.T, H_core, F.reshape(H_core.shape))
 
     P_diff = P_LR - P_RR.T
+    P_diff = P_LR - P_LR.T
 
     P_frobenius_norm = np.sqrt(np.trace(P_diff @ np.conjugate(P_diff))).real
     P_frobenius_norm /= n_elec

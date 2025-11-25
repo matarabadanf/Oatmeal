@@ -45,19 +45,21 @@ for element, n_elec, charge in zip(elements, n_elec, charges):
     if one_s2_theta1.converged:
         P_diags_cs.append(one_s2_theta1.LR_diagnostics.P_herm)
         LR_diags_cs.append(one_s2_theta1.LR_diagnostics.LR_herm)
-        ediffs_cs.append(one_s2_theta1.LR_diagnostics.E_RHF_LR-one_s2_theta0.LR_diagnostics.E_RHF_RR)
+        ediffs_cs.append(one_s2_theta1.LR_diagnostics.E_RHF_LR-one_s2_theta1.LR_diagnostics.E_RHF_RR)
 
 
 x = one_s2_theta1.X
 F_fin = one_s2_theta1.F_final.reshape(x.shape)
 
-f_prime_final = x @ F_fin @ x 
+f_prime_final = F_fin # x @ F_fin @ x 
 commutator = f_prime_final.conj().T @ f_prime_final - f_prime_final @ f_prime_final.conj().T
 
 plot_map(matrix=commutator)
 
 ediffs_ns = np.array(ediffs_ns, dtype=np.complex128)
 ediffs_cs = np.array(ediffs_cs, dtype=np.complex128)
+
+print(ediffs_cs[-1])
 # print(ediffs_cs * ediffs_cs)
 # print(repr(one_s2_theta1.F_final.reshape(one_s2_theta1.X.shape)))
 invx = np.linalg.inv(one_s2_theta0.X)
@@ -68,22 +70,21 @@ inv = np.linalg.inv(one_s2_theta0.C_prime)
 caalcinv = np.conj(one_s2_theta0.C_prime).T
 
 # plot_map((inv-caalcinv).real)
+plt.scatter(LR_diags_ns, ediffs_ns.real, label='Re(Delta_E), NS')
+plt.scatter(LR_diags_cs, ediffs_cs.real, label='Re(Delta_E), CS')
+plt.scatter(LR_diags_cs, ediffs_cs.imag, label='Im(Delta_E), CS')
+# plt.xlim([-1E-19,2E-18])
+plt.xlabel('$C_L - C_R$ Hermiticity diagnostic value / arb. units.')
+plt.ylabel('LR-RR $\Delta E$')
+plt.legend()
+plt.show()
 
-# plt.scatter(LR_diags_ns, ediffs_ns.real, label='Re(Delta_E), NS')
-# plt.scatter(LR_diags_cs, ediffs_cs.real, label='Re(Delta_E), CS')
-# plt.scatter(LR_diags_cs, ediffs_cs.imag, label='Im(Delta_E), CS')
+
+plt.scatter(P_diags_ns, ediffs_ns.real, label='Re(Delta_E), NS')
+plt.scatter(P_diags_cs, ediffs_cs.real, label='Re(Delta_E), CS')
+plt.scatter(P_diags_cs, ediffs_cs.imag, label='Im(Delta_E), CS')
 # # plt.xlim([-1E-19,2E-18])
-# plt.xlabel('LR Hermiticity diagnostic value / arb. units.')
-# plt.ylabel('LR-RR $\Delta E$')
-# plt.legend()
-# plt.show()
-
-
-# plt.scatter(P_diags_ns, ediffs_ns.real, label='Re(Delta_E), NS')
-# plt.scatter(P_diags_cs, ediffs_cs.real, label='Re(Delta_E), CS')
-# plt.scatter(P_diags_cs, ediffs_cs.imag, label='Im(Delta_E), CS')
-# # plt.xlim([-1E-19,2E-18])
-# plt.xlabel('LR Hermiticity diagnostic value / arb. units.')
-# plt.ylabel('LR-RR $\Delta E$')
-# plt.legend()
-# plt.show()
+plt.xlabel('P Hermiticity diagnostic value / arb. units.')
+plt.ylabel('LR-RR $\Delta E$')
+plt.legend()
+plt.show()
