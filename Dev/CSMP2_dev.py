@@ -56,7 +56,7 @@ def CS_MP2_RHF(CS_RHF_Context: CS_RHF_ResultsClass) -> CS_MP2_Results:
     # naive approach: no symm
     R_munu = CS_RHF_Context.R_munu
     L_munu = CS_RHF_Context.L_munu
-    # L_munu = R_munu.conj().T # use this definition to test the non-scaled case 
+    L_munu = R_munu.T # use this definition to test the non-scaled case 
 
     #rest of info
     e_orb = CS_RHF_Context.e_orb
@@ -65,55 +65,79 @@ def CS_MP2_RHF(CS_RHF_Context: CS_RHF_ResultsClass) -> CS_MP2_Results:
     n_tot = len(CS_RHF_Context.context.S)
     n_virt = n_tot - n_occ
 
-    # (ab|cd) = L_am L_bn (mn|ls) R_cl R_ds
+    print(f'Number of occupied orbitals: {n_occ}')
+    print(f'Number of virtual orbitals: {n_virt}')
+    print(f'Number of total orbitals: {n_tot}')
 
-    # get integrals in MO basis
+    # (ab|cd) = L_ma L_nb (mn|ls) R_lc R_sd
     tmp = np.einsum("ma, mnls -> anls", L_munu, eris_ao)
     tmp = np.einsum("nb, anls -> abls", L_munu, tmp)
     tmp = np.einsum("lc, abls -> abcs", R_munu, tmp)
-    eris_mo = np.einsum("sd, abcs -> abcd", R_munu, tmp)
+    eris_mo = np.einsum("sd, abcs -> abcd", R_munu, tmp).real # real for now 
 
     print('Transformed integrals')
 
-    for i in range(10):
-        i = random.randint(0, n_tot-1)
-        j = random.randint(0, n_tot-1)
-        k = random.randint(0, n_tot-1)
-        l = random.randint(0, n_tot-1)
+    # print('\n\nRandom check of symmetry of integrals in MO basis:')
 
-        print(f'[{i:2d},{j:2d},{k:2d},{l:2d}]: {eris_mo[i,j,k,l]:16.4E},     [{j:2d},{i:2d},{k:2d},{l:2d}]:{eris_mo[j,i,k,l]:8.4E},        {eris_mo[i,j,k,l]-eris_mo[j,i,k,l]:8.4E}')
+    # for i in range(5):
+    #     i = random.randint(0, n_tot-1)
+    #     j = random.randint(0, n_tot-1)
+    #     k = random.randint(0, n_tot-1)
+    #     l = random.randint(0, n_tot-1)
 
-    mp2_ener = 0 
+    #     print(f'[{i:2d},{j:2d},{k:2d},{l:2d}] == [{i:2d},{j:2d},{l:2d},{k:2d}]: {eris_mo[i,j,k,l]-eris_mo[j,i,k,l] < 1E-10}')
 
-    # occupied 
-    for i in range(n_occ):
-        ei = e_orb[i]
-        for j in range(n_occ):
-            ej = e_orb[j]
+    mp2_ener = 0.
 
+    # occupied are a,b virtual are r,s 
+
+    # occupied
+    for a in range(n_occ):
+        ea = e_orb[a]
+        for b in range(n_occ):
+            eb = e_orb[b]
             # virtual 
-            for a in range(n_occ, n_tot):
-                ea = e_orb[a]
-                for b in range(n_occ, n_tot):
-                    eb = e_orb[b]
+            for r in range(n_occ, n_tot):
+                er = e_orb[r]
+                for s in range(n_occ, n_tot):
+                    es = e_orb[s]
 
-                    # ij||kl = ij|ab - ji|ab
-                    # ij|ab = (ia|jb)
-                    # ij|kl = (ia|jb) - (ja|ib)
+                    # <ij||kl> = <ij|ab> - <ji|ab>
+                    # <ij|ab> = (ia|jb)
+                    # <ij|kl> = (ia|jb) - (ja|ib)
 
-                    iajb = eris_mo[i,a,j,b]
-                    jaib = eris_mo[j,a,i,b]
+                    abrs = eris_mo[a,r,b,s] # o,v,o,v
+                    rsba = eris_mo[r,b,s,a] # v,o,v,o
+                    rsab = eris_mo[r,a,s,b] # v,o,v,o
 
-                    antisym = (iajb - jaib)**2
+                    # for RHF: num = <ab|rs> [2 <rs|ab> - <rs|ba>]
+                    # for UHF num = (<ab||rs>)**2
 
-                    denom = ei + ej - ea - eb
+                    num = abrs * ( 2 * rsab - rsba)
+                    denom = (er + es - ea - eb).real 
+                    mp2_ener -= num / denom # 1/4 * num / denom
 
-                    mp2_ener += 1/4 * antisym / denom
+                    # as in szabo a,b are virtual and r and s occupied
+                    # i,j will be virtual and k,l will be occupied in our loop a, b occ, r, s virt
+                    # i,j = r,s
+                    # k,l = a,b
+                    # ei, ej, ek, el = er, es, ea, eb
+
+                    # # # the abrs is klij -> kilj; rsab -> ijkl; rsba -> ijlk
+                    # abrs = eris_mo[k,i,l,j]                
+                    # rsab = eris_mo[i,k,j,l]
+                    # rsba = eris_mo[i,l,j,k]
+                    # # num = (abrs - absr)**2
+                    # # num =  abrs * rsab - abrs * rsba
+                    # denom = (ei + ej - ek - el).real 
+                    # mp2_ener -= .25 * num / denom # 1/4 * num / denom
 
     E_corr = mp2_ener 
 
-    mp2_ener = CS_RHF_Context.E_RHF - E_corr
+    mp2_ener = E_corr + CS_RHF_Context.E_RHF 
 
     returnClass = CS_MP2_Results(CS_RHF_Context, mp2_ener, E_corr, mp_type)
+
+    # to see later, the exact use of slices in this https://pycrawfordprogproj.readthedocs.io/en/latest/Project_04/Project_04.html
 
     return returnClass
