@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from Dev.CSRHF_dev import CS_RHF_ResultsClass
 from py_mods.src.SCF.CSUHF import CS_UHF_ResultsClass
 import random
+from py_mods.src.SCF.plot_utilities import plot_map
 
 @dataclass
 class CS_MP2_Results(object):
@@ -54,13 +55,13 @@ def CS_MP2_RHF(CS_RHF_Context: CS_RHF_ResultsClass) -> CS_MP2_Results:
     mp_type = 'RMP2'
 
     # naive approach: no symm
-    R_munu = CS_RHF_Context.R_munu
-    L_munu = CS_RHF_Context.L_munu
-    L_munu = R_munu.T # use this definition to test the non-scaled case 
+    R_munu = CS_RHF_Context.R_munu.real
+    L_munu = CS_RHF_Context.L_munu.real
+    # L_munu = R_munu.T # use this definition to test the non-scaled case 
 
     #rest of info
     e_orb = CS_RHF_Context.e_orb
-    eris_ao = CS_RHF_Context.context.eri
+    eris_ao = CS_RHF_Context.context.eri.real
     n_occ = CS_RHF_Context.n_elec // 2 
     n_tot = len(CS_RHF_Context.context.S)
     n_virt = n_tot - n_occ
@@ -69,11 +70,37 @@ def CS_MP2_RHF(CS_RHF_Context: CS_RHF_ResultsClass) -> CS_MP2_Results:
     print(f'Number of virtual orbitals: {n_virt}')
     print(f'Number of total orbitals: {n_tot}')
 
-    # (ab|cd) = L_ma L_nb (mn|ls) R_lc R_sd
-    tmp = np.einsum("ma, mnls -> anls", L_munu, eris_ao)
-    tmp = np.einsum("nb, anls -> abls", L_munu, tmp)
-    tmp = np.einsum("lc, abls -> abcs", R_munu, tmp)
-    eris_mo = np.einsum("sd, abcs -> abcd", R_munu, tmp).real # real for now 
+    # (pq|rs) = L_mP L_nQ (mn|ls) R_lR R_sS
+    tmp = np.einsum("mP, mnls -> Pnls", R_munu, eris_ao)
+    tmp = np.einsum("nQ, Pnls -> PQls", R_munu, tmp)
+    tmp = np.einsum("lR, PQls -> PQRs", R_munu, tmp)
+    eris_mo = np.einsum("sS, PQRs -> PQRS", R_munu, tmp).real # real for now 
+
+    # lets build the T2 amplitudes ourselves
+
+    t2 = np.zeros([n_occ,n_occ,n_virt,n_virt])
+
+    # t_ab^rs = - <rs||ab>/ er+es-ea-eb = - [<rs|ab>-<rs|ba>] / ener
+
+    for a in range(n_occ):
+        ea = e_orb[a]
+        for b in range(n_occ):
+            eb = e_orb[b]
+            # virtual 
+            for r in range(n_virt):
+                er = e_orb[r + n_occ]
+                for s in range(n_occ, n_virt):
+                    es = e_orb[s + n_occ]
+
+                    rsab = eris_mo[r,a,s,b]
+                    rsba = eris_mo[r,b,s,a]
+
+                    t2[a,b,r,s] -= (rsab-rsba) / (er + es - ea - eb)
+
+    plot_map(t2[0,0,:,:])
+    plot_map(t2[0,1,:,:])
+    plot_map(t2[1,0,:,:])
+    plot_map(t2[1,1,:,:])
 
     print('Transformed integrals')
 
@@ -102,7 +129,7 @@ def CS_MP2_RHF(CS_RHF_Context: CS_RHF_ResultsClass) -> CS_MP2_Results:
                 for s in range(n_occ, n_tot):
                     es = e_orb[s]
 
-                    # <ij||kl> = <ij|ab> - <ji|ab>
+                    # <ij||kl> = <ij|kl> - <ij|lk>
                     # <ij|ab> = (ia|jb)
                     # <ij|kl> = (ia|jb) - (ja|ib)
 

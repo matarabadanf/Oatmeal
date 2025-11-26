@@ -18,7 +18,7 @@ def _plot_map_real(matrix, plot_range=None, title=None):
         plt.title("Matrix Heatmap")
     else:
         plt.title(title)
-    if range is not None: 
+    if plot_range is not None: 
         plt.xlim(plot_range[0])
         plt.ylim(plot_range[1])
     plt.show()

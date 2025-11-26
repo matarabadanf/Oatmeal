@@ -9,20 +9,22 @@ from Dev.CSMP2_dev import CS_MP2
 data_path = Path(__file__).parent.parent
 
 # pyscf data
-mol_He = gto.M(atom = 'Be 0 0 0', spin=0, charge=0, basis='cc-pvdz')
+mol_He = gto.M(atom = 'Be 0 0 0', spin=0, charge=0, basis='6-31g')
 
 kin = mol_He.intor('int1e_kin')
 vnuc = mol_He.intor('int1e_nuc')
 overlap = mol_He.intor('int1e_ovlp')
 eri = mol_He.intor('int2e')
 
-mf = scf.RHF(mol_He)
+mf = scf.RHF(mol_He) 
 
 e_He = mf.kernel()
 e_elec = mf.energy_elec()
 
 mymp = mp.RMP2(mf).run() # this is UMP2
 print('MP2 total energy = ', mymp.e_tot)
+
+print(mymp.t2)
 
 
 # implementation and calculation
@@ -35,5 +37,11 @@ print(f'\n\n\nSCF energy: {Li_UHF_results.E_RHF}')
 
 mp_resutls = CS_MP2(Li_UHF_results)
 
+P_PQ = np.einsum('mp,mn,nq->pq', Li_UHF_results.L_munu, Li_UHF_results.P_LR, Li_UHF_results.R_munu)
+
+plot_map(mymp.t2[0,0,:,:])
+plot_map(mymp.t2[0,1,:,:])
+plot_map(mymp.t2[1,0,:,:])
+plot_map(mymp.t2[1,1,:,:])
 
 print(f'\n\nMP2 calc: {mp_resutls.E_MP2}, E_corr = {mp_resutls.E_corr}')
