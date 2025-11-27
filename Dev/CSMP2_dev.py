@@ -16,7 +16,7 @@ class CS_MP2_Results(object):
     MP_type: Literal['RMP2', 'UMP2']
 
 
-def CS_MP2(CS_MP2Context: Union[CS_RHF_ResultsClass, CS_UHF_ResultsClass]) -> CS_MP2_Results:
+def CS_MP2(CS_MP2Context: Union[CS_RHF_ResultsClass, CS_UHF_ResultsClass], eris_mo) -> CS_MP2_Results:
     """Compute the MP2 energy correction using complex scaled UHF or RHF reference.
 
     Parameters
@@ -30,7 +30,7 @@ def CS_MP2(CS_MP2Context: Union[CS_RHF_ResultsClass, CS_UHF_ResultsClass]) -> CS
         Dataclass containing the MP2 energy correction.
     """
     if isinstance(CS_MP2Context, CS_RHF_ResultsClass):
-        mp2_result = CS_MP2_RHF(CS_MP2Context)
+        mp2_result = CS_MP2_RHF(CS_MP2Context, eris_mo)
     # elif isinstance(CS_MP2Context, CS_UHF_ResultsClass):
     #     mp2_result = CS_MP2_UHF(CS_MP2Context)
     else:
@@ -39,7 +39,7 @@ def CS_MP2(CS_MP2Context: Union[CS_RHF_ResultsClass, CS_UHF_ResultsClass]) -> CS
     return mp2_result
 
 
-def CS_MP2_RHF(CS_RHF_Context: CS_RHF_ResultsClass) -> CS_MP2_Results:
+def CS_MP2_RHF(CS_RHF_Context: CS_RHF_ResultsClass, eris_mo) -> CS_MP2_Results:
     """Compute the MP2 energy correction using complex scaled RHF reference.
 
     Parameters
@@ -70,11 +70,16 @@ def CS_MP2_RHF(CS_RHF_Context: CS_RHF_ResultsClass) -> CS_MP2_Results:
     print(f'Number of virtual orbitals: {n_virt}')
     print(f'Number of total orbitals: {n_tot}')
 
-    # (pq|rs) = L_mP L_nQ (mn|ls) R_lR R_sS
-    tmp = np.einsum("mP, mnls -> Pnls", R_munu, eris_ao)
-    tmp = np.einsum("nQ, Pnls -> PQls", R_munu, tmp)
-    tmp = np.einsum("lR, PQls -> PQRs", R_munu, tmp)
-    eris_mo = np.einsum("sS, PQRs -> PQRS", R_munu, tmp).real # real for now 
+    eris_mo = eris_mo.reshape([n_tot, n_tot,n_tot,n_tot])
+    eris_mo_2 = ao_to_mo(R_munu, eris_ao)
+    eris_mo_3 = ao_to_mo_biorthogonal(L_munu.T, R_munu, eris_ao)
+
+    eris_mo = eris_mo
+
+    print(f'Maximum difference between building MO eris with C and L.T, R: {np.max(eris_mo_2-eris_mo_3)}')
+
+
+    # print(eris_mo[0,0,:,:]-eris_mo_2[0,0,:,:])
 
     # lets build the T2 amplitudes ourselves
 
@@ -95,12 +100,15 @@ def CS_MP2_RHF(CS_RHF_Context: CS_RHF_ResultsClass) -> CS_MP2_Results:
                     rsab = eris_mo[r,a,s,b]
                     rsba = eris_mo[r,b,s,a]
 
-                    t2[a,b,r,s] -= (rsab-rsba) / (er + es - ea - eb)
+                    # t2[a,b,r,s] -= (rsab-rsba) / (er + es - ea - eb)
+                    t2[a,b,r,s] -= (rsab) / (er + es - ea - eb)
 
     plot_map(t2[0,0,:,:])
-    plot_map(t2[0,1,:,:])
-    plot_map(t2[1,0,:,:])
-    plot_map(t2[1,1,:,:])
+    # plot_map(t2_2[0,0,:,:])    
+    # plot_map(t2[0,1,:,:])
+    # plot_map(t2_2[0,1,:,:])
+    # plot_map(t2[1,0,:,:])
+    # plot_map(t2[1,1,:,:])
 
     print('Transformed integrals')
 
@@ -168,3 +176,21 @@ def CS_MP2_RHF(CS_RHF_Context: CS_RHF_ResultsClass) -> CS_MP2_Results:
     # to see later, the exact use of slices in this https://pycrawfordprogproj.readthedocs.io/en/latest/Project_04/Project_04.html
 
     return returnClass
+
+def ao_to_mo(C_munu, eris_ao):
+
+    # (pq|rs) = L_mP L_nQ (mn|ls) R_lR R_sS
+    tmp = np.einsum("mP, mnls -> Pnls", C_munu, eris_ao)
+    tmp = np.einsum("nQ, Pnls -> PQls", C_munu, tmp)
+    tmp = np.einsum("lR, PQls -> PQRs", C_munu, tmp)
+    eris_mo_2 = np.einsum("sS, PQRs -> PQRS", C_munu, tmp)
+    return eris_mo_2
+
+def ao_to_mo_biorthogonal(L_munu, R_munu, eris_ao):
+
+    # (pq|rs) = L_mP L_nQ (mn|ls) R_lR R_sS
+    tmp = np.einsum("mP, mnls -> Pnls", L_munu, eris_ao)
+    tmp = np.einsum("nQ, Pnls -> PQls", L_munu, tmp)
+    tmp = np.einsum("lR, PQls -> PQRs", R_munu, tmp)
+    eris_mo_2 = np.einsum("sS, PQRs -> PQRS", R_munu, tmp)
+    return eris_mo_2

@@ -230,6 +230,17 @@ def CS_RHF(ctx: CS_RHF_ContextClass) -> CS_RHF_ResultsClass:
             converged = True
             if verbose:
                 print(f'Convergence achieved after {iter} iterations.\n\n:: Final SCF energy = {E_RHF:5}\n\nFinal SCF energy in parseable format\n%% {E_RHF.real:.14E} {E_RHF.imag:.14E} {theta:.6f}')
+            
+            P_LR, C_munu, orbital_energies, L_munu, R_munu, P_RR, C_prime = calculate_P_next(
+                F.reshape(X.shape), 
+                X, 
+                n_electrons, 
+                det, 
+                theta, 
+                natural_occupation
+            )
+            F_next = F 
+            
             break
 
         # Save in memory guesses and residuals keeping size of Convergence Algorithm space
