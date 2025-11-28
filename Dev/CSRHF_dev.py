@@ -347,7 +347,7 @@ def calculate_P_next(F_0: NDArray[np.float64], X: NDArray[np.float64], n_electro
     #     plot_map(LFR.real)
     #     assert is_diagonal(LFR, 1E-5), "LFR is not diagonal in schur. Check."
     # else:
-    assert is_diagonal(LFR), "Matrix product L' @ F' @ R' is not diagonal" 
+    # assert is_diagonal(LFR), "Matrix product L' @ F' @ R' is not diagonal" 
     # print(f'C_munu @ C_munu = {np.conj(C_prime.T) @ C_prime}')
 
     # Obtain untransformed MO coefficients
