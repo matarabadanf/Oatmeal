@@ -457,11 +457,13 @@ def guess_density(dim: int, method: Literal['core', 'ones']) -> NDArray[np.compl
     return P_guess
 
 
-def diagonalize_biorthogonal(F_prime: NDArray[np.complex128], normal=False, unscaled=False):
+def diagonalize_biorthogonal(F_prime: NDArray[np.complex128]):
     """
     Diagonalize a matrix using LR solution.
 
-    Uses numpy.linalg.eig to obtain right eigenvectors. Obtains L as as the inverse of R.
+    Uses numpy.linalg.eig to obtain right eigenvectors. 
+    Afterwards they are orthonormalized.
+    L solutions are the transpose of the right ones.
 
     Parameters
     ----------
@@ -482,106 +484,178 @@ def diagonalize_biorthogonal(F_prime: NDArray[np.complex128], normal=False, unsc
         Product L_prime @ F_prime @ R_prime, should be diagonal.
     """
 
-
-    # assert is_diagonal(LFR, 1E-5), "LFR is not diagonal in schur. Check."
-    if unscaled:
-        _diagonalize_qr(F_prime)
-
-    elif not normal:
-        return _diagonalize_biorthogonal_nonherm(F_prime)
-        # print(f'F prime is normal: {normal}')
-    # print(repr(F_prime))
-
-    T, U = scipy.linalg.schur(F_prime)
-
-    e_values = scipy.linalg.eigvals(T)
-
-    R_prime = C_prime = U 
-    L_prime = U.conj().T
-
-    LFR = L_prime @ F_prime @ R_prime
-
-    return e_values, C_prime, L_prime, R_prime, LFR
-
-def _diagonalize_qr(F_prime: NDArray[np.complex128]):
-    """
-    Diagonalize a non-hermitian matrix using the QR algorithm.
-
-    Parameters
-    ----------
-    F_prime : NDArray[np.complex128], shape (n, n)
-        Transformed Fock matrix to diagonalize.
-
-    Returns
-    -------
-    e_values : NDArray[np.complex128], shape (n,)
-        Eigenvalues (orbital energies), sorted ascending.
-    C_prime : NDArray[np.complex128], shape (n, n)
-        Right eigenvector matrix whose columns are eigenvectors.
-    L_prime : NDArray[np.complex128], shape (n, n)
-        Left eigenvector matrix.
-    R_prime : NDArray[np.complex128], shape (n, n)
-        Copy of C_prime (right eigenvectors).
-    LFR : NDArray[np.complex128], shape (n, n)
-        Product L_prime @ F_prime @ R_prime, should be diagonal.
-    """
-    e_values, C_prime = np.linalg.eig(F_prime)
-
-    idx = e_values.argsort()
-    e_values = e_values[idx]
-    C_prime, _ = np.linalg.qr(C_prime[:, idx])
-    R_prime = np.copy(C_prime)
-
-    L_prime = np.linalg.inv(C_prime)
-
-    LFR = L_prime @ F_prime @ R_prime
-    assert is_diagonal(LFR), "LFR is not diagonal. Check."
-
-    return e_values, C_prime, L_prime, R_prime, LFR
-
-def _diagonalize_biorthogonal_nonherm(F_prime: NDArray[np.complex128]):
-    """
-    Diagonalize a non-hermitian matrix. 
-
-    Looking into that. 
-
-    Parameters
-    ----------
-    F_prime : NDArray[np.complex128], shape (n, n)
-        Transformed Fock matrix to diagonalize.
-
-    Returns
-    -------
-    e_values : NDArray[np.complex128], shape (n,)
-        Eigenvalues (orbital energies), sorted ascending.
-    C_prime : NDArray[np.complex128], shape (n, n)
-        Right eigenvector matrix whose columns are eigenvectors.
-    L_prime : NDArray[np.complex128], shape (n, n)
-        Left eigenvector matrix.
-    R_prime : NDArray[np.complex128], shape (n, n)
-        Copy of C_prime (right eigenvectors).
-    LFR : NDArray[np.complex128], shape (n, n)
-        Product L_prime @ F_prime @ R_prime, should be diagonal.
-    """
     e_values, C_prime = np.linalg.eig(F_prime)
 
     idx = e_values.argsort()
     e_values = e_values[idx]
     C_prime = C_prime[:, idx]
-    R_prime = np.copy(C_prime)
 
-    norms = (C_prime @ C_prime.T)
-    norms = np.array([np.sqrt(sum(c)) for c in norms])
-    
-    R_prime = C_prime / norms
+    degeneracies = count_degen(e_values)
 
-    L_prime = C_prime.T
+    C_norm = orthonormalize_solutions(e_values, C_prime, degeneracies)
+
+    R_prime = np.copy(C_norm)
+    L_prime = np.copy(C_norm.T)
 
     LFR = L_prime @ F_prime @ R_prime
 
     # assert is_diagonal(LFR), "LFR is not diagonal. Check."
 
     return e_values, C_prime, L_prime, R_prime, LFR
+
+def count_degen(e_orb: NDArray[np.complex128]) -> dict[complex, int]:
+    """
+    Counts the degeneracy of each eigenvalue.
+
+    Values are rounded (e-10) due to numerical precision.
+
+    Parameters
+    ----------
+    e_orb : NDArray[np.complex128], shape (n,)
+        Array of eigenvalues.
+
+    Returns
+    -------
+    counts : dict[complex, int]
+        Dictionary counting values and number of degeneracies.
+    """
+    counts = {}
+    for item in e_orb:
+        item = np.round(item, 10)
+        if item in counts:
+            counts[item] += 1 
+        else:
+            counts[item] = 1 
+    return counts
+
+
+def c_projector(u: NDArray[np.complex128], v: NDArray[np.complex128]) -> NDArray[np.complex128]:
+    """
+    Calculates the c-projection of vector v onto vector u.
+
+    Uses the c-product (v.u / u.u) instead of scalar product. 
+
+    Parameters
+    ----------
+    u : NDArray[np.complex128], shape (n,)
+        Vector to project onto.
+    v : NDArray[np.complex128], shape (n,)
+        Vector being projected.
+
+    Returns
+    -------
+    proj : NDArray[np.complex128], shape (n,)
+        Component of v in the direction of u.
+    """
+    num = np.dot(v, u)
+    den = np.dot(u, u)
+    return (num/den) * u
+
+
+def c_norm(u: NDArray[np.complex128]) -> np.complex128:
+    """
+    Calculates the c-norm of a vector.
+
+    Defined as sqrt(u.u) rather than scalar sqrt(u*.u) or np.linalg.norm.
+
+    Parameters
+    ----------
+    u : NDArray[np.complex128], shape (n,)
+        Input vector.
+
+    Returns
+    -------
+    norm : np.complex128
+        The calculated norm.
+    """
+    return np.sqrt(np.dot(u, u))
+
+
+def gram_schmidt(v: NDArray[np.complex128]) -> NDArray[np.complex128]:
+    """
+    Applies the Gram-Schmidt process to a set of vectors.
+    
+    Orthonormalizes the row vectors of the input matrix.
+
+    Parameters
+    ----------
+    v : NDArray[np.complex128], shape (m, n)
+        Matrix where rows are vectors to be orthonormalized.
+
+    Returns
+    -------
+    e : NDArray[np.complex128], shape (m, n)
+        Matrix where rows are orthonormalized vector.
+    """
+    size = v.shape[0]
+    dim = v.shape[1]
+    e = np.zeros([size, dim], dtype=np.complex128)
+    u = np.zeros([size, dim], dtype=np.complex128)
+
+    u[0] = np.copy(v[0])
+    e[0] = v[0] / c_norm(v[0])
+
+    for i in range(1, size):
+        v_i = v[i]
+
+        proj = np.zeros(dim, dtype=np.complex128)
+        for j in range(i):
+            proj += c_projector(u[j], v_i) 
+        
+        u[i] = v_i - proj
+        e[i] = u[i] / c_norm(u[i])
+    
+    return e
+
+
+def orthonormalize_solutions(
+    e_orb: NDArray[np.complex128], 
+    C: NDArray[np.complex128], 
+    deg_dict: dict[complex, int]
+) -> NDArray[np.complex128]:
+    """
+    Orthonormalizes of degenerate solutions.
+
+    Checks blocks of degenerate eigenvalues and applies Gram-Schmidt 
+    to the eigenvectors.
+
+    Parameters
+    ----------
+    e_orb : NDArray[np.complex128], shape (n,)
+        Array of sorted eigenvalues.
+    C : NDArray[np.complex128], shape (n, n)
+        Matrix of eigenvectors (columns).
+    degeneracies : dict[complex, int]
+        Dictionary mapping eigenvalues to their degeneracy counts.
+
+    Returns
+    -------
+    C_normalized : NDArray[np.complex128], shape (n, n)
+        Orthonormalized eigenvector matrix.
+    """
+    degeneracies = deg_dict.copy()
+
+    C_orth = np.copy(C)
+    for e_i, item in enumerate(e_orb):
+        item = np.round(item, 10)
+        if degeneracies[item] == 1:
+            degeneracies[item] = 0 
+        elif degeneracies[item] == 0:
+            continue
+        else: 
+            deg_count = degeneracies[item]
+            v = C[:, e_i:e_i + deg_count].T
+            
+            e = gram_schmidt(v)
+
+            C_orth[:, e_i: e_i + deg_count] = e.T
+
+            degeneracies[item] = 0
+
+    norms = np.array([c_norm(i) for i in C_orth.T])
+    C_normalized = C_orth / norms
+
+    return C_normalized
 
 def calc_p_matrix_comp(
     l_matrix: NDArray[np.complex128], 

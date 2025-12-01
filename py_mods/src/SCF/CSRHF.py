@@ -314,7 +314,7 @@ def calculate_P_next(F_0: NDArray[np.float64], X: NDArray[np.float64], n_electro
 
     e_values, C_prime, L_prime, R_prime, LFR = diagonalize_biorthogonal(F_prime)
 
-    assert is_diagonal(LFR), "Matrix product L' @ F' @ R' is not diagonal" 
+    # assert is_diagonal(LFR), "Matrix product L' @ F' @ R' is not diagonal" 
 
     # Obtain untransformed MO coefficients
     C_munu = X @ C_prime

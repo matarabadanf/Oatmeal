@@ -1,7 +1,7 @@
 import numpy as np
 from numpy.typing import NDArray
 from typing import Literal, Tuple, Union
-from py_mods.src.SCF.scf_utils import transformation_matrix, calc_g_matrix_comp, calc_p_matrix_comp, E_0_comp, guess_density, validate_determinant, scale_integrals, is_diagonal, diagonalize_biorthogonal, equiv_matrix
+from py_mods.src.SCF.scf_utils import transformation_matrix, calc_g_matrix_comp, calc_p_matrix_comp, E_0_comp, guess_density, validate_determinant, scale_integrals, diagonalize_biorthogonal
 import matplotlib.pyplot as plt
 from dataclasses import dataclass
 
