@@ -1,5 +1,6 @@
 import numpy as np
-from py_mods.src.SCF.CSRHF import CS_RHF, RHF_theta_traj, CS_RHF_ContextClass
+# from py_mods.src.SCF.CSRHF import CS_RHF, RHF_theta_traj, CS_RHF_ContextClass
+from  py_mods.src.SCF.CSRHF import CS_RHF, RHF_theta_traj, CS_RHF_ContextClass
 from py_mods.src.SCF.CSUHF import UHF_theta_traj, CS_UHF_ContextClass
 from py_mods.src.SCF.RHF import RHF
 from pathlib import Path
@@ -53,7 +54,7 @@ def test_theta_non_scaled() -> None:
     E_hf_29s_He = np.load(f'{data_path}/He_e_hf_29s.npy')
 
     # test: SCF convergence for He in 29s, compared with the CS algorithm at theta = 0
-    converged, E_hf, E_e_values, C_munu, P = RHF(S_29s_He, T_29s_He, V_29s_He, eri_29s_He, n_electrons=2, max_iter=400, threshold=1.2498E-07, p_guess='core', verbose=False)
+    converged, E_hf, E_e_values, C_munu, P = RHF(S_29s_He, T_29s_He, V_29s_He, eri_29s_He, n_electrons=2, max_iter=400, threshold=1.2498E-07, p_guess='core', verbose=True)
     assert converged == True, "Calculation did not converge"
     assert abs(E_hf - E_hf_29s_He) < 1E-8, f"SCF energy does not match reference value {E_hf} != {E_hf_29s_He}"
 
@@ -255,5 +256,5 @@ def test_qchem_huge() -> None:
     assert np.mean(traj_cls_ener[1]-k2) < 1E-8+1E-8j, f'Mean error is {np.mean(traj_cls_ener-k) }'
 
 if __name__ == "__main__":
-    test_qchem_huge()
+    test_theta_non_scaled()
     pass
