@@ -1,6 +1,6 @@
 import numpy as np
 # from py_mods.src.SCF.CSRHF import CS_RHF, RHF_theta_traj, CS_RHF_ContextClass
-from Dev.CSRHF_dev import CS_RHF, RHF_theta_traj, CS_RHF_ContextClass
+from  py_mods.src.SCF.CSRHF import CS_RHF, RHF_theta_traj, CS_RHF_ContextClass
 from py_mods.src.SCF.CSUHF import UHF_theta_traj, CS_UHF_ContextClass
 from py_mods.src.SCF.RHF import RHF
 from pathlib import Path

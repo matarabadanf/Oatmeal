@@ -1,7 +1,7 @@
 import numpy as np
 from numpy.typing import NDArray
 from typing import Literal, Tuple, Union
-from py_mods.src.SCF.scf_utils import transformation_matrix, calc_g_matrix_comp, calc_p_matrix_comp, E_0_comp, guess_density, validate_determinant, scale_integrals, is_diagonal, diagonalize_biorthogonal, equiv_matrix
+from py_mods.src.SCF.scf_utils import transformation_matrix, calc_g_matrix_comp, calc_p_matrix_comp, E_0_comp, guess_density, validate_determinant, scale_integrals, diagonalize_biorthogonal
 import matplotlib.pyplot as plt
 from dataclasses import dataclass
 
@@ -79,6 +79,10 @@ class _RHF_LR_DiagnosticsClass(object):
     E_RHF_RR: np.complex128
     mean_LR: np.complex128
     max_LR: np.complex128
+    P_diff: np.float64
+    LR_diff: np.float64
+    P_herm: np.float64
+    LR_herm: np.float64
 
 @dataclass
 class CS_RHF_ResultsClass(object):
@@ -120,6 +124,8 @@ class CS_RHF_ResultsClass(object):
     e_orb: NDArray[np.complex128]
     n_elec: float
     X: NDArray[np.complex128]
+    F_final: NDArray[np.complex128]
+    C_prime: NDArray[np.complex128]
     P_guess: NDArray[np.complex128]
     P_LR: NDArray[np.complex128]
     R_munu: NDArray[np.complex128]
@@ -175,15 +181,14 @@ def CS_RHF(ctx: CS_RHF_ContextClass) -> CS_RHF_ResultsClass:
     conv_type = ctx.conv_type
     conv_MEM = ctx.conv_MEM
     conv_ITER_START = ctx.conv_ITER_START
-    diagnostics = getattr(ctx, "diagnostics", False)
 
     assert len(T) == len(V) == len(S), "Matrices T, V, S must have the same dimensions"
     assert n_electrons % 2 == 0, "RHF can only be closed-shell systems"
     assert conv_type in [None, 'DIIS', 'CROP'], 'Convergence assist must be either None, DIIS, or CROP'
 
-    conv_REQUESTED = True if conv_type is not None else False
-    
-    conv_ITER_START = min(conv_ITER_START+1, conv_MEM)
+    # setup
+    conv_REQUESTED = True if  conv_type is not None else False
+    conv_ITER_START = min(conv_ITER_START+1,  conv_MEM) if  conv_MEM >= conv_ITER_START else  max(conv_ITER_START+1,  conv_MEM)
 
     # Otain transformation matrix and validate occupation determinant
     dim = len(S)
@@ -206,13 +211,14 @@ def CS_RHF(ctx: CS_RHF_ContextClass) -> CS_RHF_ResultsClass:
 
     if verbose:
         print('-'*128)
-        print('|   Iter   |               E_iter                  |                       Delta_e                   |        norm(e_i)        |')
+        print('|   Iter     |                   E_iter                      |                   Delta_e                   |      norm(e_i)      |')
         print('-'*128)
 
     # SCF loop
     for iter in range(max_iter):
         # calculate F_n and r_n from P_n
         F, r = calculate_F_and_r_comp(P_LR, S, H_core, eri_scaled)
+        # print(f'Normal condition: {np.allclose(F.conj().T @ F, F @ F.conj().T)}')
         error = np.linalg.norm(r.flatten())
         E_RHF = E_0_comp(P_LR, H_core, F.reshape(H_core.shape))
         E_diff = E_RHF - E_prev
@@ -224,6 +230,17 @@ def CS_RHF(ctx: CS_RHF_ContextClass) -> CS_RHF_ResultsClass:
             converged = True
             if verbose:
                 print(f'Convergence achieved after {iter} iterations.\n\n:: Final SCF energy = {E_RHF:5}\n\nFinal SCF energy in parseable format\n%% {E_RHF.real:.14E} {E_RHF.imag:.14E} {theta:.6f}')
+            
+            P_LR, C_munu, orbital_energies, L_munu, R_munu, P_RR, C_prime = calculate_P_next(
+                F.reshape(X.shape), 
+                X, 
+                n_electrons, 
+                det, 
+                theta, 
+                natural_occupation
+            )
+            F_next = F 
+            
             break
 
         # Save in memory guesses and residuals keeping size of Convergence Algorithm space
@@ -256,7 +273,13 @@ def CS_RHF(ctx: CS_RHF_ContextClass) -> CS_RHF_ResultsClass:
 
         P_old = np.copy(P_LR)
         
-        P_LR, C_munu, orbital_energies, L_munu, R_munu, P_RR = calculate_P_next(F_next.reshape(X.shape), X, n_electrons, det, natural_occupation, diagnostics)
+        P_LR, C_munu, orbital_energies, L_munu, R_munu, P_RR, C_prime = calculate_P_next(F_next.reshape(X.shape), X, n_electrons, det, theta, natural_occupation)
+
+        if theta == 0.:
+            P_LR.imag = 0 
+            L_munu.imag = 0 
+            R_munu.imag = 0 
+            P_RR.imag = 0 
 
         E_prev = E_RHF 
 
@@ -266,7 +289,7 @@ def CS_RHF(ctx: CS_RHF_ContextClass) -> CS_RHF_ResultsClass:
             if verbose:
                 print('-'*30,  f'   STARTED {conv_type}  ', '-' *30)
     
-    LR_diagnostics = lr_diagonstics(P_LR, P_RR, H_core, F, verbose)
+    LR_diagnostics = lr_diagonstics(P_LR, P_RR, L_munu, R_munu, X, H_core, F, n_electrons, verbose)
 
     ResultClass = CS_RHF_ResultsClass(
         context=ctx,
@@ -275,6 +298,8 @@ def CS_RHF(ctx: CS_RHF_ContextClass) -> CS_RHF_ResultsClass:
         e_orb=orbital_energies,
         n_elec=n_electrons,
         X=X,
+        F_final = F_next,
+        C_prime=C_prime,
         P_guess=P_old,
         P_LR=P_LR,
         R_munu=R_munu,
@@ -286,7 +311,7 @@ def CS_RHF(ctx: CS_RHF_ContextClass) -> CS_RHF_ResultsClass:
 
     return ResultClass
 
-def calculate_P_next(F_0: NDArray[np.float64], X: NDArray[np.float64], n_electrons: int, det, natural_occ, diagnostics=False) -> Tuple[NDArray[np.float64], NDArray[np.float64], NDArray[np.float64]]:
+def calculate_P_next(F_0: NDArray[np.float64], X: NDArray[np.float64], n_electrons: int, det, theta, natural_occ) -> Tuple[NDArray[np.float64], NDArray[np.float64], NDArray[np.float64]]:
     """
     Calculate the next density matrix P_{n+1} given Fock matrix F_n and transformation matrix X.
 
@@ -312,9 +337,18 @@ def calculate_P_next(F_0: NDArray[np.float64], X: NDArray[np.float64], n_electro
     """
     F_prime = X @ F_0 @ X.T
 
+    normal = True if np.allclose(F_prime @ F_prime.conj().T, F_prime.conj().T @ F_prime) and theta == 0. else False
+
+    unscaled = True if theta == 0. else False
+
     e_values, C_prime, L_prime, R_prime, LFR = diagonalize_biorthogonal(F_prime)
 
+    # if normal:
+    #     plot_map(LFR.real)
+    #     assert is_diagonal(LFR, 1E-5), "LFR is not diagonal in schur. Check."
+    # else:
     # assert is_diagonal(LFR), "Matrix product L' @ F' @ R' is not diagonal" 
+    # print(f'C_munu @ C_munu = {np.conj(C_prime.T) @ C_prime}')
 
     # Obtain untransformed MO coefficients
     C_munu = X @ C_prime
@@ -323,13 +357,9 @@ def calculate_P_next(F_0: NDArray[np.float64], X: NDArray[np.float64], n_electro
 
     # Build new density matrix
     P_LR = calc_p_matrix_comp(L_munu.T, R_munu, n_electrons, determinant=det, natural_occupation=natural_occ)
-
-    if diagnostics:
-        P_RR = calc_p_matrix_comp(np.conj(R_munu), R_munu, n_electrons, determinant=det, natural_occupation=natural_occ)
-    else:
-        P_RR = P_LR
+    P_RR = calc_p_matrix_comp(np.conj(R_munu), R_munu, n_electrons, determinant=det, natural_occupation=natural_occ)
     
-    return P_LR, C_munu, e_values, L_munu, R_munu, P_RR
+    return P_LR, C_munu, e_values, L_munu, R_munu, P_RR, C_prime
 
 def calculate_F_and_r_comp(P: NDArray[np.float64], S: NDArray[np.float64], H_core: NDArray[np.float64], eri: NDArray[np.float64]) -> Tuple[NDArray[np.float64], NDArray[np.float64]]:
     """
@@ -416,9 +446,23 @@ def conv_guess(residuals: NDArray[np.float64], F_guesses: NDArray[np.float64]) -
 
     return F_conv, r_conv
 
-def lr_diagonstics(P_LR, P_RR, H_core, F, verbose)->_RHF_LR_DiagnosticsClass:
+def lr_diagonstics(P_LR: NDArray[np.complex128], P_RR: NDArray[np.complex128], L_munu: NDArray[np.complex128], R_munu: NDArray[np.complex128], X, H_core: NDArray[np.complex128], F: NDArray[np.complex128], n_elec, verbose:bool = False)->_RHF_LR_DiagnosticsClass:
     E_RHF_LR = E_0_comp(P_LR, H_core, F.reshape(H_core.shape))
-    E_RHF_RR = E_0_comp(P_RR, H_core, F.reshape(H_core.shape))
+    E_RHF_RR = E_0_comp(P_LR.T, H_core, F.reshape(H_core.shape))
+
+    P_diff = P_LR - P_RR.T
+    P_diff = P_LR - P_LR.T
+
+    P_frobenius_norm = np.sqrt(np.trace(P_diff @ np.conjugate(P_diff))).real
+    P_frobenius_norm /= n_elec
+
+    invx = np.linalg.inv(X)
+
+    LR_diff = (L_munu @ invx).T - invx @ R_munu
+
+    LR_frobenius_norm = np.sqrt(np.trace(LR_diff @ np.conjugate(LR_diff))).real
+    LR_frobenius_norm /= n_elec
+
 
     if verbose:
         print('\n')
@@ -428,13 +472,21 @@ def lr_diagonstics(P_LR, P_RR, H_core, F, verbose)->_RHF_LR_DiagnosticsClass:
         print(f'LR-RR E_diff: {E_RHF_LR-E_RHF_RR:.8f}')
         print(f'\nMean P_LR-P_RR difference: {np.mean(P_LR.flatten()-P_RR.flatten()):.8E}')
         print(f'Max  P_LR-P_RR difference: {np.max(P_LR.flatten()-P_RR.flatten()):.8E}')
+        print(f'Mean C_LR-C_RR difference: {np.mean(LR_diff):.8E}')
+        print(f'Max  C_LR-C_RR difference: {np.max(LR_diff):.8E}')
+        print(f'\nP_LR hermiticity diagnostic (P_LR / P_RR): {P_frobenius_norm}')
+        print(f'\nC_LR hermiticity diagnostic (L_mn / R_mn): {LR_frobenius_norm}')
 
 
     LR_diagnostics = _RHF_LR_DiagnosticsClass(
         E_RHF_LR=E_RHF_LR,
         E_RHF_RR=E_RHF_RR,
         mean_LR=np.mean(P_LR.flatten()-P_RR.flatten()),
-        max_LR=np.max(P_LR.flatten()-P_RR.flatten())
+        max_LR=np.max(P_LR.flatten()-P_RR.flatten()),
+        P_diff=P_diff,
+        LR_diff=LR_diff,
+        P_herm=P_frobenius_norm,
+        LR_herm=LR_frobenius_norm,
     )
 
     return LR_diagnostics

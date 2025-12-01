@@ -2,9 +2,9 @@ from pyscf import gto, scf, mp, ao2mo
 import numpy as np
 from pathlib import Path
 # from py_mods.src.SCF.CSUHF import CS_UHF_ContextClass, CS_UHF
-from Dev.CSRHF_dev import CS_RHF_ContextClass, CS_RHF
+from py_mods.src.SCF.CSRHF import CS_RHF, CS_RHF_ContextClass
 from py_mods.src.SCF.plot_utilities import plot_map
-from Dev.CSMP2_dev import CS_MP2
+from py_mods.src.SCF.drafts.CSMP2_dev import CS_MP2
 
 data_path = Path(__file__).parent.parent
 
