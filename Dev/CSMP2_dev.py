@@ -54,8 +54,8 @@ def CS_MP2_RHF(CS_RHF_Context: CS_RHF_ResultsClass, eris_mo) -> CS_MP2_Results:
     mp_type = 'RMP2'
 
     # naive approach: no symm
-    R_munu = CS_RHF_Context.R_munu.real
-    L_munu = CS_RHF_Context.L_munu.real
+    R_munu = CS_RHF_Context.R_munu
+    L_munu = CS_RHF_Context.L_munu
     # L_munu = R_munu.T # use this definition to test the non-scaled case 
 
     #rest of info
@@ -71,9 +71,9 @@ def CS_MP2_RHF(CS_RHF_Context: CS_RHF_ResultsClass, eris_mo) -> CS_MP2_Results:
 
     eris_mo = eris_mo.reshape([n_tot, n_tot,n_tot,n_tot])
     eris_mo_2 = ao_to_mo(R_munu, eris_ao)
-    eris_mo_3 = ao_to_mo_biorthogonal(L_munu.T, R_munu, eris_ao)
+    eris_mo_3 = ao_to_mo_biorthogonal(L_munu, R_munu, eris_ao)
 
-    eris_mo = eris_mo
+    eris_mo = eris_mo_3
 
     print(f'Maximum difference between building MO eris with C and L.T, R: {np.max(eris_mo_2-eris_mo_3)}')
 

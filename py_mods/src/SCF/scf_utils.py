@@ -2,6 +2,8 @@ import numpy as np
 from numpy.typing import NDArray
 from typing import Literal, Optional, Union, Tuple, Sequence, Dict
 
+from py_mods.src.SCF.plot_utilities import plot_map
+
 # --- Linalg Utilities ---
 
 def transformation_matrix(
@@ -412,6 +414,21 @@ def diagonalize_biorthogonal(F_prime: NDArray[np.complex128]) -> Tuple[
     LFR : NDArray[np.complex128]
         Diagonal matrix (L @ F @ R).
     """
+
+    R_prime, L_prime, e_values, C_prime = _diagonalize_gram(F_prime)
+
+    LR = L_prime @ R_prime
+    
+    LFR = L_prime @ F_prime @ R_prime
+
+    diag_LFR = np.diag(np.diagonal(LFR))
+
+    # assert np.allclose(LFR, diag_LFR, atol=1E-8), "Matrix product L' @ F' @ R' is not diagonal"
+    # assert np.allclose(LR, np.eye(len(LR)), atol=1E-8)
+
+    return e_values, C_prime, L_prime, R_prime, LFR
+
+def _diagonalize_gram(F_prime):
     e_values, C_prime = np.linalg.eig(F_prime)
 
     # Sort by real part of eigenvalues (standard for SCF stability)
@@ -424,10 +441,8 @@ def diagonalize_biorthogonal(F_prime: NDArray[np.complex128]) -> Tuple[
 
     R_prime = np.copy(C_norm)
     L_prime = np.copy(C_norm.T) # Biorthogonal: L = C^{-1}, here approximated via ortho logic
-    
-    LFR = L_prime @ F_prime @ R_prime
 
-    return e_values, C_prime, L_prime, R_prime, LFR
+    return R_prime, L_prime, e_values, C_prime
 
 def count_degen(e_orb: NDArray[np.complex128]) -> Dict[complex, int]:
     """
@@ -445,8 +460,7 @@ def count_degen(e_orb: NDArray[np.complex128]) -> Dict[complex, int]:
     """
     counts: Dict[complex, int] = {}
     for item in e_orb:
-        # Rounding is crucial for float comparison
-        val = np.round(item, 10)
+        val = np.round(item, 5)
         counts[val] = counts.get(val, 0) + 1
     return counts
 
@@ -797,9 +811,21 @@ def calculate_P_next(F: NDArray[np.complex128], X: NDArray[np.complex128], n_ele
 
     F_prime = X @ F @ X.T
 
+    mat_norm = np.linalg.norm(F_prime)
+
+    # print(mat_norm)
+
+    F_prime /= mat_norm #divide by the norm to avoid numerical instability
+
     e_values, C_prime, L_prime, R_prime, LFR = diagonalize_biorthogonal(F_prime)
 
-    # assert is_diagonal(LFR), "Matrix product L' @ F' @ R' is not diagonal"
+
+
+    # try:
+    #     assert np.allclose(LFR, diag_LFR, atol=1E-6), "Matrix product L' @ F' @ R' is not diagonal"
+    
+    # except AssertionError:
+    #     plot_map(LFR-diag_LFR)
 
     # Obtain untransformed MO coefficients
     C_munu = X @ C_prime

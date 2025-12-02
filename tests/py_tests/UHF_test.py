@@ -101,7 +101,7 @@ def test_H2_dissociation():
     assert np.mean(Imp_RHF_eners-reference_E), 'H2 dissociation curve failed'
     
 if __name__ == "__main__":
-    # test_N()
+    test_N()
     # test_B_huge()
     # test_Cl()
     # H2_dissociation_test()

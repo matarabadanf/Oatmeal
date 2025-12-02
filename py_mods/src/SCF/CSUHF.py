@@ -136,6 +136,8 @@ class CS_UHF_ResultsClass(object):
     n_alpha: float
     n_beta: float
     X: NDArray[np.complex128]
+    F_final_alph: NDArray[np.complex128]
+    F_final_beta: NDArray[np.complex128]
     P_guess_alpha: NDArray[np.complex128]
     P_guess_beta: NDArray[np.complex128]
     P_alpha: NDArray[np.complex128]
@@ -360,6 +362,8 @@ def CS_UHF(context: CS_UHF_ContextClass) -> CS_UHF_ResultsClass:
         n_alpha=n_alpha,
         n_beta=n_beta,
         X=X,
+        F_final_alph=F_next_alph,
+        F_final_beta=F_next_beta,
         P_guess_alpha=P_guess_alpha,
         P_guess_beta=P_guess_beta,
         P_alpha=P_alph,

@@ -213,7 +213,7 @@ def CS_RHF(ctx: CS_RHF_ContextClass) -> CS_RHF_ResultsClass:
                 print(f'Convergence achieved after {iter_idx} iterations.')
             
             # Final diagonalization
-            P, e_orb, R_munu, *_ = calculate_P_next(F_next, X, n_electrons, det)
+            P, e_orb, R_munu, *_, C_prime = calculate_P_next(F_next, X, n_electrons, det)
 
             F_next = F 
             break
@@ -245,7 +245,7 @@ def CS_RHF(ctx: CS_RHF_ContextClass) -> CS_RHF_ResultsClass:
 
         # Compute next Density
         P_old = P.copy()
-        P, e_orb, R_munu, *_ = calculate_P_next(F_next, X, n_electrons, det)
+        P, e_orb, R_munu, *_, C_prime = calculate_P_next(F_next, X, n_electrons, det)
 
         # Stability Patch: Enforce real if theta=0
         if theta == 0.0:
