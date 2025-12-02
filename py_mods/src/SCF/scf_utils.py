@@ -353,7 +353,7 @@ def scale_integrals(
            (V * exp_t1).astype(np.complex128), \
            (eri * exp_t1).astype(np.complex128)
 
-def guess_density(dim: int, method: Literal['core', 'ones', 'IMPORB']) -> NDArray[np.complex128]:
+def guess_density_RHF(p_guess: Literal['core', 'ones', 'IMPORB'], dim, INPORB=None) -> NDArray[np.complex128]:
     """
     Generate initial guess density (complex).
 
@@ -369,13 +369,20 @@ def guess_density(dim: int, method: Literal['core', 'ones', 'IMPORB']) -> NDArra
     P_guess : NDArray[np.complex128]
         Guess density matrix.
     """
-    if method == 'core':
-        return np.zeros((dim, dim), dtype=np.complex128)
-    elif method == 'ones':
-        return np.ones((dim, dim), dtype=np.complex128)
-    else:
-        raise ValueError("Invalid method. Choose 'core' or 'ones'. If IMPORB was the method, this code should have not been reached.")
+    if p_guess == 'INPORB':
+        assert INPORB is not None, 'Empty INPORB alpha for guess'
 
+        assert isinstance(INPORB, np.array) and INPORB.shape == X.shape, f'Wrong type ({type(INPORB)}) or dimensions ({INPORB.shape}) of import guess orbitals, expexted {type(X)} and {X.shape}'
+        return np.copy(INPORB) 
+
+    elif p_guess == 'core':
+        return np.zeros((dim, dim), dtype=np.complex128)
+    
+    elif p_guess == 'ones':
+        return np.ones((dim, dim), dtype=np.complex128)
+    
+    else:
+        raise ValueError("Invalid method. Choose 'core', 'ones' or 'IMPORB'.")
 
 def diagonalize_biorthogonal(F_prime: NDArray[np.complex128]) -> Tuple[
     NDArray[np.complex128], 
@@ -804,7 +811,7 @@ def calculate_P_next(F: NDArray[np.complex128], X: NDArray[np.complex128], n_ele
     P_RR = np.copy(P_LR)
 
 
-    return P_LR, C_munu, e_values, L_munu, R_munu, P_RR, C_prime
+    return P_LR, e_values, C_munu, R_munu, L_munu, P_RR, C_prime
 
 
 # --- UHF helper functions ---

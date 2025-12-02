@@ -61,9 +61,9 @@ def CS_MP2_RHF(CS_RHF_Context: CS_RHF_ResultsClass, eris_mo) -> CS_MP2_Results:
     #rest of info
     e_orb = CS_RHF_Context.e_orb
     eris_ao = CS_RHF_Context.context.eri.real
-    n_occ = CS_RHF_Context.n_elec // 2 
-    n_tot = len(CS_RHF_Context.context.S)
-    n_virt = n_tot - n_occ
+    n_occ : int  = int(CS_RHF_Context.n_elec // 2 )
+    n_tot : int  = len(CS_RHF_Context.context.S)
+    n_virt : int = n_tot - n_occ
 
     print(f'Number of occupied orbitals: {n_occ}')
     print(f'Number of virtual orbitals: {n_virt}')

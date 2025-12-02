@@ -2,10 +2,9 @@ import numpy as np
 from numpy.typing import NDArray
 from typing import Literal, Tuple, Union
 from py_mods.src.SCF.scf_utils import (
-    transformation_matrix, calc_g_matrix_comp, calc_p_matrix_comp, 
-    E_0_comp, guess_density, validate_determinant, scale_integrals, 
-    diagonalize_biorthogonal, calc_residual_commutator, calc_diis_extrapolation,
-    calculate_P_next
+    transformation_matrix, calc_g_matrix_comp, E_0_comp, 
+    guess_density_RHF, validate_determinant, scale_integrals, 
+    calc_residual_commutator, calc_diis_extrapolation, calculate_P_next
 )
 import matplotlib.pyplot as plt
 from dataclasses import dataclass
@@ -96,7 +95,7 @@ class CS_RHF_ResultsClass:
         Transformed eigenvectors.
     P_guess : NDArray[np.complex128]
         Initial density guess.
-    P_LR : NDArray[np.complex128]
+    P : NDArray[np.complex128]
         Final LR density matrix.
     R_munu : NDArray[np.complex128]
         Right MO coefficients.
@@ -116,7 +115,7 @@ class CS_RHF_ResultsClass:
     F_final: NDArray[np.complex128]
     C_prime: NDArray[np.complex128]
     P_guess: NDArray[np.complex128]
-    P_LR: NDArray[np.complex128]
+    P: NDArray[np.complex128]
     R_munu: NDArray[np.complex128]
     L_munu: NDArray[np.complex128]
     error: float
@@ -152,16 +151,17 @@ def CS_RHF(ctx: CS_RHF_ContextClass) -> CS_RHF_ResultsClass:
     max_iter = ctx.max_iter
     threshold = ctx.threshold
     p_guess = ctx.p_guess
+    guess_MAX_ITER = ctx.guess_MAX_ITER
+    INPORB = ctx.INPORB
 
     
     assert len(T) == len(V) == len(S), "Matrices T, V, S must have the same dimensions"
     assert n_electrons % 2 == 0, "RHF can only be closed-shell systems"
     
     # setup
-    conv_REQUESTED = (conv_type is not None)
-    conv_start = conv_ITER_START
-    if conv_MEM >= conv_start:
-         conv_start = min(conv_start + 1, conv_MEM)
+    conv_REQUESTED = True if conv_type is not None else False
+    conv_ITER_START = min(conv_ITER_START+1,  conv_MEM) if  conv_MEM >= conv_ITER_START else max(conv_ITER_START+1,  conv_MEM)
+    
     
     # Transform & Validate
     dim = len(S)
@@ -173,7 +173,7 @@ def CS_RHF(ctx: CS_RHF_ContextClass) -> CS_RHF_ResultsClass:
     H_core = T_scaled + V_scaled
 
     # Guess
-    P_LR = guess_density(dim, p_guess)
+    P = guess_density_RHF(p_guess, dim, INPORB)
 
     # State variables
     E_prev = 0.0 + 0.0j
@@ -197,10 +197,10 @@ def CS_RHF(ctx: CS_RHF_ContextClass) -> CS_RHF_ResultsClass:
         print('-'*128)
 
     for iter_idx in range(max_iter):
-        F, r = calculate_F_and_r_comp(P_LR, S, H_core, eri_scaled)
+        F, r = calculate_F_and_r_comp(P, S, H_core, eri_scaled)
         
         error = np.linalg.norm(r.ravel())
-        E_RHF = E_0_comp(P_LR, H_core, F)
+        E_RHF = E_0_comp(P, H_core, F)
         E_diff = E_RHF - E_prev
 
         if verbose:
@@ -213,9 +213,8 @@ def CS_RHF(ctx: CS_RHF_ContextClass) -> CS_RHF_ResultsClass:
                 print(f'Convergence achieved after {iter_idx} iterations.')
             
             # Final diagonalization
-            P_LR, _, e_orb, L_munu, R_munu, _, C_prime = calculate_P_next(
-                F, X, n_electrons, det,
-            )
+            P, e_orb, R_munu, *_ = calculate_P_next(F_next, X, n_electrons, det)
+
             F_next = F 
             break
 
@@ -245,19 +244,19 @@ def CS_RHF(ctx: CS_RHF_ContextClass) -> CS_RHF_ResultsClass:
                 F_next = F
 
         # Compute next Density
-        P_old = P_LR.copy()
-        P_LR, _, e_orb, L_munu, R_munu, _, C_prime = calculate_P_next(F_next, X, n_electrons, det)
+        P_old = P.copy()
+        P, e_orb, R_munu, *_ = calculate_P_next(F_next, X, n_electrons, det)
 
         # Stability Patch: Enforce real if theta=0
         if theta == 0.0:
-            P_LR = P_LR.real.astype(np.complex128)
+            P = P.real.astype(np.complex128)
             L_munu = L_munu.real.astype(np.complex128)
             R_munu = R_munu.real.astype(np.complex128)
 
         E_prev = E_RHF 
 
         # Activate DIIS
-        if iter_idx == conv_start and conv_REQUESTED:
+        if iter_idx == conv_ITER_START and conv_REQUESTED:
             use_conv = True 
             if verbose:
                 print('-'*30,  f'   STARTED {conv_type}  ', '-' *30)
@@ -271,10 +270,10 @@ def CS_RHF(ctx: CS_RHF_ContextClass) -> CS_RHF_ResultsClass:
         X=X,
         F_final=F_next,
         C_prime=C_prime,
-        P_guess=P_old if iter_idx > 0 else P_LR,
-        P_LR=P_LR,
+        P_guess=P_old if iter_idx > 0 else P,
+        P=P,
         R_munu=R_munu,
-        L_munu=L_munu,
+        L_munu=R_munu.T,
         error=float(error),
         iterations=iter_idx
     )
