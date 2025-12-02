@@ -13,7 +13,7 @@ def test_B_huge() -> None:
 
     # test: SCF convergence for B in aug-cc-pvqz
 
-    context = CS_UHF_ContextClass(S=S_aug_cc_pvqz_B, T=T_aug_cc_pvqz_B, V=V_aug_cc_pvqz_B, eri=eri_aug_cc_pvqz_B, n_electrons=5, max_iter=500, threshold=1E-7, p_guess='core', verbose=True, conv_type='DIIS')
+    context = CS_UHF_ContextClass(S=S_aug_cc_pvqz_B, T=T_aug_cc_pvqz_B, V=V_aug_cc_pvqz_B, eri=eri_aug_cc_pvqz_B, n_electrons=5, max_iter=500, threshold=1E-7, p_guess='RHF', verbose=True, conv_type='DIIS')
 
     CS_UHF_results = CS_UHF(context)
     assert CS_UHF_results.converged, "Calculation did not converge"
@@ -28,7 +28,7 @@ def test_N() -> None:
 
     # test: SCF convergence for B in cc-pvqz
 
-    context = CS_UHF_ContextClass(S=S_aug_cc_pvqz_N, T=T_aug_cc_pvqz_N, V=V_aug_cc_pvqz_N, eri=eri_aug_cc_pvqz_N, n_electrons=7, max_iter=500, threshold=1E-8, p_guess='core', verbose=True, conv_type='DIIS')
+    context = CS_UHF_ContextClass(S=S_aug_cc_pvqz_N, T=T_aug_cc_pvqz_N, V=V_aug_cc_pvqz_N, eri=eri_aug_cc_pvqz_N, n_electrons=7, max_iter=500, threshold=1E-8, p_guess='RHF', verbose=True, conv_type='DIIS')
 
     CS_UHF_results = CS_UHF(context)
     assert CS_UHF_results.converged, "Calculation did not converge"
@@ -51,7 +51,7 @@ def test_Cl() -> None:
         n_electrons=17,
         max_iter=500,
         threshold=1E-8,
-        p_guess='core',
+        p_guess='RHF',
         verbose=True,
         conv_type='DIIS'
     )
@@ -60,7 +60,7 @@ def test_Cl() -> None:
     assert CS_UHF_results.converged, "Calculation did not converge"
     assert abs(CS_UHF_results.E_UHF.real - E_hf_aug_cc_pvqz_Cl) < 1E-8, f"SCF energy does not match reference value {CS_UHF_results.E_UHF.real} != {E_hf_aug_cc_pvqz_Cl}"
 
-def H2_dissociation_test():
+def test_H2_dissociation():
     # change here to see different curves. 
     from pyscf import gto
 
@@ -104,6 +104,6 @@ if __name__ == "__main__":
     # test_N()
     # test_B_huge()
     # test_Cl()
-    H2_dissociation_test()
+    # H2_dissociation_test()
     pass
     

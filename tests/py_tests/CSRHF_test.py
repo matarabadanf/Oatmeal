@@ -211,7 +211,7 @@ def test_qchem_21s() -> None:
     n_points = 41
 
     H2_RHF_context.occupation = np.array([0,2,0])
-    H2_context.occupation = [np.array([0,1,0]), np.array([0,1,0])]
+    H2_context.occupation = (np.array([0,1,0]), np.array([0,1,0]))
 
     traj_energies = RHF_theta_traj(max_theta, n_points, H2_RHF_context)
     assert abs(np.mean(traj_energies[1]-k2)) < 1E-8+1E-8j, f'Mean error is too large in 2s2 RHF: {abs(np.mean(traj_energies[1]-k))}'
