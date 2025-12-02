@@ -4,7 +4,8 @@ from typing import Literal, Tuple, Union
 from py_mods.src.SCF.scf_utils import (
     transformation_matrix, calc_g_matrix_comp, calc_p_matrix_comp, 
     E_0_comp, guess_density, validate_determinant, scale_integrals, 
-    diagonalize_biorthogonal, calc_residual_commutator, calc_diis_extrapolation
+    diagonalize_biorthogonal, calc_residual_commutator, calc_diis_extrapolation,
+    calculate_P_next
 )
 import matplotlib.pyplot as plt
 from dataclasses import dataclass
@@ -108,7 +109,7 @@ class CS_RHF_ResultsClass:
     """
     context: CS_RHF_ContextClass
     converged: bool
-    E_RHF: complex
+    E_RHF: np.complex128
     e_orb: NDArray[np.complex128]
     n_elec: float
     X: NDArray[np.complex128]
@@ -137,33 +138,42 @@ def CS_RHF(ctx: CS_RHF_ContextClass) -> CS_RHF_ResultsClass:
         Calculation results.
     """
     # unpacking
-    S = ctx.S
-    T = ctx.T
-    V = ctx.V
-    eri = ctx.eri
+    S = ctx.S.astype(np.complex128)
+    T = ctx.T.astype(np.complex128)
+    V = ctx.V.astype(np.complex128)
+    eri = ctx.eri.astype(np.complex128)
     n_electrons = ctx.n_electrons
     theta = ctx.theta
+    verbose = ctx.verbose
+    conv_ITER_START = ctx.conv_ITER_START
+    conv_MEM = ctx.conv_MEM
+    conv_type = ctx.conv_type
+    occupation = ctx.occupation
+    max_iter = ctx.max_iter
+    threshold = ctx.threshold
+    p_guess = ctx.p_guess
+
     
     assert len(T) == len(V) == len(S), "Matrices T, V, S must have the same dimensions"
     assert n_electrons % 2 == 0, "RHF can only be closed-shell systems"
     
     # setup
-    conv_REQUESTED = (ctx.conv_type is not None)
-    conv_start = ctx.conv_ITER_START
-    if ctx.conv_MEM >= conv_start:
-         conv_start = min(conv_start + 1, ctx.conv_MEM)
+    conv_REQUESTED = (conv_type is not None)
+    conv_start = conv_ITER_START
+    if conv_MEM >= conv_start:
+         conv_start = min(conv_start + 1, conv_MEM)
     
     # Transform & Validate
     dim = len(S)
     X = transformation_matrix(S).astype(np.complex128)
-    det, natural_occupation = validate_determinant(n_electrons, ctx.occupation, dim)
+    det, _ = validate_determinant(n_electrons, occupation, dim)
 
     # Scaling
     T_scaled, V_scaled, eri_scaled = scale_integrals(T, V, eri, theta)
     H_core = T_scaled + V_scaled
 
     # Guess
-    P_LR = guess_density(dim, ctx.p_guess)
+    P_LR = guess_density(dim, p_guess)
 
     # State variables
     E_prev = 0.0 + 0.0j
@@ -181,30 +191,30 @@ def CS_RHF(ctx: CS_RHF_ContextClass) -> CS_RHF_ResultsClass:
     
     iter_idx = 0
 
-    if ctx.verbose:
+    if verbose:
         print('-'*128)
         print('|   Iter     |                   E_iter                      |                   Delta_e                   |      norm(e_i)      |')
         print('-'*128)
 
-    for iter_idx in range(ctx.max_iter):
+    for iter_idx in range(max_iter):
         F, r = calculate_F_and_r_comp(P_LR, S, H_core, eri_scaled)
         
         error = np.linalg.norm(r.ravel())
         E_RHF = E_0_comp(P_LR, H_core, F)
         E_diff = E_RHF - E_prev
 
-        if ctx.verbose:
+        if verbose:
             print(f'{iter_idx:5}     {E_RHF:45.16f}     {E_diff:45.16f}     {error:8.4E}')
         
         # Check convergence
-        if iter_idx > 1 and error < ctx.threshold:
+        if iter_idx > 1 and error < threshold:
             converged = True
-            if ctx.verbose:
+            if verbose:
                 print(f'Convergence achieved after {iter_idx} iterations.')
             
             # Final diagonalization
             P_LR, _, e_orb, L_munu, R_munu, _, C_prime = calculate_P_next(
-                F, X, n_electrons, det, theta, natural_occupation
+                F, X, n_electrons, det,
             )
             F_next = F 
             break
@@ -213,7 +223,7 @@ def CS_RHF(ctx: CS_RHF_ContextClass) -> CS_RHF_ResultsClass:
         F_guess.append(F)
         residuals.append(r)
 
-        if len(F_guess) > ctx.conv_MEM:
+        if len(F_guess) > conv_MEM:
             F_guess.pop(0)
             residuals.pop(0)
         
@@ -225,20 +235,18 @@ def CS_RHF(ctx: CS_RHF_ContextClass) -> CS_RHF_ResultsClass:
                 F_opt, r_opt = calc_diis_extrapolation(residuals, F_guess)
                 F_next = F_opt
                 
-                if ctx.conv_type == 'CROP':
+                if conv_type == 'CROP':
                     F_guess[-1] = F_opt
                     residuals[-1] = r_opt  
             except np.linalg.LinAlgError:
-                if ctx.verbose:
-                    print('!!! DIIS SINGULARITY - REVERTING TO STANDARD SCF !!!')
+                if verbose:
+                    print('!!!!!!!!!!!!!!!! CONVERGENCE ACCELERATION CAUSED A SINGULAR MATRIX. REVERTING TO STANDARD SCF !!!!!!!!!!!!!!!')
                 use_conv = False 
                 F_next = F
 
         # Compute next Density
         P_old = P_LR.copy()
-        P_LR, _, e_orb, L_munu, R_munu, _, C_prime = calculate_P_next(
-            F_next, X, n_electrons, det, theta, natural_occupation
-        )
+        P_LR, _, e_orb, L_munu, R_munu, _, C_prime = calculate_P_next(F_next, X, n_electrons, det)
 
         # Stability Patch: Enforce real if theta=0
         if theta == 0.0:
@@ -251,8 +259,8 @@ def CS_RHF(ctx: CS_RHF_ContextClass) -> CS_RHF_ResultsClass:
         # Activate DIIS
         if iter_idx == conv_start and conv_REQUESTED:
             use_conv = True 
-            if ctx.verbose:
-                print('-'*30,  f'   STARTED {ctx.conv_type}  ', '-' *30)
+            if verbose:
+                print('-'*30,  f'   STARTED {conv_type}  ', '-' *30)
 
     return CS_RHF_ResultsClass(
         context=ctx,
@@ -271,67 +279,9 @@ def CS_RHF(ctx: CS_RHF_ContextClass) -> CS_RHF_ResultsClass:
         iterations=iter_idx
     )
 
-def calculate_P_next(
-    F_0: NDArray[np.complex128], 
-    X: NDArray[np.complex128], 
-    n_electrons: int, 
-    det: NDArray[np.int32], 
-    theta: float, 
-    natural_occ: bool
-) -> Tuple[
-    NDArray[np.complex128], # P_LR
-    NDArray[np.complex128], # C_munu
-    NDArray[np.complex128], # e_values
-    NDArray[np.complex128], # L_munu
-    NDArray[np.complex128], # R_munu
-    NDArray[np.complex128], # P_RR
-    NDArray[np.complex128]  # C_prime
-]:
-    """
-    Calculate next density matrix.
-
-    Parameters
-    ----------
-    F_0 : NDArray[np.complex128]
-        Current Fock matrix.
-    X : NDArray[np.complex128]
-        Transformation matrix.
-    n_electrons : int
-        Number of electrons.
-    det : NDArray[np.int32]
-        Occupation determinant.
-    theta : float
-        Complex scaling angle.
-    natural_occ : bool
-        If True, populate lowest orbitals naturally.
-
-    Returns
-    -------
-    Tuple[NDArray, ...]
-        Returns (P_LR, C_munu, e_values, L_munu, R_munu, P_RR, C_prime).
-    """
-    
-    F_prime = X @ F_0 @ X.T
-
-    # Diagonalize in transformed basis
-    e_values, C_prime, L_prime, R_prime, _ = diagonalize_biorthogonal(F_prime)
-
-    # Back-transform to AO basis
-    C_munu = X @ C_prime
-    L_munu = L_prime @ X
-    R_munu = X @ R_prime
-
-    # Calculate Densities
-    P_LR = calc_p_matrix_comp(L_munu.T, R_munu, n_electrons, determinant=det, natural_occupation=natural_occ)
-    
-    # P_RR calculation (often for diagnostics)
-    P_RR = calc_p_matrix_comp(np.conj(R_munu), R_munu, n_electrons, determinant=det, natural_occupation=natural_occ)
-    
-    return P_LR, C_munu, e_values, L_munu, R_munu, P_RR, C_prime
-
 def calculate_F_and_r_comp(
     P: NDArray[np.complex128], 
-    S: NDArray[np.float64], 
+    S: NDArray[np.complex128], 
     H_core: NDArray[np.complex128], 
     eri: NDArray[np.complex128]
 ) -> Tuple[NDArray[np.complex128], NDArray[np.complex128]]:

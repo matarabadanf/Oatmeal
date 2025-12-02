@@ -5,7 +5,7 @@ from typing import Literal, Optional, Union, Tuple, Sequence, Dict
 # --- Linalg Utilities ---
 
 def transformation_matrix(
-    S_munu: NDArray[np.float64], 
+    S_munu: NDArray[np.complex128], 
     method: Literal['canonical', 'symmetric'] = 'symmetric', 
     verbose: bool = False
 ) -> NDArray[np.float64]:
@@ -322,9 +322,9 @@ def V_NN(
 # --- Complex SCF Helper Functions ---
 
 def scale_integrals(
-    T: NDArray[np.float64], 
-    V: NDArray[np.float64], 
-    eri: NDArray[np.float64], 
+    T: NDArray[np.complex128], 
+    V: NDArray[np.complex128], 
+    eri: NDArray[np.complex128], 
     theta: float
 ) -> Tuple[NDArray[np.complex128], NDArray[np.complex128], NDArray[np.complex128]]:
     """
@@ -385,7 +385,7 @@ def diagonalize_biorthogonal(F_prime: NDArray[np.complex128]) -> Tuple[
     NDArray[np.complex128]
 ]:
     """
-    Diagonalize matrix using LR biorthogonal solution.
+    Diagonalize matrix using c-norm solution. Yields orthonormalized basis.
 
     Parameters
     ----------
@@ -565,6 +565,7 @@ def calc_p_matrix_comp(
     n_electrons: int,
     determinant: Optional[NDArray[np.int32]] = None,
     natural_occupation: bool = True,
+    mode: Literal['RHF', 'UHF'] = 'RHF'
 ) -> NDArray[np.complex128]:
     """
     Calculate complex density matrix.
@@ -589,25 +590,18 @@ def calc_p_matrix_comp(
     NDArray[np.complex128]
         Density matrix.
     """
-    dim = r_matrix.shape[0]
-    
-    if determinant is not None:
-        natural_occupation = False
-    
-    # Build determinant if strictly natural requested
-    if natural_occupation:
-        n_occ = n_electrons // 2 
-        det_arr = np.zeros(dim, dtype=np.int32)
-        det_arr[:n_occ] = 2
-    else:
-        # If determinant passed, use it; otherwise error or empty
-        if determinant is None:
-             raise ValueError("Must provide determinant if natural_occupation is False")
-        det_arr = determinant
+    assert n_electrons == sum(determinant) if determinant is not None else True, "n_electrons must match determinant sum"
 
-    mask = (det_arr == 2).astype(np.complex128)
-    
-    P = 2.0 * np.einsum('ma,na,a->mn', r_matrix, l_matrix, mask)
+    if determinant is None:
+            raise ValueError("Must provide determinant if natural_occupation is False")
+    det_arr = determinant
+
+    if mode == 'UHF':
+        mask = (det_arr == 1).astype(np.complex128)
+        P = np.einsum('ma, a, an -> mn', r_matrix, mask, l_matrix)
+    else:
+        mask = (det_arr == 2).astype(np.complex128)
+        P = 2.0 * np.einsum('ma, a, an->mn', r_matrix, mask, l_matrix )
 
     return P
 
@@ -695,7 +689,7 @@ def E_0_unrestricted_comp(
 def calc_residual_commutator(
     F: NDArray[np.complex128], 
     P: NDArray[np.complex128], 
-    S: NDArray[np.float64]
+    S: NDArray[np.complex128],
 ) -> NDArray[np.complex128]:
     """ 
     Calculate residual commutator [F, P]S.
@@ -767,3 +761,92 @@ def calc_diis_extrapolation(
         r_conv += coef * residuals[k]
 
     return F_conv, r_conv
+
+def calculate_P_next(F: NDArray[np.complex128], X: NDArray[np.complex128], n_electrons: int, det: NDArray[np.int32], mode: Literal['RHF', 'UHF'] = 'RHF') -> Tuple[NDArray[np.complex128], NDArray[np.complex128], NDArray[np.complex128], NDArray[np.complex128], NDArray[np.complex128], NDArray[np.complex128], NDArray[np.complex128]]:
+    """
+    Calculate the next density matrix P_{n+1} given Fock matrix F_n and transformation matrix X.
+
+    Parameters
+    ----------
+    F_0 : NDArray[np.float64] of dimension (n, n)
+        Fock matrix at iteration n.
+    X : NDArray[np.float64] of dimension (n, n)
+        Transformation matrix.
+    n_electrons : int
+        Number of electrons.
+    
+    Returns
+    -------
+    Tuple containing:
+        - P_1 (NDArray[np.float64][n, n]): Next density matrix
+        - C_munu (NDArray[np.float64][n, n]): Molecular orbital coefficients.
+        - e_values (NDArray[np.float64][n, n]): Orbital energies.
+    
+    Notes
+    ------
+    Diagonalization algorithm used is np.linalg.eigh due to the matrix being symmetric.
+    """
+    F = F.reshape(X.shape)
+
+    F_prime = X @ F @ X.T
+
+    e_values, C_prime, L_prime, R_prime, LFR = diagonalize_biorthogonal(F_prime)
+
+    # assert is_diagonal(LFR), "Matrix product L' @ F' @ R' is not diagonal"
+
+    # Obtain untransformed MO coefficients
+    C_munu = X @ C_prime
+    L_munu = L_prime @ X
+    R_munu = X @ R_prime
+
+    # Build new density matrix
+    P_LR = calc_p_matrix_comp(L_munu, R_munu, n_electrons, det, mode=mode)
+    P_RR = np.copy(P_LR)
+
+
+    return P_LR, C_munu, e_values, L_munu, R_munu, P_RR, C_prime
+
+
+# --- UHF helper functions ---
+def calculate_unrestricted_F_and_r_comp(P_alpha: NDArray[np.complex128], P_beta, S: NDArray[np.complex128], H_core: NDArray[np.complex128], eri: NDArray[np.complex128]) -> Tuple[NDArray[np.complex128], NDArray[np.complex128], NDArray[np.complex128], NDArray[np.complex128]]:
+    """
+    Calculate Fock matrix F and residual r from P.
+    
+    Parameters
+    ----------
+    P : NDArray[np.float64] of dimension (n, n)
+        Density matrix.
+    S : NDArray[np.float64] of dimension (n, n)
+        Overlap matrix.
+    H_core : NDArray[np.float64] of dimension (n, n)
+        Core Hamiltonian matrix.
+    eri : NDArray[np.float64] of dimension (n, n, n, n)
+        Electron repulsion integrals.
+    
+    Returns
+    -------
+    Tuple containing:
+        - F (NDArray[np.float64][n, n]): Fock matrix.
+        - r (NDArray[np.float64][n, n]): Residual matrix.
+    """
+    G_alpha, G_beta = calc_g_matrix_spin_comp(P_alpha, P_beta, eri)
+    F_alpha = H_core + G_alpha
+    F_beta = H_core + G_beta
+    r_alpha = calc_residual_commutator(F_alpha, P_alpha, S)
+    r_beta = calc_residual_commutator(F_beta, P_beta, S)
+
+    return F_alpha.flatten(), r_alpha.flatten(), F_beta.flatten(), r_beta.flatten()
+
+def calc_g_matrix_spin_comp(P_alpha, P_beta, eri) -> Tuple[NDArray[np.complex128], NDArray[np.complex128]]:
+
+    P_total = P_alpha + P_beta
+    # J from total density
+    J = np.einsum('mnsl, ls -> mn', eri, P_total)
+    # K from same-spin density
+    K_alpha = np.einsum('mlns, ls -> mn', eri, P_alpha)
+    K_beta  = np.einsum('mlns, ls -> mn', eri, P_beta)
+
+    G_alpha = J - K_alpha
+    G_beta  = J - K_beta
+
+    return G_alpha, G_beta
