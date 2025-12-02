@@ -2,7 +2,7 @@ import numpy as np
 from numpy.typing import NDArray
 from typing import Literal, Tuple, Union
 from py_mods.src.SCF.CSRHF import CS_RHF, CS_RHF_ContextClass
-from py_mods.src.SCF.scf_utils import transformation_matrix, guess_density, validate_unrestricted_determinant, scale_integrals, is_diagonal
+from py_mods.src.SCF.scf_utils import transformation_matrix, guess_density, validate_unrestricted_determinant, scale_integrals
 import matplotlib.pyplot as plt
 from dataclasses import dataclass
 
@@ -64,7 +64,7 @@ class CS_UHF_ContextClass:
     # Optional 
     mult: Union[None, int] = None
     theta: float = 0.
-    occupation: Union[int, NDArray[np.int32], None] = None
+    occupation: Union[int, Tuple[NDArray[np.int32], NDArray[np.int32]], None] = None
     max_iter: int = 100
     threshold: float = 1E-12
     p_guess: Literal['core', 'ones', 'RHF', 'IMPORB'] = 'core'

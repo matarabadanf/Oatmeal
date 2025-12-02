@@ -4,75 +4,6 @@ from typing import Literal, Optional, Union, Tuple, Sequence, Dict
 
 # --- Linalg Utilities ---
 
-def kroeneker_delta(i: int, j: int) -> int:
-    """
-    Calculate Kronecker delta.
-
-    Parameters
-    ----------
-    i : int
-        First index.
-    j : int
-        Second index.
-
-    Returns
-    -------
-    int
-        1 if i == j, else 0.
-    """
-    return 1 if i == j else 0
-
-def equiv_matrix(
-    prev: NDArray[np.float64], 
-    curr: NDArray[np.float64], 
-    threshold: float = 1e-7
-) -> bool:
-    """
-    Check array equality using max difference.
-
-    Parameters
-    ----------
-    prev : NDArray[np.float64]
-        Previous array.
-    curr : NDArray[np.float64]
-        Current array.
-    threshold : float
-        Convergence threshold.
-
-    Returns
-    -------
-    bool
-        True if max difference < threshold.
-    """
-    return bool(np.max(np.abs(curr - prev)) < threshold)
-
-
-def is_diagonal(matrix: NDArray, atol: float = 1e-8) -> bool:
-    """
-    Check if matrix is diagonal.
-
-    Parameters
-    ----------
-    matrix : NDArray
-        Input matrix.
-    atol : float
-        Absolute tolerance.
-
-    Returns
-    -------
-    bool
-        True if off-diagonal elements are zero within tolerance.
-    """
-    # Use generic zero check to handle both float and complex
-    reference = np.zeros_like(matrix)
-    
-    # We only care about off-diagonal, so zero out diagonal of input for comparison
-    test_matrix = matrix.copy()
-    np.fill_diagonal(test_matrix, 0)
-
-    return bool(np.allclose(test_matrix, reference, atol=atol))
-
-
 def transformation_matrix(
     S_munu: NDArray[np.float64], 
     method: Literal['canonical', 'symmetric'] = 'symmetric', 
@@ -373,7 +304,7 @@ def V_NN(
     float
         Nuclear repulsion energy.
     """
-    energy = 0.0
+    energy = np.float64(0.)
     n_atoms = len(positions)
 
     for i in range(n_atoms):
@@ -422,7 +353,7 @@ def scale_integrals(
            (V * exp_t1).astype(np.complex128), \
            (eri * exp_t1).astype(np.complex128)
 
-def guess_density(dim: int, method: Literal['core', 'ones']) -> NDArray[np.complex128]:
+def guess_density(dim: int, method: Literal['core', 'ones', 'IMPORB']) -> NDArray[np.complex128]:
     """
     Generate initial guess density (complex).
 
@@ -443,7 +374,7 @@ def guess_density(dim: int, method: Literal['core', 'ones']) -> NDArray[np.compl
     elif method == 'ones':
         return np.ones((dim, dim), dtype=np.complex128)
     else:
-        raise ValueError("Invalid method. Choose 'core' or 'ones'.")
+        raise ValueError("Invalid method. Choose 'core' or 'ones'. If IMPORB was the method, this code should have not been reached.")
 
 
 def diagonalize_biorthogonal(F_prime: NDArray[np.complex128]) -> Tuple[
