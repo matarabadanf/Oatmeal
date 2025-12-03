@@ -819,7 +819,7 @@ def calculate_P_next(F: NDArray[np.complex128], X: NDArray[np.complex128], n_ele
 
     e_values, C_prime, L_prime, R_prime, LFR = diagonalize_biorthogonal(F_prime)
 
-
+    e_values *= mat_norm
 
     # try:
     #     assert np.allclose(LFR, diag_LFR, atol=1E-6), "Matrix product L' @ F' @ R' is not diagonal"
