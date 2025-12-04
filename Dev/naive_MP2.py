@@ -5,7 +5,6 @@ from dataclasses import dataclass
 from py_mods.src.SCF.CSRHF import CS_RHF_ResultsClass
 from py_mods.src.SCF.CSUHF import CS_UHF_ResultsClass
 from py_mods.src.SCF.plot_utilities import plot_map
-from time import time
 
 @dataclass
 class CS_MP2_Results(object):
@@ -67,49 +66,46 @@ def CS_MP2_RHF(CS_RHF_Context: CS_RHF_ResultsClass) -> CS_MP2_Results:
     n_tot : int  = len(CS_RHF_Context.context.S)
     n_virt : int = n_tot - n_occ
 
-    # we get the occupied and virtual indices:
-    o = slice(0, n_occ)
-    v = slice(n_occ, None)
+    # print(f'Number of occupied orbitals: {n_occ}')
+    # print(f'Number of virtual orbitals: {n_virt}')
+    # print(f'Number of total orbitals: {n_tot}')
 
-    # print(f'Number of occupied orbitals: {n_occ} ({o})')
-    # print(f'Number of virtual orbitals: {n_virt} ({v})')
-    # print(f'Number of total orbitals: {n_tot} ')
-
-    # more appropriate approach, calculate only (ovov) integrals
-    t_start = time()
-    eris_mo_chem = ao_to_ovov(R_munu, eris_ao, o, v, n_occ)
-    t_end = time()
-    # print(f'Time taken for (ovov) AO to MO integral transformation: {t_end - t_start}')
-
-    # <ij||kl> = <ij|kl> - <ij|lk>
-    # <ij|ab> = (ia|jb)
-    # <ij|kl> = (ia|jb) - (ja|ib)
-    eris_mo_phys = eris_mo_chem.transpose(0,2,1,3) # oovv
-    
-    # print('Transformed integrals shape (oovv): ', eris_mo_phys.shape)
+    eris_mo = ao_to_mo(R_munu, eris_ao)
 
     mp2_ener = 0.
 
-    # dim = n_occ, n_occ, n_virt, n_virt
-    # what this does is that it "stretches" the smaller size axes and then
-    # builds the "4D cube" where each entry is the operation r + s - a- b
-    denom_abrs =  (
-        e_orb[None, None, n_occ:, None]
-      + e_orb[None, None, None, n_occ:]  
-      - e_orb[:n_occ, None, None, None] 
-      - e_orb[None, :n_occ, None, None]
-    )
+    # occupied are a,b virtual are r,s 
+    # occupied
+    for a in range(n_occ):
+        ea = e_orb[a]
+        for b in range(n_occ):
+            eb = e_orb[b]
+            # virtual 
+            for r in range(n_occ, n_tot):
+                er = e_orb[r]
+                for s in range(n_occ, n_tot):
+                    es = e_orb[s]
 
+                    # <ij||kl> = <ij|kl> - <ij|lk>
+                    # <ij|ab> = (ia|jb)
+                    # <ij|kl> = (ia|jb) - (ja|ib)
 
-    # for RHF: num = <ab|rs> [2 <rs|ab> - <rs|ba>]
-    # for UHF num = (<ab||rs>)**2
-    num = eris_mo_phys * ( 2 * eris_mo_phys - eris_mo_phys.transpose(0,1,3,2) )
+                    abrs = eris_mo[a,r,b,s] # o,v,o,v
+                    rsba = eris_mo[r,b,s,a] # v,o,v,o
+                    rsab = eris_mo[r,a,s,b] # v,o,v,o
 
-    E_corr = -np.sum(num/denom_abrs)
+                    # for RHF: num = <ab|rs> [2 <rs|ab> - <rs|ba>]
+                    # for UHF num = (<ab||rs>)**2
 
-    E_MP2 = E_corr + CS_RHF_Context.E_RHF 
+                    num = abrs * ( 2 * rsab - rsba)
+                    denom = (er + es - ea - eb)
+                    mp2_ener -= num / denom # 1/4 * num / denom
 
-    returnClass = CS_MP2_Results(CS_RHF_Context, E_MP2, E_corr, mp_type, eris_mo_chem)
+    E_corr = mp2_ener 
+
+    mp2_ener = E_corr + CS_RHF_Context.E_RHF 
+
+    returnClass = CS_MP2_Results(CS_RHF_Context, mp2_ener, E_corr, mp_type, eris_mo)
 
     return returnClass
 
@@ -121,13 +117,3 @@ def ao_to_mo(C_munu, eris_ao):
     tmp = np.einsum("lR, PQls -> PQRs", C_munu, tmp)
     eris_mo_2 = np.einsum("sS, PQRs -> PQRS", C_munu, tmp)
     return eris_mo_2
-
-
-def ao_to_ovov(C_munu, eris_ao, o: slice, v: slice, n_occ):
-    
-    # (ia|jb) = L_mi L_nj (mn|ls) R_la R_sb
-    tmp = np.einsum("mP, mnls -> Pnls", C_munu[:, o], eris_ao)
-    tmp = np.einsum("lR, PQls -> PQRs", C_munu[:, o], tmp)
-    tmp = np.einsum("nQ, Pnls -> PQls", C_munu[:, v], tmp)
-    eris_mo_ovov = np.einsum("sS, PQRs -> PQRS", C_munu[:, v], tmp)
-    return eris_mo_ovov
