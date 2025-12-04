@@ -1,10 +1,11 @@
+from matplotlib.pylab import int32
 import numpy as np
 from numpy.typing import NDArray
 from typing import Literal, Tuple, Union
 from py_mods.src.SCF.scf_utils import (
-    transformation_matrix, calc_g_matrix_comp, E_0_comp, 
+    diagonalize_biorthogonal, transformation_matrix, calc_g_matrix_comp, E_0_comp, 
     guess_density_RHF, validate_determinant, scale_integrals, 
-    calc_residual_commutator, calc_diis_extrapolation, calculate_P_next
+    calc_residual_commutator, calc_diis_extrapolation, calculate_P_next, 
 )
 import matplotlib.pyplot as plt
 from dataclasses import dataclass
@@ -110,7 +111,8 @@ class CS_RHF_ResultsClass:
     converged: bool
     E_RHF: np.complex128
     e_orb: NDArray[np.complex128]
-    n_elec: float
+    n_elec: int32
+    det: NDArray[np.int32]
     X: NDArray[np.complex128]
     F_final: NDArray[np.complex128]
     C_prime: NDArray[np.complex128]
@@ -261,22 +263,48 @@ def CS_RHF(ctx: CS_RHF_ContextClass) -> CS_RHF_ResultsClass:
             if verbose:
                 print('-'*30,  f'   STARTED {conv_type}  ', '-' *30)
 
+
+    C_canon, e_canon = canonicalize(R_munu, F_next)
+
     return CS_RHF_ResultsClass(
         context=ctx,
         converged=converged,
         E_RHF=E_RHF,
-        e_orb=e_orb,
-        n_elec=float(n_electrons),
+        e_orb=e_canon,
+        n_elec=int(n_electrons),
+        det=det,
         X=X,
         F_final=F_next,
         C_prime=C_prime,
         P_guess=P_old if iter_idx > 0 else P,
         P=P,
-        R_munu=R_munu,
-        L_munu=R_munu.T,
+        R_munu=C_canon,
+        L_munu=C_canon.T,
         error=float(error),
         iterations=iter_idx
     )
+
+def canonicalize(C_munu: NDArray[np.complex128], F: NDArray[np.complex128]) -> NDArray[np.complex128]:
+    """
+    Canonicalize MO coefficients.
+
+    Parameters
+    ----------
+    C_munu : NDArray[np.complex128]
+        MO coefficients.
+    F : NDArray[np.complex128]
+        Fock matrix.
+
+    Returns
+    -------
+    NDArray[np.complex128]
+        Canonical MO coefficients.
+    """
+    F_mo = C_munu.T @ F @ C_munu
+
+    e_orb, _,_, U, *_ = diagonalize_biorthogonal(F_mo)
+    C_canon = C_munu @ U
+    return C_canon, e_orb
 
 def calculate_F_and_r_comp(
     P: NDArray[np.complex128], 

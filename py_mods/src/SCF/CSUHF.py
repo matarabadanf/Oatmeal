@@ -135,6 +135,7 @@ class CS_UHF_ResultsClass(object):
     e_beta: NDArray[np.complex128]
     n_alpha: float
     n_beta: float
+    det: Tuple[NDArray[np.int32], NDArray[np.int32]]
     X: NDArray[np.complex128]
     F_final_alph: NDArray[np.complex128]
     F_final_beta: NDArray[np.complex128]
@@ -361,6 +362,7 @@ def CS_UHF(context: CS_UHF_ContextClass) -> CS_UHF_ResultsClass:
         e_beta=e_beta,
         n_alpha=n_alpha,
         n_beta=n_beta,
+        det=(det_alpha, det_beta),
         X=X,
         F_final_alph=F_next_alph,
         F_final_beta=F_next_beta,
@@ -370,9 +372,7 @@ def CS_UHF(context: CS_UHF_ContextClass) -> CS_UHF_ResultsClass:
         P_beta=P_beta,
         P_total=P_total,
         P_diff=P_diff,
-        L_alpha=None,
         R_alpha=R_alph,
-        L_beta=None,
         R_beta=R_beta,
         S_diagnostics=S_diagnostics,
         error=error,
