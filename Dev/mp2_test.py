@@ -54,6 +54,10 @@ mf = scf.RHF(mol)
 
 e_He = mf.kernel()
 e_elec = mf.energy_elec()
+py_e_orb = mf.mo_energy
+py_mo_coeff = mf.mo_coeff
+
+print(py_e_orb)
 
 plot_map(mf.mo_coeff)
 
@@ -65,8 +69,11 @@ mymp = mp.RMP2(mf).run() # this is UMP2
 # implementation and calculation
 RHF_cxt = RHF_context_from_pyscf(**pyscf_args)
 RHF_cxt.theta = 0.00
-RHF_cxt.occupation = np.array([2,0])
+# RHF_cxt.occupation = np.array([2,0])
 RHF_res = CS_RHF(RHF_cxt)
+print(RHF_res.e_orb)
+
+print(RHF_res.e_orb - py_e_orb)
 
 plot_map(RHF_res.R_munu.real)
 

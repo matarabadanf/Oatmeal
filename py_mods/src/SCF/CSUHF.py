@@ -145,9 +145,7 @@ class CS_UHF_ResultsClass(object):
     P_beta: NDArray[np.complex128]
     P_total: NDArray[np.complex128]
     P_diff: NDArray[np.complex128]
-    L_alpha: NDArray[np.complex128]
     R_alpha: NDArray[np.complex128]
-    L_beta: NDArray[np.complex128]
     R_beta: NDArray[np.complex128]
     S_diagnostics: _UHF_SpinDiagnosticsClass
     error: float

@@ -264,13 +264,15 @@ def CS_RHF(ctx: CS_RHF_ContextClass) -> CS_RHF_ResultsClass:
                 print('-'*30,  f'   STARTED {conv_type}  ', '-' *30)
 
 
-    C_canon, e_canon = canonicalize(R_munu, F_next)
+    C_canon, _ = canonicalize(R_munu, F_next)
+
+    e_canon = np.diag(C_canon.T @ F @ C_canon)
 
     return CS_RHF_ResultsClass(
         context=ctx,
         converged=converged,
         E_RHF=E_RHF,
-        e_orb=e_canon,
+        e_orb=e_orb,
         n_elec=int(n_electrons),
         det=det,
         X=X,

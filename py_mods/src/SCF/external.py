@@ -25,6 +25,6 @@ def UHF_context_from_pyscf(atom= 'He 0 0 0', spin=0, charge=0, basis='cc-pvdz'):
     overlap = mol.intor('int1e_ovlp')
     eri = mol.intor('int2e')
 
-    return_class = CS_RHF_ContextClass(overlap, kin, vnuc, eri, n_electrons=n_elec)
+    return_class = CS_UHF_ContextClass(overlap, kin, vnuc, eri, n_electrons=n_elec)
 
     return return_class
