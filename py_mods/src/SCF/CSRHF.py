@@ -5,7 +5,7 @@ from typing import Literal, Tuple, Union
 from py_mods.src.SCF.scf_utils import (
     diagonalize_biorthogonal, transformation_matrix, calc_g_matrix_comp, E_0_comp, 
     guess_density_RHF, validate_determinant, scale_integrals, 
-    calc_residual_commutator, calc_diis_extrapolation, calculate_P_next, 
+    calc_residual_commutator, calc_diis_extrapolation, calculate_P_next, canonicalize
 )
 import matplotlib.pyplot as plt
 from dataclasses import dataclass
@@ -286,27 +286,6 @@ def CS_RHF(ctx: CS_RHF_ContextClass) -> CS_RHF_ResultsClass:
         iterations=iter_idx
     )
 
-def canonicalize(C_munu: NDArray[np.complex128], F: NDArray[np.complex128]) -> NDArray[np.complex128]:
-    """
-    Canonicalize MO coefficients.
-
-    Parameters
-    ----------
-    C_munu : NDArray[np.complex128]
-        MO coefficients.
-    F : NDArray[np.complex128]
-        Fock matrix.
-
-    Returns
-    -------
-    NDArray[np.complex128]
-        Canonical MO coefficients.
-    """
-    F_mo = C_munu.T @ F @ C_munu
-
-    e_orb, _,_, U, *_ = diagonalize_biorthogonal(F_mo)
-    C_canon = C_munu @ U
-    return C_canon, e_orb
 
 def calculate_F_and_r_comp(
     P: NDArray[np.complex128], 

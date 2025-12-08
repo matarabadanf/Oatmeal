@@ -883,3 +883,25 @@ def calc_g_matrix_spin_comp(P_alpha, P_beta, eri) -> Tuple[NDArray[np.complex128
     G_beta  = J - K_beta
 
     return G_alpha, G_beta
+
+def canonicalize(C_munu: NDArray[np.complex128], F: NDArray[np.complex128]) -> NDArray[np.complex128]:
+    """
+    Canonicalize MO coefficients.
+
+    Parameters
+    ----------
+    C_munu : NDArray[np.complex128]
+        MO coefficients.
+    F : NDArray[np.complex128]
+        Fock matrix.
+
+    Returns
+    -------
+    NDArray[np.complex128]
+        Canonical MO coefficients.
+    """
+    F_mo = C_munu.T @ F @ C_munu
+
+    e_orb, _,_, U, *_ = diagonalize_biorthogonal(F_mo)
+    C_canon = C_munu @ U
+    return C_canon, e_orb

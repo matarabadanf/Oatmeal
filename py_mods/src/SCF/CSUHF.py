@@ -5,7 +5,7 @@ from py_mods.src.SCF.CSRHF import CS_RHF, CS_RHF_ContextClass
 from py_mods.src.SCF.scf_utils import (
     transformation_matrix, E_0_unrestricted_comp, guess_density_RHF, 
     validate_unrestricted_determinant, scale_integrals, calc_diis_extrapolation, 
-    calculate_P_next, calculate_unrestricted_F_and_r_comp
+    calculate_P_next, calculate_unrestricted_F_and_r_comp, canonicalize
 )
 from dataclasses import dataclass
 
@@ -351,6 +351,9 @@ def CS_UHF(context: CS_UHF_ContextClass) -> CS_UHF_ResultsClass:
     n_beta  = np.trace(P_beta.real @ S)
 
     assert abs(n_alpha + n_beta - n_electrons) < 1E-10, 'Number of electrons was not conserved in the calculation'
+
+    R_alph, _ = canonicalize(R_alph, F_next_alph.reshape(X.shape))
+    R_beta, _ = canonicalize(R_beta, F_next_beta.reshape(X.shape))
 
     ResultClass = CS_UHF_ResultsClass(
         context=context,
