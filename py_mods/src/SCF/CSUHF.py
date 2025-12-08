@@ -280,8 +280,8 @@ def CS_UHF(context: CS_UHF_ContextClass) -> CS_UHF_ResultsClass:
             converged = True
             if verbose:
                 print(f'Convergence achieved after {iteration} iterations.\n\n:: Final SCF energy = {E_UHF:5}\n\nFinal SCF energy in parseable format\n%% {E_UHF.real:.14E} {E_UHF.imag:.14E} {theta:.6f}')
-            P_alph, _, e_alph, R_alph, *_ = calculate_P_next(F_next_alph, X, alpha_elec, det_alpha, mode='UHF')
-            P_beta, _, e_beta, R_beta, *_ = calculate_P_next(F_next_beta, X,  beta_elec, det_beta,  mode='UHF')
+            P_alph, e_alph, R_alph, *_  = calculate_P_next(F_next_alph, X, alpha_elec, det_alpha, mode='UHF')
+            P_beta, e_beta, R_beta, *_ = calculate_P_next(F_next_beta, X,  beta_elec, det_beta,  mode='UHF')
             break
 
         # Save in memory guesses and residuals keeping size of Convergence Algorithm space
