@@ -3,12 +3,21 @@ import numpy as np
 from numpy.typing import NDArray
 from typing import Literal, Tuple, Union
 from py_mods.src.SCF.scf_utils import (
-    diagonalize_biorthogonal, transformation_matrix, calc_g_matrix_comp, E_0_comp, 
-    guess_density_RHF, validate_determinant, scale_integrals, 
-    calc_residual_commutator, calc_diis_extrapolation, calculate_P_next, canonicalize
+    diagonalize_biorthogonal,
+    transformation_matrix,
+    calc_g_matrix_comp,
+    E_0_comp,
+    guess_density_RHF,
+    validate_determinant,
+    scale_integrals,
+    calc_residual_commutator,
+    calc_diis_extrapolation,
+    calculate_P_next,
+    canonicalize,
 )
 import matplotlib.pyplot as plt
 from dataclasses import dataclass
+
 
 @dataclass
 class CS_RHF_ContextClass:
@@ -50,23 +59,24 @@ class CS_RHF_ContextClass:
     conv_ITER_START : int
         Iteration to start acceleration.
     """
-    # Required 
+
+    # Required
     S: NDArray[np.float64]
     T: NDArray[np.float64]
     V: NDArray[np.float64]
     eri: NDArray[np.float64]
     n_electrons: int
 
-    # Optional 
-    theta: float = 0.
+    # Optional
+    theta: float = 0.0
     occupation: Union[int, NDArray[np.int32], None] = None
     max_iter: int = 100
-    threshold: float = 1E-12
-    p_guess: Literal['core', 'ones', 'IMPORB'] = 'core'
+    threshold: float = 1e-12
+    p_guess: Literal["core", "ones", "IMPORB"] = "core"
     guess_MAX_ITER: Union[int, None] = None
     INPORB: Union[NDArray[np.float64], NDArray[np.complex128], None] = None
     verbose: bool = False
-    conv_type: Literal[None, 'DIIS', 'CROP'] = 'DIIS'
+    conv_type: Literal[None, "DIIS", "CROP"] = "DIIS"
     conv_MEM: int = 8
     conv_ITER_START: int = 12
 
@@ -107,6 +117,7 @@ class CS_RHF_ResultsClass:
     iterations : int
         Total iterations performed.
     """
+
     context: CS_RHF_ContextClass
     converged: bool
     E_RHF: np.complex128
@@ -156,15 +167,17 @@ def CS_RHF(ctx: CS_RHF_ContextClass) -> CS_RHF_ResultsClass:
     guess_MAX_ITER = ctx.guess_MAX_ITER
     INPORB = ctx.INPORB
 
-    
     assert len(T) == len(V) == len(S), "Matrices T, V, S must have the same dimensions"
     assert n_electrons % 2 == 0, "RHF can only be closed-shell systems"
-    
+
     # setup
     conv_REQUESTED = True if conv_type is not None else False
-    conv_ITER_START = min(conv_ITER_START+1,  conv_MEM) if  conv_MEM >= conv_ITER_START else max(conv_ITER_START+1,  conv_MEM)
-    
-    
+    conv_ITER_START = (
+        min(conv_ITER_START + 1, conv_MEM)
+        if conv_MEM >= conv_ITER_START
+        else max(conv_ITER_START + 1, conv_MEM)
+    )
+
     # Transform & Validate
     dim = len(S)
     X = transformation_matrix(S).astype(np.complex128)
@@ -179,7 +192,7 @@ def CS_RHF(ctx: CS_RHF_ContextClass) -> CS_RHF_ResultsClass:
 
     # State variables
     E_prev = 0.0 + 0.0j
-    use_conv = False 
+    use_conv = False
     converged = False
     F_guess = []
     residuals = []
@@ -190,34 +203,40 @@ def CS_RHF(ctx: CS_RHF_ContextClass) -> CS_RHF_ResultsClass:
     C_prime = np.zeros((dim, dim), dtype=np.complex128)
     L_munu = np.zeros_like(C_prime)
     R_munu = np.zeros_like(C_prime)
-    
+
     iter_idx = 0
 
     if verbose:
-        print('-'*128)
-        print('|   Iter     |                   E_iter                      |                   Delta_e                   |      norm(e_i)      |')
-        print('-'*128)
+        print("-" * 128)
+        print(
+            "|   Iter     |                   E_iter                      |                   Delta_e                   |      norm(e_i)      |"
+        )
+        print("-" * 128)
 
     for iter_idx in range(max_iter):
         F, r = calculate_F_and_r_comp(P, S, H_core, eri_scaled)
-        
+
         error = np.linalg.norm(r.ravel())
         E_RHF = E_0_comp(P, H_core, F)
         E_diff = E_RHF - E_prev
 
         if verbose:
-            print(f'{iter_idx:5}     {E_RHF:45.16f}     {E_diff:45.16f}     {error:8.4E}')
-        
+            print(
+                f"{iter_idx:5}     {E_RHF:45.16f}     {E_diff:45.16f}     {error:8.4E}"
+            )
+
         # Check convergence
         if iter_idx > 1 and error < threshold:
             converged = True
             if verbose:
-                print(f'Convergence achieved after {iter_idx} iterations.')
-            
-            # Final diagonalization
-            P, e_orb, R_munu, *_, C_prime = calculate_P_next(F_next, X, n_electrons, det)
+                print(f"Convergence achieved after {iter_idx} iterations.")
 
-            F_next = F 
+            # Final diagonalization
+            P, e_orb, R_munu, *_, C_prime = calculate_P_next(
+                F_next, X, n_electrons, det
+            )
+
+            F_next = F
             break
 
         # History storage
@@ -227,22 +246,24 @@ def CS_RHF(ctx: CS_RHF_ContextClass) -> CS_RHF_ResultsClass:
         if len(F_guess) > conv_MEM:
             F_guess.pop(0)
             residuals.pop(0)
-        
+
         # Update F_next
         if not use_conv:
-            F_next = F 
+            F_next = F
         else:
             try:
                 F_opt, r_opt = calc_diis_extrapolation(residuals, F_guess)
                 F_next = F_opt
-                
-                if conv_type == 'CROP':
+
+                if conv_type == "CROP":
                     F_guess[-1] = F_opt
-                    residuals[-1] = r_opt  
+                    residuals[-1] = r_opt
             except np.linalg.LinAlgError:
                 if verbose:
-                    print('!!!!!!!!!!!!!!!! CONVERGENCE ACCELERATION CAUSED A SINGULAR MATRIX. REVERTING TO STANDARD SCF !!!!!!!!!!!!!!!')
-                use_conv = False 
+                    print(
+                        "!!!!!!!!!!!!!!!! CONVERGENCE ACCELERATION CAUSED A SINGULAR MATRIX. REVERTING TO STANDARD SCF !!!!!!!!!!!!!!!"
+                    )
+                use_conv = False
                 F_next = F
 
         # Compute next Density
@@ -255,14 +276,13 @@ def CS_RHF(ctx: CS_RHF_ContextClass) -> CS_RHF_ResultsClass:
             L_munu = L_munu.real.astype(np.complex128)
             R_munu = R_munu.real.astype(np.complex128)
 
-        E_prev = E_RHF 
+        E_prev = E_RHF
 
         # Activate DIIS
         if iter_idx == conv_ITER_START and conv_REQUESTED:
-            use_conv = True 
+            use_conv = True
             if verbose:
-                print('-'*30,  f'   STARTED {conv_type}  ', '-' *30)
-
+                print("-" * 30, f"   STARTED {conv_type}  ", "-" * 30)
 
     C_canon, _ = canonicalize(R_munu, F_next)
 
@@ -283,15 +303,15 @@ def CS_RHF(ctx: CS_RHF_ContextClass) -> CS_RHF_ResultsClass:
         R_munu=C_canon,
         L_munu=C_canon.T,
         error=float(error),
-        iterations=iter_idx
+        iterations=iter_idx,
     )
 
 
 def calculate_F_and_r_comp(
-    P: NDArray[np.complex128], 
-    S: NDArray[np.complex128], 
-    H_core: NDArray[np.complex128], 
-    eri: NDArray[np.complex128]
+    P: NDArray[np.complex128],
+    S: NDArray[np.complex128],
+    H_core: NDArray[np.complex128],
+    eri: NDArray[np.complex128],
 ) -> Tuple[NDArray[np.complex128], NDArray[np.complex128]]:
     """
     Calculate Fock matrix and Residual.
@@ -343,11 +363,12 @@ def RHF_theta_traj(max_theta, n_points, cxt: CS_RHF_ContextClass):
         if res.converged:
             energies.append(res.E_RHF)
         else:
-            print(f'Traj {th} did not converge.')
+            print(f"Traj {th} did not converge.")
         if cxt.verbose and res.converged:
-            print(f'Converged point at theta = {th:6.4f} : E = {res.E_RHF:12.8f}') 
+            print(f"Converged point at theta = {th:6.4f} : E = {res.E_RHF:12.8f}")
 
     return thetas, np.array(energies, dtype=np.complex128)
+
 
 def plot_theta_traj(energies):
     """
@@ -360,16 +381,17 @@ def plot_theta_traj(energies):
     """
     reals = [energy.real for energy in energies]
     imags = [energy.imag for energy in energies]
-    plt.plot(reals, imags, marker='o')
-    plt.xlabel('Re(E)')
-    plt.ylabel('Im(E)')
-    plt.title('Complex Scaled RHF Energy vs Theta')
-    plt.ticklabel_format(style='sci', axis='both', scilimits=(0,0))
-    plt.ticklabel_format(style='sci')
+    plt.plot(reals, imags, marker="o")
+    plt.xlabel("Re(E)")
+    plt.ylabel("Im(E)")
+    plt.title("Complex Scaled RHF Energy vs Theta")
+    plt.ticklabel_format(style="sci", axis="both", scilimits=(0, 0))
+    plt.ticklabel_format(style="sci")
     plt.grid(True, alpha=0.3)
     plt.show()
 
-def plot_theta_orbital_energies(energies, theta, xrange=[0,0]):
+
+def plot_theta_orbital_energies(energies, theta, xrange=[0, 0]):
     """
     Scatter plot orbital energies.
 
@@ -384,18 +406,18 @@ def plot_theta_orbital_energies(energies, theta, xrange=[0,0]):
     """
     reals = [energy.real for energy in energies]
     imags = [energy.imag for energy in energies]
-    if xrange != [0,0]:
+    if xrange != [0, 0]:
         plt.xlim(xrange)
         reals = [re for re in reals if re < xrange[1]]
-        imags = imags[0:len(reals)]
+        imags = imags[0 : len(reals)]
 
-    plt.scatter(reals, imags, marker='o')
-    plt.xlabel('Re(Orbital Energies)')
-    plt.ylabel('Im(Orbital Energies)')
-    plt.ticklabel_format(style='sci')
-    plt.title(f'Complex Scaled RHF Orbital Energies at Theta={theta}')
-    plt.axhline(y=0, color='k', linestyle='-', alpha=0.3)
-    plt.axvline(x=0, color='k', linestyle='-', alpha=0.3)
+    plt.scatter(reals, imags, marker="o")
+    plt.xlabel("Re(Orbital Energies)")
+    plt.ylabel("Im(Orbital Energies)")
+    plt.ticklabel_format(style="sci")
+    plt.title(f"Complex Scaled RHF Orbital Energies at Theta={theta}")
+    plt.axhline(y=0, color="k", linestyle="-", alpha=0.3)
+    plt.axvline(x=0, color="k", linestyle="-", alpha=0.3)
 
     plt.grid(True, alpha=0.3)
     plt.show()
