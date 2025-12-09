@@ -3,9 +3,10 @@ from py_mods.src.SCF.CSUHF import CS_UHF
 from py_mods.src.SCF.plot_utilities import plot_map
 from Dev.CSMP2_dev import CS_MP2
 from py_mods.src.SCF.external import UHF_context_from_pyscf
-import matplotlib.pyplot as plt 
+import matplotlib.pyplot as plt
+import numpy as np
 
-large_basis = '''
+large_basis = """
 He    S
       5.285000E+02           0.000000E+00           9.400000E-04           0.000000E+00           0.000000E+00
       7.931000E+01           0.000000E+00           7.214000E-03           0.000000E+00           0.000000E+00
@@ -32,21 +33,22 @@ He    F
 He    F
       0.6906000              1.0000000
 END
-'''
+"""
 
 # pyscf data
 pyscf_args = {
-    'atom': 'He 0 0 0',
-    'spin': 1,
-    'charge': -1,
-    'basis': 'cc-pvdz',
+    "atom": "He 0 0 0",
+    "spin": 0,
+    "charge": 0,
+    "basis": "aug-cc-pvqz",
 }
+override = False  # override calculated MO coefficients by PySCF's
 
 mol = gto.M(**pyscf_args)
-mol.basis = {'He': gto.basis.parse(large_basis)}
-mol.build()
+# mol.basis = {"He": gto.basis.parse(large_basis)}
+# mol.build()
 
-mf = scf.UHF(mol) 
+mf = scf.UHF(mol)
 
 e_He = mf.kernel()
 e_elec = mf.energy_elec()
@@ -55,29 +57,44 @@ py_mo_coeff = mf.mo_coeff
 
 # print(py_e_orb)
 
-mymp = mp.UMP2(mf).run() # this is UMP2
-
-
+mymp = mp.UMP2(mf).run()  # this is UMP2
 
 # implementation and calculation
-RHF_cxt = UHF_context_from_pyscf(**pyscf_args)
-RHF_cxt.theta = 0.00
-# RHF_cxt.occupation = np.array([2,0])
-RHF_res = CS_UHF(RHF_cxt)
-# print(RHF_res.e_alpha)
-# print(RHF_res.e_beta)
+UHF_cxt = UHF_context_from_pyscf(**pyscf_args)
+UHF_res = CS_UHF(UHF_cxt)
+# print(UHF_res.e_alpha)
+# print(UHF_res.e_beta)
 
-print(f'\nSCF energy: {RHF_res.E_UHF} (converged: {RHF_res.converged})')
-print(f'SCF pyscf: {e_He}')
-print(f'Difference: {RHF_res.E_UHF.real - e_He} \n')
+print(f"\nSCF energy: {UHF_res.E_UHF} (converged: {UHF_res.converged})")
+print(f"SCF pyscf: {e_He}")
+print(f"Difference: {UHF_res.E_UHF.real - e_He} \n")
 
-print('Orbital energies UHF implementation:')
-e_orb =(RHF_res.e_alpha.real, RHF_res.e_beta.real)
-print(e_orb)
+# print('Orbital energies UHF implementation:')
+# e_orb =(UHF_res.e_alpha.real, UHF_res.e_beta.real)
+# print(e_orb)
 
-mp_results = CS_MP2(RHF_res)
+print(mf.mo_coeff[0].shape)
+print(UHF_res.R_alpha.shape)
 
-print(f'\n\nMP2 calc: {mp_results.E_MP2}, E_corr = {mp_results.E_corr}')
-print(f'MP2 pyscf: {mymp.e_tot}, E_corr = {mymp.e_corr}')
-print(f'Differences: {mp_results.E_MP2 - mymp.e_tot}, E_corr = {mp_results.E_corr - mymp.e_corr}\n')
+# Once again, enforcingg MO coefficients should yield the same results as PySCF with our implementation
+# print(f"Maximum difference between Alpha and Beta MO coefficients: {np.max(mf.mo_coeff[0] - mf.mo_coeff[1])}")
+if override:
+    UHF_res.R_alpha = mf.mo_coeff[0]
+    UHF_res.R_beta = mf.mo_coeff[1]
+    UHF_res.e_alpha = mf.mo_energy[0]
+    UHF_res.e_beta = mf.mo_energy[1]
 
+# not enforcing MOs and Energies, error of MP2 energy of  0.003220297697885094 for He/aug-cc-pvqz
+#     Enforcing MOS and energies, error of MP2 energy of  1E-17                for He/aug-cc-pvqz
+# not enforcing MOs and Energies, error of MP2 energy of -0.006341869083391349 for Be/aug-cc-pvqz
+#     Enforcing MOS and energies, error of MP2 energy of  7E-17                for Be/aug-cc-pvqz
+# not enforcing MOs and Energies, error of MP2 energy of  6.72990602135215e-09 for Ne/aug-cc-pvqz
+#     Enforcing MOS and energies, error of MP2 energy of  4E-16                for Ne/aug-cc-pvqz
+
+mp_results = CS_MP2(UHF_res)
+
+print(f"\n\nMP2 calc: {mp_results.E_MP2}, E_corr = {mp_results.E_corr}")
+print(f"MP2 pyscf: {mymp.e_tot}, E_corr = {mymp.e_corr}")
+print(
+    f"Differences: {mp_results.E_MP2 - mymp.e_tot}, E_corr = {mp_results.E_corr - mymp.e_corr}\n"
+)

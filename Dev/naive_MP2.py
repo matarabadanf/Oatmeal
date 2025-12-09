@@ -6,16 +6,19 @@ from py_mods.src.SCF.CSRHF import CS_RHF_ResultsClass
 from py_mods.src.SCF.CSUHF import CS_UHF_ResultsClass
 from py_mods.src.SCF.plot_utilities import plot_map
 
+
 @dataclass
 class CS_MP2_Results(object):
     CS_MP2Context: Union[CS_RHF_ResultsClass, CS_UHF_ResultsClass]
     E_MP2: np.complex128
     E_corr: np.complex128
-    MP_type: Literal['RMP2', 'UMP2']
+    MP_type: Literal["RMP2", "UMP2"]
     eris_mo: NDArray[np.complex128]
 
 
-def CS_MP2(CS_MP2Context: Union[CS_RHF_ResultsClass, CS_UHF_ResultsClass]) -> CS_MP2_Results:
+def CS_MP2(
+    CS_MP2Context: Union[CS_RHF_ResultsClass, CS_UHF_ResultsClass],
+) -> CS_MP2_Results:
     """Compute the MP2 energy correction using complex scaled UHF or RHF reference.
 
     Parameters
@@ -33,7 +36,9 @@ def CS_MP2(CS_MP2Context: Union[CS_RHF_ResultsClass, CS_UHF_ResultsClass]) -> CS
     # elif isinstance(CS_MP2Context, CS_UHF_ResultsClass):
     #     mp2_result = CS_MP2_UHF(CS_MP2Context)
     else:
-        raise TypeError(f"CS_MP2Context must be either CS_RHF_ResultsClass or CS_UHF_ResultsClass. Type is {type(CS_MP2Context)}")
+        raise TypeError(
+            f"CS_MP2Context must be either CS_RHF_ResultsClass or CS_UHF_ResultsClass. Type is {type(CS_MP2Context)}"
+        )
 
     return mp2_result
 
@@ -51,7 +56,7 @@ def CS_MP2_RHF(CS_RHF_Context: CS_RHF_ResultsClass) -> CS_MP2_Results:
     returnClass: CS_MP2_Results
         Dataclass containing the MP2 energy correction.
     """
-    mp_type = 'RMP2'
+    mp_type = "RMP2"
 
     # naive approach: no symm
     R_munu = CS_RHF_Context.R_munu
@@ -59,12 +64,12 @@ def CS_MP2_RHF(CS_RHF_Context: CS_RHF_ResultsClass) -> CS_MP2_Results:
     if np.isclose(CS_RHF_Context.context.theta, 0.0):
         R_munu = R_munu.real
 
-    #rest of info
+    # rest of info
     e_orb = CS_RHF_Context.e_orb
     eris_ao = CS_RHF_Context.context.eri.real
-    n_occ : int  = int(CS_RHF_Context.n_elec // 2 )
-    n_tot : int  = len(CS_RHF_Context.context.S)
-    n_virt : int = n_tot - n_occ
+    n_occ: int = int(CS_RHF_Context.n_elec // 2)
+    n_tot: int = len(CS_RHF_Context.context.S)
+    n_virt: int = n_tot - n_occ
 
     # print(f'Number of occupied orbitals: {n_occ}')
     # print(f'Number of virtual orbitals: {n_virt}')
@@ -72,15 +77,15 @@ def CS_MP2_RHF(CS_RHF_Context: CS_RHF_ResultsClass) -> CS_MP2_Results:
 
     eris_mo = ao_to_mo(R_munu, eris_ao)
 
-    mp2_ener = 0.
+    mp2_ener = 0.0
 
-    # occupied are a,b virtual are r,s 
+    # occupied are a,b virtual are r,s
     # occupied
     for a in range(n_occ):
         ea = e_orb[a]
         for b in range(n_occ):
             eb = e_orb[b]
-            # virtual 
+            # virtual
             for r in range(n_occ, n_tot):
                 er = e_orb[r]
                 for s in range(n_occ, n_tot):
@@ -90,24 +95,25 @@ def CS_MP2_RHF(CS_RHF_Context: CS_RHF_ResultsClass) -> CS_MP2_Results:
                     # <ij|ab> = (ia|jb)
                     # <ij|kl> = (ia|jb) - (ja|ib)
 
-                    abrs = eris_mo[a,r,b,s] # o,v,o,v
-                    rsba = eris_mo[r,b,s,a] # v,o,v,o
-                    rsab = eris_mo[r,a,s,b] # v,o,v,o
+                    abrs = eris_mo[a, r, b, s]  # o,v,o,v
+                    rsba = eris_mo[r, b, s, a]  # v,o,v,o
+                    rsab = eris_mo[r, a, s, b]  # v,o,v,o
 
                     # for RHF: num = <ab|rs> [2 <rs|ab> - <rs|ba>]
                     # for UHF num = (<ab||rs>)**2
 
-                    num = abrs * ( 2 * rsab - rsba)
-                    denom = (er + es - ea - eb)
-                    mp2_ener -= num / denom # 1/4 * num / denom
+                    num = abrs * (2 * rsab - rsba)
+                    denom = er + es - ea - eb
+                    mp2_ener -= num / denom  # 1/4 * num / denom
 
-    E_corr = mp2_ener 
+    E_corr = mp2_ener
 
-    mp2_ener = E_corr + CS_RHF_Context.E_RHF 
+    mp2_ener = E_corr + CS_RHF_Context.E_RHF
 
     returnClass = CS_MP2_Results(CS_RHF_Context, mp2_ener, E_corr, mp_type, eris_mo)
 
     return returnClass
+
 
 def ao_to_mo(C_munu, eris_ao):
 
