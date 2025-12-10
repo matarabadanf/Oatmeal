@@ -101,7 +101,7 @@ plot_map(RHF_res.R_munu.real, title='Imp MOs', filename='Implem_mos.jpg')
 
 # RHF_res.R_munu[:, [5, 6]] = RHF_res.R_munu[:, [6, 5]]
 # RHF_res.R_munu[:, [10, 13]] = RHF_res.R_munu[:, [13, 10]]
-RHF_res.R_munu[:, 5] *= -1
+# RHF_res.R_munu[:, 5] *= -1
 
 # Not Forcing this swap of colums the error in correlation energy for He/cc-pvtz is  0.0012775690626617084
 #     Forcing this swap of colums the error in correlation energy for He/cc-pvtz is -0.0003459117340629397

@@ -14,6 +14,7 @@ from py_mods.src.SCF.scf_utils import (
     calc_diis_extrapolation,
     calculate_P_next,
     canonicalize,
+    sign_convention,
 )
 import matplotlib.pyplot as plt
 from dataclasses import dataclass
@@ -285,13 +286,10 @@ def CS_RHF(ctx: CS_RHF_ContextClass) -> CS_RHF_ResultsClass:
                 print("-" * 30, f"   STARTED {conv_type}  ", "-" * 30)
 
 
-    C_canon = np.copy(R_munu)
+    R_munu = sign_convention(R_munu)
 
-    C_canon, _ = canonicalize(R_munu, F_next)
+    # R_munu, _ = canonicalize(R_munu, F_next)
 
-
-
-    e_canon = np.diag(C_canon.T @ F @ C_canon)
 
     return CS_RHF_ResultsClass(
         context=ctx,
@@ -305,8 +303,8 @@ def CS_RHF(ctx: CS_RHF_ContextClass) -> CS_RHF_ResultsClass:
         C_prime=C_prime,
         P_guess=P_old if iter_idx > 0 else P,
         P=P,
-        R_munu=C_canon,
-        L_munu=C_canon.T,
+        R_munu=R_munu,
+        L_munu=R_munu.T,
         error=float(error),
         iterations=iter_idx,
     )

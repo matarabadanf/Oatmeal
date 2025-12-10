@@ -410,8 +410,8 @@ def CS_UHF(context: CS_UHF_ContextClass) -> CS_UHF_ResultsClass:
         abs(n_alpha + n_beta - n_electrons) < 1e-10
     ), "Number of electrons was not conserved in the calculation"
 
-    R_alph, _ = canonicalize(R_alph, F_next_alph.reshape(X.shape))
-    R_beta, _ = canonicalize(R_beta, F_next_beta.reshape(X.shape))
+    # R_alph, _ = canonicalize(R_alph, F_next_alph.reshape(X.shape))
+    # R_beta, _ = canonicalize(R_beta, F_next_beta.reshape(X.shape))
 
     ResultClass = CS_UHF_ResultsClass(
         context=context,
