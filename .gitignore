@@ -75,3 +75,6 @@ tests/py_tests/data/*.dat
 
 
 *DS_store
+*.molden
+*.jpg
+*.cube

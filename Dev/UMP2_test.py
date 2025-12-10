@@ -5,6 +5,7 @@ from Dev.CSMP2_dev import CS_MP2
 from py_mods.src.SCF.external import UHF_context_from_pyscf
 import matplotlib.pyplot as plt
 import numpy as np
+from pyscf.tools import molden
 
 large_basis = """
 He    S
@@ -37,12 +38,12 @@ END
 
 # pyscf data
 pyscf_args = {
-    "atom": "He 0 0 0",
+    "atom": "Ne 0 0 0; Ne 0 0 1",
     "spin": 0,
     "charge": 0,
-    "basis": "aug-cc-pvqz",
+    "basis": "cc-pvtz",
 }
-override = False  # override calculated MO coefficients by PySCF's
+override = True  # override calculated MO coefficients by PySCF's
 
 mol = gto.M(**pyscf_args)
 # mol.basis = {"He": gto.basis.parse(large_basis)}
@@ -73,8 +74,8 @@ print(f"Difference: {UHF_res.E_UHF.real - e_He} \n")
 # e_orb =(UHF_res.e_alpha.real, UHF_res.e_beta.real)
 # print(e_orb)
 
-print(mf.mo_coeff[0].shape)
-print(UHF_res.R_alpha.shape)
+# print(mf.mo_coeff[0].shape)
+# print(UHF_res.R_alpha.shape)
 
 # Once again, enforcingg MO coefficients should yield the same results as PySCF with our implementation
 # print(f"Maximum difference between Alpha and Beta MO coefficients: {np.max(mf.mo_coeff[0] - mf.mo_coeff[1])}")
@@ -90,6 +91,9 @@ if override:
 #     Enforcing MOS and energies, error of MP2 energy of  7E-17                for Be/aug-cc-pvqz
 # not enforcing MOs and Energies, error of MP2 energy of  6.72990602135215e-09 for Ne/aug-cc-pvqz
 #     Enforcing MOS and energies, error of MP2 energy of  4E-16                for Ne/aug-cc-pvqz
+
+molden.from_scf(mf, 'hf_result.molden')
+
 
 mp_results = CS_MP2(UHF_res)
 

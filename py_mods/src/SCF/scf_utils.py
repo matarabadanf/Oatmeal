@@ -460,10 +460,26 @@ def _diagonalize_gram(F_prime):
     degeneracies = count_degen(e_values)
     C_norm = orthonormalize_solutions(e_values, C_prime, degeneracies)
 
-    R_prime = np.copy(C_norm)
+    # 1. Find the ROW indices of the maximum absolute values for each column
+    max_abs_rows = np.argmax(np.abs(C_norm), axis=0)
+
+    # 2. Create an array of COLUMN indices (0, 1, 2, ... N)
+    col_indices = np.arange(C_norm.shape[1])
+
+    # 3. Extract the signs of the specific elements at those (row, col) coordinates
+    # This checks the sign of the "dominant" value, not just the algebraic max.
+    signs = np.sign(C_norm[max_abs_rows, col_indices])
+
+    # 4. Handle zeros (optional safety): if the max value is 0, sign is 0. Force to 1.
+    signs[signs == 0] = 1
+
+    # 5. Broadcast the multiplication
+    C_norm_p = C_norm * signs
+
+    R_prime = np.copy(C_norm_p)
     L_prime = np.copy(
-        C_norm.T
-    )  # Biorthogonal: L = C^{-1}, here approximated via ortho logic
+        C_norm_p.T
+    ) 
 
     return R_prime, L_prime, e_values, C_prime
 

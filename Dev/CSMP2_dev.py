@@ -79,7 +79,6 @@ def CS_MP2_RHF(CS_RHF_Context: CS_RHF_ResultsClass) -> CS_MP2_Results:
     # calculate only (ovov) integrals
     eris_mo_chem = ao_to_ovov(R_munu, eris_ao, o_i, v_i)
 
-
     # <ij||kl> = <ij|kl> - <ij|lk>
     # <ij|ab> = (ia|jb)
     # <ij|kl> = (ia|jb) - (ja|ib)
@@ -116,8 +115,20 @@ def CS_MP2_RHF(CS_RHF_Context: CS_RHF_ResultsClass) -> CS_MP2_Results:
 
 
 def CS_MP2_UHF(CS_UHF_Context: CS_UHF_ResultsClass) -> CS_MP2_Results:
-    print("Not implemented yet")
+    """
+    Compute the MP2 energy correction using complex scaled UHF reference.
 
+    Parameters
+    ----------
+    CS_UHF_Context: CS_UHF_ResultsClass
+        Dataclass containing converged CS-UHF results.
+
+    Returns
+    -------
+    returnClass: CS_MP2_Results
+        Dataclass containing the MP2 energy correction.
+    """
+    
     verbose = CS_UHF_Context.context.verbose
 
     mp_type = "RMP2"

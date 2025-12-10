@@ -284,7 +284,12 @@ def CS_RHF(ctx: CS_RHF_ContextClass) -> CS_RHF_ResultsClass:
             if verbose:
                 print("-" * 30, f"   STARTED {conv_type}  ", "-" * 30)
 
+
+    C_canon = np.copy(R_munu)
+
     C_canon, _ = canonicalize(R_munu, F_next)
+
+
 
     e_canon = np.diag(C_canon.T @ F @ C_canon)
 

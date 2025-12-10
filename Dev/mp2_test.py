@@ -12,6 +12,7 @@ from Dev.CSMP2_dev import CS_MP2
 from py_mods.src.SCF.external import RHF_context_from_pyscf
 import matplotlib.pyplot as plt
 
+from pyscf.tools import molden
 large_basis = """
 He    S
       5.285000E+02           0.000000E+00           9.400000E-04           0.000000E+00           0.000000E+00
@@ -43,13 +44,13 @@ END
 
 # pyscf data
 pyscf_args = {
-    "atom": "Ne 0 0 0",
+    "atom": "He 0 0 0",
     "spin": 0,
     "charge": 0,
-    "basis": "aug-cc-pvqz",
+    "basis": "cc-pvtz",
 }
 
-mol = gto.M(**pyscf_args)
+mol = gto.M(**pyscf_args,       )
 # mol.basis = {'He': gto.basis.parse(large_basis)}
 # mol.build()
 
@@ -60,8 +61,10 @@ e_elec = mf.energy_elec()
 py_e_orb = mf.mo_energy
 py_mo_coeff = mf.mo_coeff
 
-# print(py_e_orb)
 
+# print(py_e_orb)
+# plot_map(mf.mo_coeff.real, title='Pyscf MOs', filename='pyscf_mos.jpg')
+molden.from_scf(mf, 'hf_pyscf_cc-pvtz.molden')
 # plot_map(mf.mo_coeff)
 
 mymp = mp.RMP2(mf).run()  # this is UMP2
@@ -83,8 +86,33 @@ print(f"SCF pyscf: {e_He}")
 print(f"Difference: {RHF_res.E_RHF.real - e_He} \n")
 
 # Brute forcing this:
-RHF_res.R_munu = mf.mo_coeff
-RHF_res.e_orb = mf.mo_energy
+# RHF_res.R_munu = mf.mo_coeff
+# RHF_res.e_orb = mf.mo_energy
+
+# print(mf.mo_energy)
+# print(RHF_res.e_orb.real)
+
+
+plot_map(mf.mo_coeff.real, title='PYSCF MOs', filename='PYSCF_mos.jpg')
+mf.mo_coeff = RHF_res.R_munu.real
+molden.from_scf(mf, 'hf_self_cc-pvtz.molden')
+
+plot_map(RHF_res.R_munu.real, title='Imp MOs', filename='Implem_mos.jpg')
+
+# RHF_res.R_munu[:, [5, 6]] = RHF_res.R_munu[:, [6, 5]]
+# RHF_res.R_munu[:, [10, 13]] = RHF_res.R_munu[:, [13, 10]]
+RHF_res.R_munu[:, 5] *= -1
+
+# Not Forcing this swap of colums the error in correlation energy for He/cc-pvtz is  0.0012775690626617084
+#     Forcing this swap of colums the error in correlation energy for He/cc-pvtz is -0.0003459117340629397
+# Not forcing swap and without canonicalization step of coeffs, error value here is -0.0003459117340629050
+
+
+# plot_map(RHF_res.R_munu.real - mf.mo_coeff)
+
+plot_map(RHF_res.R_munu.real, title='Imp MOs reordered', filename='Implem_mos_reordered.jpg')
+mf.mo_coeff = RHF_res.R_munu.real
+molden.from_scf(mf, 'hf_self_forced_cc-pvtz.molden')
 
 mp_results = CS_MP2(RHF_res)
 
