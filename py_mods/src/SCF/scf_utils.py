@@ -1,7 +1,7 @@
 import numpy as np
 from numpy.typing import NDArray
 from typing import Literal, Optional, Union, Tuple, Sequence, Dict
-
+from scipy.linalg import block_diag
 from py_mods.src.SCF.plot_utilities import plot_map
 
 # --- Linalg Utilities ---
@@ -954,30 +954,23 @@ def calc_g_matrix_spin_comp(
 
 
 def canonicalize(
-    C_munu: NDArray[np.complex128], F: NDArray[np.complex128]
+    C_munu: NDArray[np.complex128], 
+    F: NDArray[np.complex128],
+    n_occ: int,
 ) -> NDArray[np.complex128]:
-    """
-    Canonicalize MO coefficients.
-
-    Parameters
-    ----------
-    C_munu : NDArray[np.complex128]
-        MO coefficients.
-    F : NDArray[np.complex128]
-        Fock matrix.
-
-    Returns
-    -------
-    NDArray[np.complex128]
-        Canonical MO coefficients.
-    """
-    F_mo = C_munu.T @ F @ C_munu
-
-    e_orb, _, _, U, *_ = diagonalize_biorthogonal(F_mo)
+    F_mo = np.einsum('mu, uv, vn -> mn', C_munu.conj().T, F, C_munu)
     
-    C_canon = C_munu @ U
-    return C_canon, e_orb
+    F_vv = F_mo[n_occ:, n_occ:]
+    
+    eps_virt, U_virt = np.linalg.eigh(F_vv)
+    
+    U_full = block_diag(np.eye(n_occ), U_virt)
+    
+    C_new = C_munu @ U_full
+    eps_occ = np.diag(F_mo)[:n_occ]
+    epsilon_new = np.concatenate([eps_occ, eps_virt])
 
+    return C_new, epsilon_new
 
 def sign_convention(matrix):
     for i, col in enumerate(matrix.T):

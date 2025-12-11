@@ -3,7 +3,7 @@ from py_mods.src.SCF.CSUHF import CS_UHF_ContextClass
 from pyscf import gto
 
 
-def RHF_context_from_pyscf(atom="He 0 0 0", spin=0, charge=0, basis="cc-pvdz"):
+def RHF_context_from_pyscf(atom="He 0 0 0", spin=0, charge=0, basis="cc-pvdz", verbose=0):
     mol = gto.M(atom=atom, spin=spin, charge=charge, basis=basis)
     n_elec = sum(mol.nelec)
 

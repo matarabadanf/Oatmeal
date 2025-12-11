@@ -79,7 +79,7 @@ RHF_res = CS_RHF(RHF_cxt)
 
 # print(RHF_res.e_orb - py_e_orb)
 
-# plot_map(RHF_res.R_munu.real)
+plot_map(RHF_res.R_munu.real.T @ RHF_res.F_final @ RHF_res.R_munu.real, title='Imp Fock MO basis', filename='Implem_Fock_MO_basis.jpg')
 
 print(f"\nSCF energy: {RHF_res.E_RHF} (converged: {RHF_res.converged})")
 print(f"SCF pyscf: {e_He}")
@@ -90,7 +90,7 @@ print(f"Difference: {RHF_res.E_RHF.real - e_He} \n")
 # RHF_res.e_orb = mf.mo_energy
 
 # print(mf.mo_energy)
-# print(RHF_res.e_orb.real)
+print(RHF_res.e_orb.real)
 
 
 plot_map(mf.mo_coeff.real, title='PYSCF MOs', filename='PYSCF_mos.jpg')

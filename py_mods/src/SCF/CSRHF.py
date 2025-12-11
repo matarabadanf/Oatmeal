@@ -162,6 +162,7 @@ def CS_RHF(ctx: CS_RHF_ContextClass) -> CS_RHF_ResultsClass:
     conv_MEM = ctx.conv_MEM
     conv_type = ctx.conv_type
     occupation = ctx.occupation
+    n_occ = n_electrons // 2
     max_iter = ctx.max_iter
     threshold = ctx.threshold
     p_guess = ctx.p_guess
@@ -288,7 +289,7 @@ def CS_RHF(ctx: CS_RHF_ContextClass) -> CS_RHF_ResultsClass:
 
     R_munu = sign_convention(R_munu)
 
-    # R_munu, _ = canonicalize(R_munu, F_next)
+    # R_munu, e_orb = canonicalize(R_munu, F_next , n_occ)
 
 
     return CS_RHF_ResultsClass(
