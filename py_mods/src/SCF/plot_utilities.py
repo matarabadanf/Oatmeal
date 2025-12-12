@@ -1,3 +1,4 @@
+from re import I
 import matplotlib.pyplot as plt
 from numpy.typing import NDArray
 from typing import Literal, Tuple, Union
@@ -125,5 +126,36 @@ def plot_mo_analysis(C1, E1, C2, E2, titles=None):
         ax_e.set_ylabel("E") 
 
         fig.colorbar(im_e, ax=ax_e, label="Energy")
+
+    return fig
+
+def _plot_3_maps_real(matrices, plot_range=None, titles=None):
+    """
+    Plots 3 matrices side-by-side.
+    
+    Parameters
+    ----------
+    matrices: list of 3 NDArray[np.float64]
+        List containing the three matrices to plot.
+    plot_range: tuple, optional
+        Tuple containing x and y limits for the plots.
+    titles: list of str, optional
+        List containing titles for each subplot.
+    """
+    fig, axes = plt.subplots(1, 3, figsize=(15, 5), constrained_layout=True)
+
+    if titles is None:
+        titles = ["Matrix 1", "Matrix 2", "Matrix 3"]
+
+    for ax, matrix, title in zip(axes, matrices, titles):
+        
+        im = ax.imshow(matrix, cmap="viridis", interpolation="nearest")
+        fig.colorbar(im, ax=ax, label="Value", fraction=0.046, pad=0.04)
+        
+        ax.set_title(title)
+
+        if plot_range is not None:
+            ax.set_xlim(plot_range[0])
+            ax.set_ylim(plot_range[1])
 
     return fig

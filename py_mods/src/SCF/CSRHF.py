@@ -125,6 +125,7 @@ class CS_RHF_ResultsClass:
     e_orb: NDArray[np.complex128]
     n_elec: int32
     det: NDArray[np.int32]
+    H_core: NDArray[np.complex128]
     X: NDArray[np.complex128]
     F_final: NDArray[np.complex128]
     C_prime: NDArray[np.complex128]
@@ -188,6 +189,7 @@ def CS_RHF(ctx: CS_RHF_ContextClass) -> CS_RHF_ResultsClass:
     # Scaling
     T_scaled, V_scaled, eri_scaled = scale_integrals(T, V, eri, theta)
     H_core = T_scaled + V_scaled
+    core_mask = np.abs(H_core) > 1e-10
 
     # Guess
     P = guess_density_RHF(p_guess, dim, INPORB)
@@ -271,6 +273,7 @@ def CS_RHF(ctx: CS_RHF_ContextClass) -> CS_RHF_ResultsClass:
         # Compute next Density
         P_old = P.copy()
         P, e_orb, R_munu, *_, C_prime = calculate_P_next(F_next, X, n_electrons, det)
+        P = P * core_mask
 
         # Stability Patch: Enforce real if theta=0
         if theta == 0.0:
@@ -289,7 +292,7 @@ def CS_RHF(ctx: CS_RHF_ContextClass) -> CS_RHF_ResultsClass:
 
     R_munu = sign_convention(R_munu)
 
-    # R_munu, e_orb = canonicalize(R_munu, F_next , n_occ)
+    R_munu, e_orb = canonicalize(R_munu, F_next , n_occ)
 
 
     return CS_RHF_ResultsClass(
@@ -299,6 +302,7 @@ def CS_RHF(ctx: CS_RHF_ContextClass) -> CS_RHF_ResultsClass:
         e_orb=e_orb,
         n_elec=int(n_electrons),
         det=det,
+        H_core=H_core,
         X=X,
         F_final=F_next,
         C_prime=C_prime,
