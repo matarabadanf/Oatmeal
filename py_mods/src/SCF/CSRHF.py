@@ -292,7 +292,7 @@ def CS_RHF(ctx: CS_RHF_ContextClass) -> CS_RHF_ResultsClass:
 
     R_munu = sign_convention(R_munu)
 
-    R_munu, e_orb = canonicalize(R_munu, F_next , n_occ)
+    R_munu, _ = canonicalize(R_munu, F_next , n_occ)
 
 
     return CS_RHF_ResultsClass(

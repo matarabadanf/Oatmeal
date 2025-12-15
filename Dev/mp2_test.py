@@ -93,11 +93,11 @@ print(f"Difference: {RHF_res.E_RHF.real - e_He} \n")
 print(RHF_res.e_orb.real)
 
 
-plot_map(mf.mo_coeff.real, title='PYSCF MOs', filename='PYSCF_mos.jpg')
+# plot_map(mf.mo_coeff.real, title='PYSCF MOs', filename='PYSCF_mos.jpg')
 mf.mo_coeff = RHF_res.R_munu.real
 molden.from_scf(mf, 'hf_self_cc-pvtz.molden')
 
-plot_map(RHF_res.R_munu.real, title='Imp MOs', filename='Implem_mos.jpg')
+# plot_map(RHF_res.R_munu.real, title='Imp MOs', filename='Implem_mos.jpg')
 
 # RHF_res.R_munu[:, [5, 6]] = RHF_res.R_munu[:, [6, 5]]
 # RHF_res.R_munu[:, [10, 13]] = RHF_res.R_munu[:, [13, 10]]
