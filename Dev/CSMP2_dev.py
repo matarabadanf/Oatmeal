@@ -14,6 +14,7 @@ class CS_MP2_Results(object):
     E_MP2: np.complex128
     E_corr: np.complex128
     MP_type: Literal["RMP2", "UMP2"]
+    t2_abrs: NDArray[np.complex128] | None
     eris_mo: NDArray[np.complex128]
 
 
@@ -101,15 +102,23 @@ def CS_MP2_RHF(CS_RHF_Context: CS_RHF_ResultsClass) -> CS_MP2_Results:
         - e_b[None, :, None, None]
     )
 
+    asym_eri = eris_mo_phys - eris_mo_phys.transpose(0, 1, 3, 2)
+
+    t2_abrs = asym_eri / denom_abrs
+
     # for RHF: num = <ab|rs> [2 <rs|ab> - <rs|ba>]
     # for UHF num = (<ab||rs>)**2
     num = eris_mo_phys * (2 * eris_mo_phys - eris_mo_phys.transpose(0, 1, 3, 2))
+
+    contribution = num / denom_abrs
 
     E_corr = -np.sum(num / denom_abrs)
 
     E_MP2 = E_corr + CS_RHF_Context.E_RHF
 
-    returnClass = CS_MP2_Results(CS_RHF_Context, E_MP2, E_corr, mp_type, eris_mo_chem)
+    returnClass = CS_MP2_Results(
+        CS_RHF_Context, E_MP2, E_corr, mp_type, contribution, eris_mo_chem
+    )
 
     return returnClass
 
@@ -128,7 +137,7 @@ def CS_MP2_UHF(CS_UHF_Context: CS_UHF_ResultsClass) -> CS_MP2_Results:
     returnClass: CS_MP2_Results
         Dataclass containing the MP2 energy correction.
     """
-    
+
     verbose = CS_UHF_Context.context.verbose
 
     mp_type = "RMP2"
@@ -279,7 +288,7 @@ def CS_MP2_UHF(CS_UHF_Context: CS_UHF_ResultsClass) -> CS_MP2_Results:
 
     E_MP2 = E_corr + CS_UHF_Context.E_UHF
 
-    returnClass = CS_MP2_Results(CS_UHF_Context, E_MP2, E_corr, mp_type, None)
+    returnClass = CS_MP2_Results(CS_UHF_Context, E_MP2, E_corr, mp_type, None, None)
 
     return returnClass
 

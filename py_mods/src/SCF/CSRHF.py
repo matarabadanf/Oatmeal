@@ -276,12 +276,13 @@ def CS_RHF(ctx: CS_RHF_ContextClass) -> CS_RHF_ResultsClass:
         P_old = P.copy()
         P, e_orb, R_munu, *_, C_prime = calculate_P_next(F_next, X, n_electrons, det)
         P = P * core_mask
+        R_munu = sign_convention(R_munu)
 
-        # Stability Patch: Enforce real if theta=0
-        if theta == 0.0:
-            P = P.real.astype(np.complex128)
-            L_munu = L_munu.real.astype(np.complex128)
-            R_munu = R_munu.real.astype(np.complex128)
+        # # Stability Patch: Enforce real if theta=0
+        # if theta == 0.0:
+        #     P = P.real.astype(np.complex128)
+        #     L_munu = L_munu.real.astype(np.complex128)
+        #     R_munu = R_munu.real.astype(np.complex128)
 
         E_prev = E_RHF
 
@@ -291,10 +292,17 @@ def CS_RHF(ctx: CS_RHF_ContextClass) -> CS_RHF_ResultsClass:
             if verbose:
                 print("-" * 30, f"   STARTED {conv_type}  ", "-" * 30)
 
-
-    R_munu = sign_convention(R_munu)
-
     # R_munu, _ = canonicalize(R_munu, F_next , n_occ)
+
+    # postconv = True
+    # if postconv:
+    #     print('Starting postconv iterations')
+    #     for i in range(10):
+    #         P, e_orb, R_munu, *_, C_prime = calculate_P_next(
+    #             F_next, X, n_electrons, det
+    #         )
+    #         F_next = F
+    
 
 
     return CS_RHF_ResultsClass(

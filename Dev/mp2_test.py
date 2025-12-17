@@ -44,10 +44,10 @@ END
 
 # pyscf data
 pyscf_args = {
-    "atom": "Ar 0 0 0",
+    "atom": "He 0 0 0",
     "spin": 0,
     "charge": 0,
-    "basis": "aug-cc-pvdz",
+    "basis": "aug-cc-pvqz",
 }
 
 mol = gto.M(**pyscf_args,       )
@@ -64,7 +64,7 @@ py_mo_coeff = mf.mo_coeff
 
 # print(py_e_orb)
 # plot_map(mf.mo_coeff.real, title='Pyscf MOs', filename='pyscf_mos.jpg')
-# molden.from_scf(mf, 'hf_pyscf_cc-pvtz.molden')
+molden.from_scf(mf, 'ref_arb_orbs.molden')
 # plot_map(mf.mo_coeff)
 
 mymp = mp.RMP2(mf).run()  # this is UMP2
@@ -72,6 +72,8 @@ mymp = mp.RMP2(mf).run()  # this is UMP2
 # implementation and calculation
 RHF_cxt = RHF_context_from_pyscf(**pyscf_args)
 RHF_cxt.theta = 0.00
+# RHF_cxt.threshold = 1e-8
+RHF_cxt.verbose = True
 # RHF_cxt.occupation = np.array([2,0])
 RHF_res = CS_RHF(RHF_cxt)
 
@@ -89,13 +91,14 @@ print(f"Difference: {RHF_res.E_RHF.real - e_He} \n")
 # RHF_res.R_munu = mf.mo_coeff
 # RHF_res.e_orb = mf.mo_energy
 
-# print(mf.mo_energy)
-# print(RHF_res.e_orb.real)
+print(mf.mo_energy)
+print(RHF_res.e_orb.real)
 
+print(mf.mo_energy-RHF_res.e_orb.real)
 
 # plot_map(mf.mo_coeff.real, title='PYSCF MOs', filename='PYSCF_mos.jpg')
-# mf.mo_coeff = RHF_res.R_munu.real
-# molden.from_scf(mf, 'hf_self_cc-pvtz.molden')
+mf.mo_coeff = RHF_res.R_munu.real
+molden.from_scf(mf, 'new_Ar_orbs.molden')
 
 # plot_map(RHF_res.R_munu.real, title='Imp MOs', filename='Implem_mos.jpg')
 
@@ -111,7 +114,7 @@ print(f"Difference: {RHF_res.E_RHF.real - e_He} \n")
 # plot_map(RHF_res.R_munu.real - mf.mo_coeff)
 
 # plot_map(RHF_res.R_munu.real, title='Imp MOs reordered', filename='Implem_mos_reordered.jpg')
-mf.mo_coeff = RHF_res.R_munu.real
+# mf.mo_coeff = RHF_res.R_munu.real
 # molden.from_scf(mf, 'hf_self_forced_cc-pvtz.molden')
 
 mp_results = CS_MP2(RHF_res)
