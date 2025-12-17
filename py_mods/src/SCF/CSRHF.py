@@ -207,6 +207,8 @@ def CS_RHF(ctx: CS_RHF_ContextClass) -> CS_RHF_ResultsClass:
     C_prime = np.zeros((dim, dim), dtype=np.complex128)
     L_munu = np.zeros_like(C_prime)
     R_munu = np.zeros_like(C_prime)
+    E_RHF = 0. + 0j
+    error = 13
 
     iter_idx = 0
 
@@ -292,7 +294,7 @@ def CS_RHF(ctx: CS_RHF_ContextClass) -> CS_RHF_ResultsClass:
 
     R_munu = sign_convention(R_munu)
 
-    R_munu, _ = canonicalize(R_munu, F_next , n_occ)
+    # R_munu, _ = canonicalize(R_munu, F_next , n_occ)
 
 
     return CS_RHF_ResultsClass(

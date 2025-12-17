@@ -437,6 +437,9 @@ def diagonalize_biorthogonal(
 
     R_prime, _, e_values, C_prime = _diagonalize_gram(F_prime)
 
+    # e_values, R_prime = np.linalg.eigh(F_prime)
+
+    C_prime = R_prime
     L_prime = R_prime.T
 
     LR = L_prime @ R_prime
@@ -460,7 +463,8 @@ def _diagonalize_gram(F_prime):
     C_prime = C_prime[:, idx]
 
     degeneracies = count_degen(e_values)
-    C_norm = orthonormalize_solutions(e_values, C_prime, degeneracies)
+    # C_norm = orthonormalize_solutions(e_values, C_prime, degeneracies)
+    C_norm = orthonormalize_solutions2(e_values, C_prime)
 
     C_norm_p = C_norm
 
@@ -492,6 +496,29 @@ def count_degen(e_orb: NDArray[np.complex128]) -> Dict[complex, int]:
         counts[val] = counts.get(val, 0) + 1
     return counts
 
+def count_degen2(e_orb: NDArray[np.complex128]) -> Dict[complex, int]:
+    """
+    Count eigenvalue degeneracies.
+
+    Parameters
+    ----------
+    e_orb : NDArray[np.complex128]
+        Orbital energies.
+
+    Returns
+    -------
+    Dict[complex, int]
+        Degeneracy map.
+    """
+    counts: Dict[complex, int] = {}
+    for item in e_orb:
+        val = np.round(item, 5)
+        counts[val] = counts.get(val, 0) + 1
+
+    keys = np.array(list(counts.keys()))
+    degs = np.array(list(counts.values()))
+
+    return keys, degs 
 
 def c_projector(
     u: NDArray[np.complex128], v: NDArray[np.complex128]
@@ -614,6 +641,33 @@ def orthonormalize_solutions(
     norms = np.array([c_norm(col) for col in C_orth.T])
     return C_orth / norms
 
+def orthonormalize_solutions2(eval, evec):
+    ener, n_deg = count_degen2(eval)
+    # print("Energy snd degeneracy in Fock eigenvalues:")
+
+    # for e, d in zip(ener, n_deg):
+        # print(f"{e:.6f}   {d}")
+
+    copyy = np.copy(evec)
+
+    distinct_evals = len(n_deg)
+    for i in range(distinct_evals):
+        # print(f"Processing degenerate set {ener[i]} with degeneracy {n_deg[i]}")
+        if n_deg[i] != 1:
+            # print(n_deg[0:i-1])
+            idx_str = sum(n_deg[0:i]) 
+            # print('Starting on column ', idx_str)
+            idx_end = idx_str + n_deg[i]
+            # print(evec[:, idx_str:idx_end].real)
+            v = gram_schmidt(evec[:,idx_str:idx_end].T).T #WIWOWIWOWIWO the issue was here looks like 
+            copyy[:, idx_str:idx_end] = v
+        
+        # else:
+            # print('Nothing to do\n')
+    
+    norms = np.array([c_norm(col) for col in copyy.T])
+
+    return copyy / norms
 
 def calc_p_matrix_comp(
     l_matrix: NDArray[np.complex128],

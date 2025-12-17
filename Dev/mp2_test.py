@@ -44,10 +44,10 @@ END
 
 # pyscf data
 pyscf_args = {
-    "atom": "He 0 0 0",
+    "atom": "Ar 0 0 0",
     "spin": 0,
     "charge": 0,
-    "basis": "cc-pvtz",
+    "basis": "aug-cc-pvdz",
 }
 
 mol = gto.M(**pyscf_args,       )
@@ -64,7 +64,7 @@ py_mo_coeff = mf.mo_coeff
 
 # print(py_e_orb)
 # plot_map(mf.mo_coeff.real, title='Pyscf MOs', filename='pyscf_mos.jpg')
-molden.from_scf(mf, 'hf_pyscf_cc-pvtz.molden')
+# molden.from_scf(mf, 'hf_pyscf_cc-pvtz.molden')
 # plot_map(mf.mo_coeff)
 
 mymp = mp.RMP2(mf).run()  # this is UMP2
@@ -79,7 +79,7 @@ RHF_res = CS_RHF(RHF_cxt)
 
 # print(RHF_res.e_orb - py_e_orb)
 
-plot_map(RHF_res.R_munu.real.T @ RHF_res.F_final @ RHF_res.R_munu.real, title='Imp Fock MO basis', filename='Implem_Fock_MO_basis.jpg')
+# plot_map(RHF_res.R_munu.real.T @ RHF_res.F_final @ RHF_res.R_munu.real, title='Imp Fock MO basis', filename='Implem_Fock_MO_basis.jpg')
 
 print(f"\nSCF energy: {RHF_res.E_RHF} (converged: {RHF_res.converged})")
 print(f"SCF pyscf: {e_He}")
@@ -90,12 +90,12 @@ print(f"Difference: {RHF_res.E_RHF.real - e_He} \n")
 # RHF_res.e_orb = mf.mo_energy
 
 # print(mf.mo_energy)
-print(RHF_res.e_orb.real)
+# print(RHF_res.e_orb.real)
 
 
 # plot_map(mf.mo_coeff.real, title='PYSCF MOs', filename='PYSCF_mos.jpg')
-mf.mo_coeff = RHF_res.R_munu.real
-molden.from_scf(mf, 'hf_self_cc-pvtz.molden')
+# mf.mo_coeff = RHF_res.R_munu.real
+# molden.from_scf(mf, 'hf_self_cc-pvtz.molden')
 
 # plot_map(RHF_res.R_munu.real, title='Imp MOs', filename='Implem_mos.jpg')
 
@@ -110,9 +110,9 @@ molden.from_scf(mf, 'hf_self_cc-pvtz.molden')
 
 # plot_map(RHF_res.R_munu.real - mf.mo_coeff)
 
-plot_map(RHF_res.R_munu.real, title='Imp MOs reordered', filename='Implem_mos_reordered.jpg')
+# plot_map(RHF_res.R_munu.real, title='Imp MOs reordered', filename='Implem_mos_reordered.jpg')
 mf.mo_coeff = RHF_res.R_munu.real
-molden.from_scf(mf, 'hf_self_forced_cc-pvtz.molden')
+# molden.from_scf(mf, 'hf_self_forced_cc-pvtz.molden')
 
 mp_results = CS_MP2(RHF_res)
 
