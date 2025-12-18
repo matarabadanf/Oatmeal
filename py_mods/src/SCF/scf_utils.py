@@ -462,7 +462,7 @@ def _diagonalize_gram(F_prime):
     e_values = e_values[idx]
     C_prime = C_prime[:, idx]
 
-    degeneracies = count_degen(e_values)
+    # degeneracies = count_degen(e_values)
     # C_norm = orthonormalize_solutions(e_values, C_prime, degeneracies)
     C_norm = orthonormalize_solutions2(e_values, C_prime)
 
@@ -476,25 +476,25 @@ def _diagonalize_gram(F_prime):
     return R_prime, L_prime, e_values, C_prime
 
 
-def count_degen(e_orb: NDArray[np.complex128]) -> Dict[complex, int]:
-    """
-    Count eigenvalue degeneracies.
+# def count_degen(e_orb: NDArray[np.complex128]) -> Dict[complex, int]:
+#     """
+#     Count eigenvalue degeneracies.
 
-    Parameters
-    ----------
-    e_orb : NDArray[np.complex128]
-        Orbital energies.
+#     Parameters
+#     ----------
+#     e_orb : NDArray[np.complex128]
+#         Orbital energies.
 
-    Returns
-    -------
-    Dict[complex, int]
-        Degeneracy map.
-    """
-    counts: Dict[complex, int] = {}
-    for item in e_orb:
-        val = np.round(item, 5)
-        counts[val] = counts.get(val, 0) + 1
-    return counts
+#     Returns
+#     -------
+#     Dict[complex, int]
+#         Degeneracy map.
+#     """
+#     counts: Dict[complex, int] = {}
+#     for item in e_orb:
+#         val = np.round(item, 5)
+#         counts[val] = counts.get(val, 0) + 1
+#     return counts
 
 def count_degen2(e_orb: NDArray[np.complex128]) -> Dict[complex, int]:
     """
@@ -569,77 +569,151 @@ def gram_schmidt(v: NDArray[np.complex128]) -> NDArray[np.complex128]:
     Parameters
     ----------
     v : NDArray[np.complex128]
-        Input vectors (rows).
+        Input vectors as columns.
+
+    Returns
+    -------
+    NDArray[np.complex128]
+        Orthonormalized vectors as columns.
+    """
+    # initialize the space
+    dim, vectors = v.shape
+    e = np.zeros((dim, vectors), dtype=np.complex128)
+    u = np.zeros((dim, vectors), dtype=np.complex128)
+
+    # obtain first basis vector 
+    u[:,0] = v[:,0].copy()
+    e[:,0] = v[:,0] / c_norm(v[:,0])
+
+    # for every remaining vector, subtract the projection of the previous basis vectors
+    for i in range(1, vectors):
+        v_i = v[:,i]
+        proj = np.zeros(dim, dtype=np.complex128)
+        for j in range(i):
+            proj += c_projector(u[:,j], v_i)
+        u[:,i] = v_i - proj
+
+        # and normalize to get the next basis vector
+        e[:,i] = u[:,i] / c_norm(u[:,i])
+
+    return e
+
+def modified_gram_schmidt(v: NDArray[np.complex128]) -> NDArray[np.complex128]:
+    """
+    Apply Modified Gram-Schmidt orthonormalization.
+
+    Parameters
+    ----------
+    v : NDArray[np.complex128]
+        Input vectors as columns.
 
     Returns
     -------
     NDArray[np.complex128]
         Orthonormalized vectors.
     """
-    size, dim = v.shape
-    e = np.zeros((size, dim), dtype=np.complex128)
-    u = np.zeros((size, dim), dtype=np.complex128)
 
-    u[0] = v[0].copy()
-    e[0] = v[0] / c_norm(v[0])
+    # exctract number of dimensions and of vectors (array in column form has a shape ())
+    dim, vectors = v.shape
+    e = np.zeros((dim, vectors), dtype=np.complex128)
 
-    for i in range(1, size):
-        v_i = v[i]
-        proj = np.zeros(dim, dtype=np.complex128)
-        for j in range(i):
-            proj += c_projector(u[j], v_i)
+    # copy the original vectors to modify them at each step
+    v_copy = v.astype(np.complex128)
 
-        u[i] = v_i - proj
-        e[i] = u[i] / c_norm(u[i])
+    for _ in range(2):
+        for i in range(vectors):
+            # normalize the i-th basis vector
+            threshold = 1e-14
+            v_copy[:,i].imag[np.abs(v_copy[:,i].imag) < threshold] = 0.0
+            
+            # normalize
+            e[:,i] = v_copy[:,i] / c_norm(v_copy[:,i])
+            
+            # remove component in this direction of all the remaining vectors
+            for j in range(i + 1, vectors):
+                proj = c_projector(e[:,i], v_copy[:,j])
+                v_copy[:,j] -= proj
 
     return e
 
+# def gram_schmidt(v: NDArray[np.complex128]) -> NDArray[np.complex128]:
+#     """
+#     Apply Gram-Schmidt orthonormalization.
 
-def orthonormalize_solutions(
-    e_orb: NDArray[np.complex128],
-    C: NDArray[np.complex128],
-    deg_dict: Dict[complex, int],
-) -> NDArray[np.complex128]:
-    """
-    Orthonormalize degenerate solutions.
+#     Parameters
+#     ----------
+#     v : NDArray[np.complex128]
+#         Input vectors (rows).
 
-    Parameters
-    ----------
-    e_orb : NDArray[np.complex128]
-        Orbital energies.
-    C : NDArray[np.complex128]
-        Eigenvectors.
-    deg_dict : Dict[complex, int]
-        Degeneracy map.
+#     Returns
+#     -------
+#     NDArray[np.complex128]
+#         Orthonormalized vectors.
+#     """
+#     size, dim = v.shape
+#     e = np.zeros((size, dim), dtype=np.complex128)
+#     u = np.zeros((size, dim), dtype=np.complex128)
 
-    Returns
-    -------
-    NDArray[np.complex128]
-        Normalized eigenvectors.
-    """
-    degeneracies = deg_dict.copy()
-    C_orth = C.copy()
+#     u[0] = v[0].copy()
+#     e[0] = v[0] / c_norm(v[0])
 
-    n_orb = len(e_orb)
-    i = 0
-    while i < n_orb:
-        val = np.round(e_orb[i], 10)
-        deg = degeneracies.get(val, 0)
+#     for i in range(1, size):
+#         v_i = v[i]
+#         proj = np.zeros(dim, dtype=np.complex128)
+#         for j in range(i):
+#             proj += c_projector(u[j], v_i)
 
-        if deg > 1:
-            # Extract subspace
-            v = C[:, i : i + deg].T
-            # Orthogonalize
-            e = gram_schmidt(v)
-            # Place back
-            C_orth[:, i : i + deg] = e.T
-            i += deg
-        else:
-            i += 1
+#         u[i] = v_i - proj
+#         e[i] = u[i] / c_norm(u[i])
 
-    # Normalize all columns
-    norms = np.array([c_norm(col) for col in C_orth.T])
-    return C_orth / norms
+#     return e
+
+
+# def orthonormalize_solutions(
+#     e_orb: NDArray[np.complex128],
+#     C: NDArray[np.complex128],
+#     deg_dict: Dict[complex, int],
+# ) -> NDArray[np.complex128]:
+#     """
+#     Orthonormalize degenerate solutions.
+
+#     Parameters
+#     ----------
+#     e_orb : NDArray[np.complex128]
+#         Orbital energies.
+#     C : NDArray[np.complex128]
+#         Eigenvectors.
+#     deg_dict : Dict[complex, int]
+#         Degeneracy map.
+
+#     Returns
+#     -------
+#     NDArray[np.complex128]
+#         Normalized eigenvectors.
+#     """
+#     degeneracies = deg_dict.copy()
+#     C_orth = C.copy()
+
+#     n_orb = len(e_orb)
+#     i = 0
+#     while i < n_orb:
+#         val = np.round(e_orb[i], 10)
+#         deg = degeneracies.get(val, 0)
+
+#         if deg > 1:
+#             # Extract subspace
+#             v = C[:, i : i + deg].T
+#             # Orthogonalize
+#             e = gram_schmidt(v)
+#             # Place back
+#             C_orth[:, i : i + deg] = e.T
+#             i += deg
+#         else:
+#             i += 1
+
+#     # Normalize all columns
+#     norms = np.array([c_norm(col) for col in C_orth.T])
+#     return C_orth / norms
 
 def orthonormalize_solutions2(eval, evec):
     ener, n_deg = count_degen2(eval)
@@ -659,11 +733,17 @@ def orthonormalize_solutions2(eval, evec):
             # print('Starting on column ', idx_str)
             idx_end = idx_str + n_deg[i]
             # print(evec[:, idx_str:idx_end].real)
-            v = gram_schmidt(evec[:,idx_str:idx_end].T).T #WIWOWIWOWIWO the issue was here looks like 
+            v = modified_gram_schmidt(evec[:,idx_str:idx_end]) #WIWOWIWOWIWO the issue was here looks like 
             copyy[:, idx_str:idx_end] = v
         
         # else:
             # print('Nothing to do\n')
+
+    # reorthonormalize all
+    copyy = modified_gram_schmidt(copyy)
+
+    # set to zero imaginary part below threshold
+    
     
     norms = np.array([c_norm(col) for col in copyy.T])
 
