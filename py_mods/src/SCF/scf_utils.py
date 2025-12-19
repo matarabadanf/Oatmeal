@@ -455,7 +455,11 @@ def diagonalize_biorthogonal(
 
 
 def _diagonalize_gram(F_prime):
-    e_values, C_prime = np.linalg.eig(F_prime)
+
+    if np.allclose(F_prime.T, F_prime) and np.linalg.norm(F_prime.imag) < 1E-14:
+        e_values, C_prime = np.linalg.eigh(F_prime)
+    else:
+        e_values, C_prime = np.linalg.eig(F_prime)
 
     # Sort by real part of eigenvalues (standard for SCF stability)
     idx = e_values.argsort()
