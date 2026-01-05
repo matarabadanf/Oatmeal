@@ -460,6 +460,8 @@ def _diagonalize_gram(F_prime):
         e_values, C_prime = np.linalg.eigh(F_prime)
     else:
         e_values, C_prime = np.linalg.eig(F_prime)
+    
+    # e_values, C_prime = np.linalg.eig(F_prime)
 
     # Sort by real part of eigenvalues (standard for SCF stability)
     idx = e_values.argsort()

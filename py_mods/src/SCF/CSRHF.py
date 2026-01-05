@@ -263,7 +263,7 @@ def CS_RHF(ctx: CS_RHF_ContextClass) -> CS_RHF_ResultsClass:
 
         if verbose:
             print(
-                f"{iter_idx:5}     {E_RHF:45.16f}     {E_diff:45.16f}     {error_re:8.4E}     {error_im:8.4E}j"
+                f"{iter_idx:5}     {E_RHF:24.12E}     {E_diff:24.12E}     {error_re:8.4E}     {error_im:8.4E}j"
             )
 
         # Check convergence
