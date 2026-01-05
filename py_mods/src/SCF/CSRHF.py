@@ -78,8 +78,8 @@ class CS_RHF_ContextClass:
     INPORB: Union[NDArray[np.float64], NDArray[np.complex128], None] = None
     verbose: bool = False
     conv_type: Literal[None, "DIIS", "CROP"] = "DIIS"
-    conv_MEM: int = 8
-    conv_ITER_START: int = 12
+    conv_MEM: int = 4
+    conv_ITER_START: int = 4
 
 
 @dataclass
@@ -194,8 +194,40 @@ def CS_RHF(ctx: CS_RHF_ContextClass) -> CS_RHF_ResultsClass:
     # Guess
     P = guess_density_RHF(p_guess, dim, INPORB)
 
+    if theta != 0.:
+        if verbose:
+            print('Converging unscaled case:')
+        unscaled_ctx = CS_RHF_ContextClass(
+            S=ctx.S,
+            T=ctx.T,
+            V=ctx.V,
+            eri=ctx.eri,
+            n_electrons=ctx.n_electrons,
+            theta=0.0,
+            occupation=ctx.occupation,
+            max_iter=ctx.max_iter,
+            threshold=ctx.threshold,
+            p_guess=ctx.p_guess,
+            guess_MAX_ITER=ctx.guess_MAX_ITER,
+            INPORB=ctx.INPORB,
+            verbose=ctx.verbose,
+            conv_type=ctx.conv_type,
+            conv_MEM=ctx.conv_MEM,
+            conv_ITER_START=10,
+        )
+
+        unscaled_res = CS_RHF(unscaled_ctx)
+
+        if verbose:
+            print('Unscaled energy: ', unscaled_res.E_RHF)
+            print('\n\n\nConverging scaled case from unscaled density as reference:')
+
+        P = unscaled_res.P
+
     # State variables
     E_prev = 0.0 + 0.0j
+    if theta != 0.0:
+        E_prev = unscaled_res.E_RHF
     use_conv = False
     converged = False
     F_guess = []
@@ -222,17 +254,20 @@ def CS_RHF(ctx: CS_RHF_ContextClass) -> CS_RHF_ResultsClass:
     for iter_idx in range(max_iter):
         F, r = calculate_F_and_r_comp(P, S, H_core, eri_scaled)
 
-        error = np.linalg.norm(r.ravel())
+        # error = np.linalg.norm(r.ravel())
+        error_re = np.max(np.abs(r.real))
+        error_im = np.max(np.abs(r.imag))
+        
         E_RHF = E_0_comp(P, H_core, F)
         E_diff = E_RHF - E_prev
 
         if verbose:
             print(
-                f"{iter_idx:5}     {E_RHF:45.16f}     {E_diff:45.16f}     {error:8.4E}"
+                f"{iter_idx:5}     {E_RHF:45.16f}     {E_diff:45.16f}     {error_re:8.4E}     {error_im:8.4E}j"
             )
 
         # Check convergence
-        if iter_idx > 1 and error < threshold:
+        if iter_idx > 1 and error_re < threshold and error_im < threshold:
             converged = True
             if verbose:
                 print(f"Convergence achieved after {iter_idx} iterations.")
@@ -277,8 +312,8 @@ def CS_RHF(ctx: CS_RHF_ContextClass) -> CS_RHF_ResultsClass:
         P, e_orb, R_munu, *_, C_prime = calculate_P_next(F_next, X, n_electrons, det)
         P = P * core_mask
         R_munu = sign_convention(R_munu)
-
-        # # Stability Patch: Enforce real if theta=0
+        
+        # Enforce real if theta=0
         # if theta == 0.0:
         #     P = P.real.astype(np.complex128)
         #     L_munu = L_munu.real.astype(np.complex128)
