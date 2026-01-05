@@ -3,6 +3,7 @@ from numpy.typing import NDArray
 from typing import Literal, Optional, Union, Tuple, Sequence, Dict
 from scipy.linalg import block_diag
 from py_mods.src.SCF.plot_utilities import plot_map
+import scipy
 
 # --- Linalg Utilities ---
 
@@ -1035,6 +1036,51 @@ def calculate_P_next(
 
     return P_LR, e_values, C_munu, R_munu, L_munu, P_RR, C_prime
 
+
+def calculate_P_next_2(
+    F: NDArray[np.complex128],
+    S: NDArray[np.complex128],
+    n_electrons: int,
+    det: NDArray[np.int32],
+    mode: Literal["RHF", "UHF"] = "RHF",
+) -> Tuple[
+    NDArray[np.complex128],
+    NDArray[np.complex128],
+    NDArray[np.complex128],
+    NDArray[np.complex128],
+    NDArray[np.complex128],
+    NDArray[np.complex128],
+    NDArray[np.complex128],
+]:
+    """
+    Calculate the next density matrix P_{n+1} given Fock matrix F_n and transformation matrix X.
+
+    Parameters
+    ----------
+    F_0 : NDArray[np.float64] of dimension (n, n)
+        Fock matrix at iteration n.
+    X : NDArray[np.float64] of dimension (n, n)
+        Transformation matrix.
+    n_electrons : int
+        Number of electrons.
+
+    Returns
+    -------
+    Tuple containing:
+        - P_1 (NDArray[np.float64][n, n]): Next density matrix
+        - C_munu (NDArray[np.float64][n, n]): Molecular orbital coefficients.
+        - e_values (NDArray[np.float64][n, n]): Orbital energies.
+
+    Notes
+    ------
+    Diagonalization algorithm used is np.linalg.eigh due to the matrix being symmetric.
+    """
+    e_values, C_munu = scipy.linalg.eigh(F, S)
+
+    # Build new density matrix
+    P_LR = calc_p_matrix_comp(C_munu.T, C_munu, n_electrons, det, mode=mode)
+
+    return P_LR, e_values, C_munu
 
 # --- UHF helper functions ---
 def calculate_unrestricted_F_and_r_comp(

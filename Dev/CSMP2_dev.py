@@ -61,10 +61,10 @@ def CS_MP2_RHF(CS_RHF_Context: CS_RHF_ResultsClass) -> CS_MP2_Results:
     mp_type = "RMP2"
 
     # naive approach: no symm
-    R_munu = CS_RHF_Context.R_munu
+    C_munu = CS_RHF_Context.C_munu
 
     if np.isclose(CS_RHF_Context.context.theta, 0.0):
-        R_munu = R_munu.real
+        C_munu = C_munu.real
 
     # rest of info
     e_orb = CS_RHF_Context.e_orb
@@ -78,7 +78,7 @@ def CS_MP2_RHF(CS_RHF_Context: CS_RHF_ResultsClass) -> CS_MP2_Results:
     v_i = np.array([i for i, j in enumerate(CS_RHF_Context.det) if j == 0])
 
     # calculate only (ovov) integrals
-    eris_mo_chem = ao_to_ovov(R_munu, eris_ao, o_i, v_i)
+    eris_mo_chem = ao_to_ovov(C_munu, eris_ao, o_i, v_i)
 
     # <ij||kl> = <ij|kl> - <ij|lk>
     # <ij|ab> = (ia|jb)

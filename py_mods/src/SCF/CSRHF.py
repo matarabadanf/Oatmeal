@@ -13,6 +13,7 @@ from py_mods.src.SCF.scf_utils import (
     calc_residual_commutator,
     calc_diis_extrapolation,
     calculate_P_next,
+    calculate_P_next_2,
     canonicalize,
     sign_convention,
 )
@@ -109,10 +110,8 @@ class CS_RHF_ResultsClass:
         Initial density guess.
     P : NDArray[np.complex128]
         Final LR density matrix.
-    R_munu : NDArray[np.complex128]
-        Right MO coefficients.
-    L_munu : NDArray[np.complex128]
-        Left MO coefficients.
+    C_munu : NDArray[np.complex128]
+        Final MO coefficients.
     error : float
         Final residual norm.
     iterations : int
@@ -131,8 +130,7 @@ class CS_RHF_ResultsClass:
     C_prime: NDArray[np.complex128]
     P_guess: NDArray[np.complex128]
     P: NDArray[np.complex128]
-    R_munu: NDArray[np.complex128]
-    L_munu: NDArray[np.complex128]
+    C_munu: NDArray[np.complex128]
     error: float
     iterations: int
 
@@ -237,8 +235,7 @@ def CS_RHF(ctx: CS_RHF_ContextClass) -> CS_RHF_ResultsClass:
     F_next = np.zeros_like(H_core)
     e_orb = np.zeros(dim, dtype=np.complex128)
     C_prime = np.zeros((dim, dim), dtype=np.complex128)
-    L_munu = np.zeros_like(C_prime)
-    R_munu = np.zeros_like(C_prime)
+    C_munu = np.zeros_like(C_prime)
     E_RHF = 0. + 0j
     error = 13
 
@@ -263,19 +260,25 @@ def CS_RHF(ctx: CS_RHF_ContextClass) -> CS_RHF_ResultsClass:
 
         if verbose:
             print(
-                f"{iter_idx:5}     {E_RHF:24.12E}     {E_diff:24.12E}     {error_re:8.4E}     {error_im:8.4E}j"
+                f"{iter_idx:5}     {E_RHF:24.6E}     {E_diff:24.6E}     {error_re:8.4E}     {error_im:8.4E}j"
             )
 
         # Check convergence
         if iter_idx > 1 and error_re < threshold and error_im < threshold:
+        # if iter_idx > 1 and abs(E_diff) < threshold:
             converged = True
             if verbose:
                 print(f"Convergence achieved after {iter_idx} iterations.")
 
             # Final diagonalization
-            P, e_orb, R_munu, *_, C_prime = calculate_P_next(
-                F_next, X, n_electrons, det
+            P, e_orb, C_munu, *_, C_prime = calculate_P_next(
+                F_next, X, n_electrons, det,
             )
+
+            # P, e_orb, C_munu = calculate_P_next_2(
+            #     F_next, S, n_electrons, det,
+            # )
+
 
             F_next = F
             break
@@ -309,15 +312,19 @@ def CS_RHF(ctx: CS_RHF_ContextClass) -> CS_RHF_ResultsClass:
 
         # Compute next Density
         P_old = P.copy()
-        P, e_orb, R_munu, *_, C_prime = calculate_P_next(F_next, X, n_electrons, det)
+        P, e_orb, C_munu, *_, C_prime = calculate_P_next(F_next, X, n_electrons, det)
+
+        # P, e_orb, C_munu = calculate_P_next_2(
+        #     F_next, S, n_electrons, det,
+        # )
+
         P = P * core_mask
-        R_munu = sign_convention(R_munu)
+        C_munu = sign_convention(C_munu)
         
         # Enforce real if theta=0
         # if theta == 0.0:
         #     P = P.real.astype(np.complex128)
-        #     L_munu = L_munu.real.astype(np.complex128)
-        #     R_munu = R_munu.real.astype(np.complex128)
+        #     C_munu = C_munu.real.astype(np.complex128)
 
         E_prev = E_RHF
 
@@ -327,13 +334,13 @@ def CS_RHF(ctx: CS_RHF_ContextClass) -> CS_RHF_ResultsClass:
             if verbose:
                 print("-" * 30, f"   STARTED {conv_type}  ", "-" * 30)
 
-    # R_munu, _ = canonicalize(R_munu, F_next , n_occ)
+    # C_munu, _ = canonicalize(C_munu, F_next , n_occ)
 
     # postconv = True
     # if postconv:
     #     print('Starting postconv iterations')
     #     for i in range(10):
-    #         P, e_orb, R_munu, *_, C_prime = calculate_P_next(
+    #         P, e_orb, C_munu, *_, C_prime = calculate_P_next(
     #             F_next, X, n_electrons, det
     #         )
     #         F_next = F
@@ -353,8 +360,7 @@ def CS_RHF(ctx: CS_RHF_ContextClass) -> CS_RHF_ResultsClass:
         C_prime=C_prime,
         P_guess=P_old if iter_idx > 0 else P,
         P=P,
-        R_munu=R_munu,
-        L_munu=R_munu.T,
+        C_munu=C_munu,
         error=float(error),
         iterations=iter_idx,
     )
