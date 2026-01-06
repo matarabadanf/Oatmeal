@@ -59,10 +59,10 @@ def CS_MP2_RHF(CS_RHF_Context: CS_RHF_ResultsClass) -> CS_MP2_Results:
     mp_type = "RMP2"
 
     # naive approach: no symm
-    R_munu = CS_RHF_Context.R_munu
+    C_munu = CS_RHF_Context.C_munu
 
     if np.isclose(CS_RHF_Context.context.theta, 0.0):
-        R_munu = R_munu.real
+        C_munu = C_munu.real
 
     # rest of info
     e_orb = CS_RHF_Context.e_orb
@@ -75,7 +75,7 @@ def CS_MP2_RHF(CS_RHF_Context: CS_RHF_ResultsClass) -> CS_MP2_Results:
     # print(f'Number of virtual orbitals: {n_virt}')
     # print(f'Number of total orbitals: {n_tot}')
 
-    eris_mo = ao_to_mo(R_munu, eris_ao)
+    eris_mo = ao_to_mo(C_munu, eris_ao)
 
     mp2_ener = 0.0
 

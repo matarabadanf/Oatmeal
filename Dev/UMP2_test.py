@@ -50,7 +50,8 @@ mol = gto.M(**pyscf_args)
 # mol.build()
 
 mf = scf.UHF(mol)
-
+mf.conv_tol = 1E-14
+mf.conv_tol_grad = 1E-14
 e_He = mf.kernel()
 e_elec = mf.energy_elec()
 py_e_orb = mf.mo_energy

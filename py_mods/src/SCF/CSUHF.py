@@ -11,7 +11,6 @@ from py_mods.src.SCF.scf_utils import (
     calc_diis_extrapolation,
     calculate_P_next,
     calculate_unrestricted_F_and_r_comp,
-    canonicalize,
 )
 from dataclasses import dataclass
 
