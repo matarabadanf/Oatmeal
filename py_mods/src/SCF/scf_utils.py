@@ -370,7 +370,9 @@ def scale_integrals(
 
 
 def guess_density_RHF(
-    p_guess: Literal["core", "ones", "IMPORB"], dim, INPORB=None
+    p_guess: Literal["core", "ones", "IMPORB"],
+    dim: int,
+    INPORB: Union[NDArray[np.complex128], NDArray[np.float64], None],
 ) -> NDArray[np.complex128]:
     """
     Generate initial guess density (complex).
@@ -379,8 +381,10 @@ def guess_density_RHF(
     ----------
     dim : int
         Basis dimension.
-    method : {'core', 'ones'}
+    method : {'core', 'ones', 'IMPORB'}
         Guess method.
+    INPORB : {NDArray[np.complex128], NDArray[np.float64], None}
+        Imported guess orbitals.
 
     Returns
     -------
@@ -393,7 +397,8 @@ def guess_density_RHF(
         assert (
             isinstance(INPORB, np.array) and INPORB.shape == X.shape
         ), f"Wrong type ({type(INPORB)}) or dimensions ({INPORB.shape}) of import guess orbitals, expexted {type(X)} and {X.shape}"
-        return np.copy(INPORB)
+
+        return np.copy(INPORB.astype(np.complex128))
 
     elif p_guess == "core":
         return np.zeros((dim, dim), dtype=np.complex128)
@@ -457,11 +462,11 @@ def diagonalize_biorthogonal(
 
 def _diagonalize_gram(F_prime):
 
-    if np.allclose(F_prime.T, F_prime) and np.linalg.norm(F_prime.imag) < 1E-14:
+    if np.allclose(F_prime.T, F_prime) and np.linalg.norm(F_prime.imag) < 1e-14:
         e_values, C_prime = np.linalg.eigh(F_prime)
     else:
         e_values, C_prime = np.linalg.eig(F_prime)
-    
+
     # e_values, C_prime = np.linalg.eig(F_prime)
 
     # Sort by real part of eigenvalues (standard for SCF stability)
@@ -476,9 +481,7 @@ def _diagonalize_gram(F_prime):
     C_norm_p = C_norm
 
     R_prime = np.copy(C_norm_p)
-    L_prime = np.copy(
-        C_norm_p.T
-    ) 
+    L_prime = np.copy(C_norm_p.T)
 
     return R_prime, L_prime, e_values, C_prime
 
@@ -503,6 +506,7 @@ def _diagonalize_gram(F_prime):
 #         counts[val] = counts.get(val, 0) + 1
 #     return counts
 
+
 def count_degen2(e_orb: NDArray[np.complex128]) -> Dict[complex, int]:
     """
     Count eigenvalue degeneracies.
@@ -525,7 +529,8 @@ def count_degen2(e_orb: NDArray[np.complex128]) -> Dict[complex, int]:
     keys = np.array(list(counts.keys()))
     degs = np.array(list(counts.values()))
 
-    return keys, degs 
+    return keys, degs
+
 
 def c_projector(
     u: NDArray[np.complex128], v: NDArray[np.complex128]
@@ -588,22 +593,23 @@ def gram_schmidt(v: NDArray[np.complex128]) -> NDArray[np.complex128]:
     e = np.zeros((dim, vectors), dtype=np.complex128)
     u = np.zeros((dim, vectors), dtype=np.complex128)
 
-    # obtain first basis vector 
-    u[:,0] = v[:,0].copy()
-    e[:,0] = v[:,0] / c_norm(v[:,0])
+    # obtain first basis vector
+    u[:, 0] = v[:, 0].copy()
+    e[:, 0] = v[:, 0] / c_norm(v[:, 0])
 
     # for every remaining vector, subtract the projection of the previous basis vectors
     for i in range(1, vectors):
-        v_i = v[:,i]
+        v_i = v[:, i]
         proj = np.zeros(dim, dtype=np.complex128)
         for j in range(i):
-            proj += c_projector(u[:,j], v_i)
-        u[:,i] = v_i - proj
+            proj += c_projector(u[:, j], v_i)
+        u[:, i] = v_i - proj
 
         # and normalize to get the next basis vector
-        e[:,i] = u[:,i] / c_norm(u[:,i])
+        e[:, i] = u[:, i] / c_norm(u[:, i])
 
     return e
+
 
 def modified_gram_schmidt(v: NDArray[np.complex128]) -> NDArray[np.complex128]:
     """
@@ -631,17 +637,18 @@ def modified_gram_schmidt(v: NDArray[np.complex128]) -> NDArray[np.complex128]:
         for i in range(vectors):
             # normalize the i-th basis vector
             threshold = 1e-14
-            v_copy[:,i].imag[np.abs(v_copy[:,i].imag) < threshold] = 0.0
-            
+            v_copy[:, i].imag[np.abs(v_copy[:, i].imag) < threshold] = 0.0
+
             # normalize
-            e[:,i] = v_copy[:,i] / c_norm(v_copy[:,i])
-            
+            e[:, i] = v_copy[:, i] / c_norm(v_copy[:, i])
+
             # remove component in this direction of all the remaining vectors
             for j in range(i + 1, vectors):
-                proj = c_projector(e[:,i], v_copy[:,j])
-                v_copy[:,j] -= proj
+                proj = c_projector(e[:, i], v_copy[:, j])
+                v_copy[:, j] -= proj
 
     return e
+
 
 # def gram_schmidt(v: NDArray[np.complex128]) -> NDArray[np.complex128]:
 #     """
@@ -722,12 +729,13 @@ def modified_gram_schmidt(v: NDArray[np.complex128]) -> NDArray[np.complex128]:
 #     norms = np.array([c_norm(col) for col in C_orth.T])
 #     return C_orth / norms
 
+
 def orthonormalize_solutions2(eval, evec):
     ener, n_deg = count_degen2(eval)
     # print("Energy snd degeneracy in Fock eigenvalues:")
 
     # for e, d in zip(ener, n_deg):
-        # print(f"{e:.6f}   {d}")
+    # print(f"{e:.6f}   {d}")
 
     copyy = np.copy(evec)
 
@@ -736,25 +744,27 @@ def orthonormalize_solutions2(eval, evec):
         # print(f"Processing degenerate set {ener[i]} with degeneracy {n_deg[i]}")
         if n_deg[i] != 1:
             # print(n_deg[0:i-1])
-            idx_str = sum(n_deg[0:i]) 
+            idx_str = sum(n_deg[0:i])
             # print('Starting on column ', idx_str)
             idx_end = idx_str + n_deg[i]
             # print(evec[:, idx_str:idx_end].real)
-            v = modified_gram_schmidt(evec[:,idx_str:idx_end]) #WIWOWIWOWIWO the issue was here looks like 
+            v = modified_gram_schmidt(
+                evec[:, idx_str:idx_end]
+            )  # WIWOWIWOWIWO the issue was here looks like
             copyy[:, idx_str:idx_end] = v
-        
+
         # else:
-            # print('Nothing to do\n')
+        # print('Nothing to do\n')
 
     # reorthonormalize all
     copyy = modified_gram_schmidt(copyy)
 
     # set to zero imaginary part below threshold
-    
-    
+
     norms = np.array([c_norm(col) for col in copyy.T])
 
     return copyy / norms
+
 
 def calc_p_matrix_comp(
     l_matrix: NDArray[np.complex128],
@@ -1020,7 +1030,9 @@ def calculate_P_next(
     diag_LFR = np.diag(np.diagonal(LFR))
 
     # try:
-    assert np.allclose(LFR, diag_LFR, atol=1E-6), "Matrix product L' @ F' @ R' is not diagonal"
+    assert np.allclose(
+        LFR, diag_LFR, atol=1e-6
+    ), "Matrix product L' @ F' @ R' is not diagonal"
 
     # except AssertionError:
     #     plot_map(LFR-diag_LFR)
@@ -1082,6 +1094,7 @@ def calculate_P_next_2(
 
     return P_LR, e_values, C_munu
 
+
 # --- UHF helper functions ---
 def calculate_unrestricted_F_and_r_comp(
     P_alpha: NDArray[np.complex128],
@@ -1142,26 +1155,27 @@ def calc_g_matrix_spin_comp(
 
 
 def canonicalize(
-    C_munu: NDArray[np.complex128], 
+    C_munu: NDArray[np.complex128],
     F: NDArray[np.complex128],
     n_occ: int,
 ) -> NDArray[np.complex128]:
-    F_mo = np.einsum('mu, uv, vn -> mn', C_munu.conj().T, F, C_munu)
-    
+    F_mo = np.einsum("mu, uv, vn -> mn", C_munu.conj().T, F, C_munu)
+
     F_vv = F_mo[n_occ:, n_occ:]
-    
+
     eps_virt, U_virt = np.linalg.eigh(F_vv)
-    
+
     U_full = block_diag(np.eye(n_occ), U_virt)
-    
+
     C_new = C_munu @ U_full
     eps_occ = np.diag(F_mo)[:n_occ]
     epsilon_new = np.concatenate([eps_occ, eps_virt])
 
     return C_new, epsilon_new
 
+
 def sign_convention(matrix):
     for i, col in enumerate(matrix.T):
         if np.abs(max(col.real)) < np.abs(min(col.real)):
-            matrix[:,i] *= -1
+            matrix[:, i] *= -1
     return matrix

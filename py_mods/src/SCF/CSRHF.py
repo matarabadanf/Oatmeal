@@ -203,7 +203,7 @@ def CS_RHF(ctx: CS_RHF_ContextClass) -> CS_RHF_ResultsClass:
             print_cycle_data(iter_idx, r, E_RHF, E_diff)
 
         # Check convergence
-        converged = check_conv(verbose, threshold, iter_idx, r)
+        converged = is_converged(verbose, threshold, iter_idx, r)
         if converged:
             break
 
@@ -240,7 +240,7 @@ def CS_RHF(ctx: CS_RHF_ContextClass) -> CS_RHF_ResultsClass:
         converged=converged,
         E_RHF=E_RHF,
         e_orb=e_orb,
-        n_elec=int(n_electrons),
+        n_elec=np.int32(n_electrons),
         det=det,
         H_core=H_core,
         X=X,
@@ -254,9 +254,31 @@ def CS_RHF(ctx: CS_RHF_ContextClass) -> CS_RHF_ResultsClass:
     )
 
 
-def check_conv(verbose, threshold, iter_idx, r):
-    converged = False
-    error_re, error_im = np.max(np.abs(r.real)), np.max(np.abs(r.imag))
+def is_converged(
+    verbose: bool, threshold: float, iter_idx: int, r: NDArray[np.complex128]
+) -> bool:
+    """
+    Check convergence based on residual norms.
+
+    Parameters
+    ----------
+    verbose : bool
+        If True, print status.
+    threshold : float
+        Convergence threshold.
+    iter_idx : int
+        Current iteration index.
+    r : NDArray[np.complex128]
+        Residual matrix.
+
+    Returns
+    -------
+    converged : bool
+        True if converged, else False.
+    """
+    converged: bool = False
+    error_re: float = np.max(np.abs(r.real))
+    error_im: float = np.max(np.abs(r.imag))
     if iter_idx > 1 and error_re < threshold and error_im < threshold:
         # if iter_idx > 1 and abs(E_diff) < threshold:
         converged = True
@@ -265,24 +287,126 @@ def check_conv(verbose, threshold, iter_idx, r):
     return converged
 
 
-def initialize_P_and_E(ctx, theta, verbose, p_guess, INPORB, dim):
+def initialize_P_and_E(
+    ctx: CS_RHF_ContextClass,
+    theta: float,
+    verbose: bool,
+    p_guess: Literal["core", "ones", "IMPORB"],
+    INPORB: Union[NDArray[np.float64], NDArray[np.complex128], None],
+    dim: int,
+) -> Tuple[NDArray[np.complex128], np.complex128]:
+    """
+    Initialize density matrix and previous energy.
+
+    Parameters
+    ----------
+    ctx : CS_RHF_ContextClass
+        Calculation parameters & integrals.
+    theta : float
+        Complex-scaling angle.
+    verbose : bool
+        If True, print status.
+    p_guess : {'core', 'ones', 'IMPORB'}
+        Initial density guess type.
+    INPORB : NDArray or None
+        Imported orbitals for guess.
+    dim : int
+        Dimension of matrices.
+
+    Returns
+    -------
+    P : NDArray[np.complex128]
+        Initial density matrix.
+    E_prev : np.complex128
+        Initial previous energy.
+    """
     if theta != 0.0:
         P, unscaled_E_RHF = compute_unscaled_density(ctx, verbose)
         E_prev = np.complex128(unscaled_E_RHF)
+
+        return P, E_prev
     else:
         P = guess_density_RHF(p_guess, dim, INPORB)
-        E_prev: np.complex128 = np.complex128(0.0)
+        E_prev = np.complex128(0.0)
+
     return P, E_prev
 
 
-def print_cycle_data(iter_idx, r, E_RHF, E_diff):
+def print_cycle_data(
+    iter_idx: int,
+    r: NDArray[np.complex128],
+    E_RHF: np.complex128,
+    E_diff: np.complex128,
+) -> None:
+    """
+    Print SCF iteration data.
+
+    Parameters
+    ----------
+    iter_idx : int
+        Current iteration index.
+    r : NDArray[np.complex128]
+        Residual matrix.
+    E_RHF : np.complex128
+        Current RHF energy.
+    E_diff : np.complex128
+        Energy difference from previous iteration.
+
+    Returns
+    -------
+    None
+    """
     error_re, error_im = np.max(np.abs(r.real)), np.max(np.abs(r.imag))
     print(
         f"{iter_idx:5}     {E_RHF:24.6E}     {E_diff:24.6E}     {error_re:8.4E}     {error_im:8.4E}j"
     )
 
 
-def update_density(n_electrons, X, det, core_mask, F_next):
+def update_density(
+    n_electrons: int,
+    X: NDArray[np.complex128],
+    det: NDArray[np.int32],
+    core_mask: NDArray[np.bool],
+    F_next: NDArray[np.complex128],
+) -> Tuple[
+    NDArray[np.complex128],
+    NDArray[np.complex128],
+    NDArray[np.complex128],
+    NDArray[np.complex128],
+]:
+    """
+    Update density matrix and related quantities. For specifics, see calculate_P_next.
+
+    Parameters
+    ----------
+    n_electrons : int
+        Total electron count.
+    X : NDArray[np.complex128]
+        Transformation matrix.
+    det : NDArray[np.int32]
+        Occupation determinant.
+    core_mask : NDArray[np.bool]
+        Mask to mitigate numerical noise.
+    F_next : NDArray[np.complex128]
+        Next Fock matrix.
+
+    Returns
+    -------
+    P : NDArray[np.complex128]
+        Updated density matrix.
+    e_orb : NDArray[np.complex128]
+        Updated orbital energies.
+    C_munu : NDArray[np.complex128]
+        Updated MO coefficients.
+    C_prime : NDArray[np.complex128]
+        Updated transformed eigenvectors.
+
+    Notes
+    -----
+    - This function applies a core mask to the density matrix to reduce numerical noise,
+    where it is understood that different angular momentum matrix elements must be 0.
+    """
+
     P, e_orb, C_munu, *_, C_prime = calculate_P_next(F_next, X, n_electrons, det)
 
     # P, e_orb, C_munu = calculate_P_next_2(
@@ -294,7 +418,21 @@ def update_density(n_electrons, X, det, core_mask, F_next):
     return P, e_orb, C_munu, C_prime
 
 
-def initialize_scf_variables(dim, H_core):
+def initialize_scf_variables(dim: int, H_core: NDArray[np.complex128]) -> Tuple:
+    """
+    Initialize SCF iteration variables.
+
+    Parameters
+    ----------
+    dim : int
+        Dimension of matrices.
+    H_core : NDArray[np.complex128]
+        Core Hamiltonian.
+
+    Returns
+    -------
+    Tuple containing initialized SCF variables.
+    """
     use_conv_acc: bool = False
     converged: bool = False
     F_guess: List[NDArray[np.complex128]] = []
@@ -303,13 +441,24 @@ def initialize_scf_variables(dim, H_core):
     e_orb: NDArray[np.complex128] = np.zeros(dim, dtype=np.complex128)
     C_prime: NDArray[np.complex128] = np.zeros((dim, dim), dtype=np.complex128)
     C_munu: NDArray[np.complex128] = np.zeros_like(C_prime, dtype=np.complex128)
-    error: complex = np.inf
-    converged: bool = False
+    error: complex = 1E10
 
     return use_conv_acc, F_guess, residuals, F_next, error, converged, C_munu, e_orb
 
 
-def unpack_ctx_class(ctx):
+def unpack_ctx_class(ctx: CS_RHF_ContextClass) -> Tuple:
+    """
+    Unpack CS_RHF_ContextClass attributes.
+
+    Parameters
+    ----------
+    ctx : CS_RHF_ContextClass
+        Context to unpack.
+
+    Returns
+    -------
+    Tuple of unpacked attributes.
+    """
     S = ctx.S.astype(np.complex128)
     T = ctx.T.astype(np.complex128)
     V = ctx.V.astype(np.complex128)
@@ -346,9 +495,42 @@ def unpack_ctx_class(ctx):
     )
 
 
-def setup_mat_and_occ(S, T, V, eri, n_electrons, theta, occupation):
+def setup_mat_and_occ(
+    S: NDArray[np.float64],
+    T: NDArray[np.complex128],
+    V: NDArray[np.complex128],
+    eri: NDArray[np.complex128],
+    n_electrons: int,
+    theta: float,
+    occupation: Union[int, NDArray[np.int32], None],
+) -> Tuple:
+    """
+    Setup matrices and occupation determinant.
+
+    Parameters
+    ----------
+    S : NDArray[np.float64]
+        Overlap matrix.
+    T : NDArray[np.complex128]
+        Kinetic energy matrix.
+    V : NDArray[np.complex128]
+        Nuclear attraction matrix.
+    eri : NDArray[np.complex128]
+        Electron repulsion integrals.
+    n_electrons : int
+        Total electron count.
+    theta : float
+        Complex-scaling angle.
+    occupation : int or NDArray[np.int32] or None
+        Occupation vector. If -1/None, build default.
+
+    Returns
+    -------
+    Tuple containing dimension, transformation matrix, occupation determinant,
+    scaled integrals, core Hamiltonian, and core mask.
+    """
     dim = len(S)
-    X = transformation_matrix(S).astype(np.complex128)
+    X = transformation_matrix(S.astype(np.complex128)).astype(np.complex128)
     det, _ = validate_determinant(n_electrons, occupation, dim)
 
     T_scaled, V_scaled, eri_scaled = scale_integrals(T, V, eri, theta)
@@ -357,7 +539,23 @@ def setup_mat_and_occ(S, T, V, eri, n_electrons, theta, occupation):
     return dim, X, det, eri_scaled, H_core, core_mask
 
 
-def setup_conv_acc(conv_MEM, conv_type, conv_ITER_START):
+def setup_conv_acc(
+    conv_MEM: int,
+    conv_type: Literal[None, "DIIS", "CROP"],
+    conv_ITER_START: int,
+) -> Tuple[int, bool]:
+    """
+    Setup convergence acceleration parameters.
+
+    Parameters
+    ----------
+    """
+    if conv_type not in [None, "DIIS", "CROP"]:
+        print(
+            "Convergence assist must be either None, 'DIIS', or 'CROP'. Reverted to no convergence acceleration"
+        )
+        return int(1E10), False
+
     conv_REQUESTED = conv_type is not None
     conv_ITER_START = (
         min(conv_ITER_START + 1, conv_MEM)
@@ -365,10 +563,29 @@ def setup_conv_acc(conv_MEM, conv_type, conv_ITER_START):
         else max(conv_ITER_START + 1, conv_MEM)
     )
 
-    return conv_ITER_START, conv_REQUESTED
+    return (conv_ITER_START, conv_REQUESTED)
 
 
-def compute_unscaled_density(ctx, verbose: bool):
+def compute_unscaled_density(
+    ctx: CS_RHF_ContextClass, verbose: bool
+) -> Tuple[NDArray[np.complex128], np.complex128]:
+    """
+    Compute unscaled density matrix for theta=0.
+
+    Parameters
+    ----------
+    ctx : CS_RHF_ContextClass
+        Original context with integrals and parameters.
+    verbose : bool
+        If True, print status.
+
+    Returns
+    -------
+    P : NDArray[np.complex128]
+        Unscaled density matrix.
+    E_RHF : np.complex128
+        Unscaled RHF energy.
+    """
     if verbose:
         print("Converging unscaled case:")
     unscaled_ctx = CS_RHF_ContextClass(
@@ -401,6 +618,13 @@ def compute_unscaled_density(ctx, verbose: bool):
 
 
 def print_table_header():
+    """
+    Print SCF iteration table header.
+
+    Returns
+    -------
+    None
+    """
     print("-" * 128)
     print(
         "|   Iter     |                   E_iter                      |                   Delta_e                   |      norm(e_i)      |"
@@ -408,7 +632,21 @@ def print_table_header():
     print("-" * 128)
 
 
-def clear_imaginary(theta, P, C_munu):
+def clear_imaginary(
+    theta: float,
+    P: NDArray[np.complex128],
+    C_munu: NDArray[np.complex128],
+) -> Tuple[NDArray[np.complex128], NDArray[np.complex128]]:
+    """
+    Clear imaginary components if theta is zero by recasting real part as complex.
+
+    Parameters
+    ----------
+    theta : float
+        Complex-scaling angle.
+    P : NDArray[np.complex128]
+        Density matrix.
+    """
     if theta == 0.0:
         P = P.real.astype(np.complex128)
         C_munu = C_munu.real.astype(np.complex128)
@@ -416,8 +654,12 @@ def clear_imaginary(theta, P, C_munu):
 
 
 def conv_acc_criteria_met(
-    verbose, conv_ITER_START, conv_type, conv_REQUESTED, iter_idx
-):
+    verbose: bool,
+    conv_ITER_START: int,
+    conv_type: Literal[None, "DIIS", "CROP"],
+    conv_REQUESTED: bool,
+    iter_idx: int,
+) -> bool:
     use_conv_acc = False
     if iter_idx == conv_ITER_START and conv_REQUESTED:
         use_conv_acc = True

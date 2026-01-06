@@ -129,11 +129,11 @@ class CS_UHF_ResultsClass(object):
         Spin density matrix (P_alpha - P_beta).
     L_alpha : NDArray[np.complex128], shape (n, n)
         Left eigenvector matrix for alpha spin.
-    R_alpha : NDArray[np.complex128], shape (n, n)
+    C_alpha : NDArray[np.complex128], shape (n, n)
         Right eigenvector matrix for alpha spin.
     L_beta : NDArray[np.complex128], shape (n, n)
         Left eigenvector matrix for beta spin.
-    R_beta : NDArray[np.complex128], shape (n, n)
+    C_beta : NDArray[np.complex128], shape (n, n)
         Right eigenvector matrix for beta spin.
     """
 
@@ -154,8 +154,8 @@ class CS_UHF_ResultsClass(object):
     P_beta: NDArray[np.complex128]
     P_total: NDArray[np.complex128]
     P_diff: NDArray[np.complex128]
-    R_alpha: NDArray[np.complex128]
-    R_beta: NDArray[np.complex128]
+    C_alpha: NDArray[np.complex128]
+    C_beta: NDArray[np.complex128]
     S_diagnostics: _UHF_SpinDiagnosticsClass
     error: float
     iterations: int
@@ -319,10 +319,10 @@ def CS_UHF(context: CS_UHF_ContextClass) -> CS_UHF_ResultsClass:
                 print(
                     f"Convergence achieved after {iteration} iterations.\n\n:: Final SCF energy = {E_UHF:5}\n\nFinal SCF energy in parseable format\n%% {E_UHF.real:.14E} {E_UHF.imag:.14E} {theta:.6f}"
                 )
-            P_alph, e_alph, R_alph, *_ = calculate_P_next(
+            P_alph, e_alph, C_alph, *_ = calculate_P_next(
                 F_next_alph, X, alpha_elec, det_alpha, mode="UHF"
             )
-            P_beta, e_beta, R_beta, *_ = calculate_P_next(
+            P_beta, e_beta, C_beta, *_ = calculate_P_next(
                 F_next_beta, X, beta_elec, det_beta, mode="UHF"
             )
             break
@@ -375,17 +375,17 @@ def CS_UHF(context: CS_UHF_ContextClass) -> CS_UHF_ResultsClass:
                     )
                 use_conv = False
 
-        # P_LR, C_munu, e_values, L_munu, R_munu, P_RR, C_prime
-        P_alph, e_alph, R_alph, *_ = calculate_P_next(
+        # P_LR, C_munu, e_values, L_munu, C_munu, P_RR, C_prime
+        P_alph, e_alph, C_alph, *_ = calculate_P_next(
             F_next_alph, X, alpha_elec, det_alpha, mode="UHF"
         )
-        P_beta, e_beta, R_beta, *_ = calculate_P_next(
+        P_beta, e_beta, C_beta, *_ = calculate_P_next(
             F_next_beta, X, beta_elec, det_beta, mode="UHF"
         )
 
         if theta == 0.0:
             P_alph = P_alph.real.astype(np.complex128)
-            R_alph = R_alph.real.astype(np.complex128)
+            C_alph = C_alph.real.astype(np.complex128)
 
         P_total = P_alph + P_beta
         P_diff = P_alph - P_beta
@@ -409,8 +409,8 @@ def CS_UHF(context: CS_UHF_ContextClass) -> CS_UHF_ResultsClass:
         abs(n_alpha + n_beta - n_electrons) < 1e-10
     ), "Number of electrons was not conserved in the calculation"
 
-    # R_alph, _ = canonicalize(R_alph, F_next_alph.reshape(X.shape))
-    # R_beta, _ = canonicalize(R_beta, F_next_beta.reshape(X.shape))
+    # C_alph, _ = canonicalize(C_alph, F_next_alph.reshape(X.shape))
+    # C_beta, _ = canonicalize(C_beta, F_next_beta.reshape(X.shape))
 
     ResultClass = CS_UHF_ResultsClass(
         context=context,
@@ -430,8 +430,8 @@ def CS_UHF(context: CS_UHF_ContextClass) -> CS_UHF_ResultsClass:
         P_beta=P_beta,
         P_total=P_total,
         P_diff=P_diff,
-        R_alpha=R_alph,
-        R_beta=R_beta,
+        C_alpha=C_alph,
+        C_beta=C_beta,
         S_diagnostics=S_diagnostics,
         error=error,
         iterations=iteration,
