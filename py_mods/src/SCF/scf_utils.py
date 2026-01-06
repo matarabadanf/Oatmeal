@@ -1,13 +1,17 @@
 import numpy as np
 from numpy.typing import NDArray
 from typing import Literal, Optional, Union, Tuple, Sequence, Dict
+from scipy.linalg import block_diag
+from py_mods.src.SCF.plot_utilities import plot_map
+import scipy
 
 # --- Linalg Utilities ---
 
+
 def transformation_matrix(
-    S_munu: NDArray[np.complex128], 
-    method: Literal['canonical', 'symmetric'] = 'symmetric', 
-    verbose: bool = False
+    S_munu: NDArray[np.complex128],
+    method: Literal["canonical", "symmetric"] = "symmetric",
+    verbose: bool = False,
 ) -> NDArray[np.float64]:
     """
     Calculate basis transformation matrix X.
@@ -26,34 +30,40 @@ def transformation_matrix(
     X : NDArray[np.float64]
         Transformation matrix.
     """
-    assert method in ['canonical', 'symmetric'], "method must be 'canonical' or 'symmetric'"
-    
+    assert method in [
+        "canonical",
+        "symmetric",
+    ], "method must be 'canonical' or 'symmetric'"
+
     # diagonalize U.T @ S @ U = s
     s, U = np.linalg.eigh(S_munu)
     s_root = np.diag(1.0 / np.sqrt(s))
 
-    if method == 'symmetric':
+    if method == "symmetric":
         X = U @ s_root @ U.T
-    elif method == 'canonical':
+    elif method == "canonical":
         X = U @ s_root
-    
+
     transformed = X.T @ S_munu @ X
-    
+
     if verbose:
         print(transformed)
 
     # Use identity matrix of correct size for check
-    assert np.allclose(transformed, np.eye(len(S_munu)), atol=1e-7), "Transformation failed"
+    assert np.allclose(
+        transformed, np.eye(len(S_munu)), atol=1e-7
+    ), "Transformation failed"
 
     return X
 
 
 # --- Real SCF Helper Functions ---
 
+
 def validate_determinant(
     n_electrons: int,
     determinant: Union[int, NDArray[np.int32], None],
-    expected_dim: int
+    expected_dim: int,
 ) -> Tuple[NDArray[np.int32], bool]:
     """
     Validate or construct occupation determinant.
@@ -86,16 +96,18 @@ def validate_determinant(
             det_arr[:n_occ] = 2
             return det_arr, natural_occupation
         else:
-            raise TypeError('determinant must be -1, None or a numpy array')
+            raise TypeError("determinant must be -1, None or a numpy array")
 
     if not isinstance(determinant, np.ndarray):
-        raise TypeError('determinant must be a numpy.ndarray when not -1/None')
+        raise TypeError("determinant must be a numpy.ndarray when not -1/None")
 
     natural_occupation = False
     det_arr = determinant.astype(np.int32)
 
     if int(np.sum(det_arr)) != n_electrons:
-        raise ValueError(f'determinant sum ({int(np.sum(det_arr))}) != n_electrons ({n_electrons})')
+        raise ValueError(
+            f"determinant sum ({int(np.sum(det_arr))}) != n_electrons ({n_electrons})"
+        )
 
     if len(det_arr) != expected_dim:
         new_occ = np.zeros(expected_dim, dtype=np.int32)
@@ -143,7 +155,7 @@ def validate_unrestricted_determinant(
     if isinstance(determinants, int):
         if determinants == -1:
             alpha_det = np.zeros(expected_dim, dtype=np.int32)
-            beta_det  = np.zeros(expected_dim, dtype=np.int32)     
+            beta_det = np.zeros(expected_dim, dtype=np.int32)
 
             n_doubly_occ = (n_electrons - multiplicity) // 2
             alpha_det[:n_doubly_occ] = 1
@@ -155,37 +167,38 @@ def validate_unrestricted_determinant(
 
             valid, _ = check_unpaired(alpha_det, beta_det, multiplicity)
             assert valid, f"Multiplicity mismatch for auto-generated determinant."
-            
+
             return alpha_det, beta_det, natural_occupation
         else:
-            raise TypeError('determinant must be -1, None or a tuple of arrays')
+            raise TypeError("determinant must be -1, None or a tuple of arrays")
 
     if not isinstance(determinants, (list, tuple)):
-        raise TypeError('determinant must be a list or tuple of arrays')
+        raise TypeError("determinant must be a list or tuple of arrays")
 
     natural_occupation = False
-    
+
     alpha_in = np.array(determinants[0], dtype=np.int32)
     beta_in = np.array(determinants[1], dtype=np.int32)
 
     alpha_det = np.zeros(expected_dim, dtype=np.int32)
     beta_det = np.zeros(expected_dim, dtype=np.int32)
 
-    alpha_det[:len(alpha_in)] = alpha_in
-    beta_det[:len(beta_in)] = beta_in
+    alpha_det[: len(alpha_in)] = alpha_in
+    beta_det[: len(beta_in)] = beta_in
 
     total_elec = np.sum(alpha_det) + np.sum(beta_det)
-    assert total_elec == n_electrons, f"Occupation sum ({total_elec}) != n_electrons ({n_electrons})"
-    
+    assert (
+        total_elec == n_electrons
+    ), f"Occupation sum ({total_elec}) != n_electrons ({n_electrons})"
+
     valid, _ = check_unpaired(alpha_det, beta_det, multiplicity)
     assert valid, f"Multiplicity mismatch."
-    
+
     return alpha_det, beta_det, natural_occupation
 
+
 def check_unpaired(
-    alpha_det: NDArray[np.int32],
-    beta_det: NDArray[np.int32],
-    multiplicity: int
+    alpha_det: NDArray[np.int32], beta_det: NDArray[np.int32], multiplicity: int
 ) -> Tuple[bool, int]:
     """
     Verify unpaired electrons match multiplicity.
@@ -208,12 +221,12 @@ def check_unpaired(
     """
     diff = alpha_det - beta_det
     calc_mult = int(np.sum(np.abs(diff)))
-    
+
     return (calc_mult == multiplicity), calc_mult
 
+
 def calc_p_matrix(
-    C_matrix: NDArray[np.float64], 
-    n_electrons: int
+    C_matrix: NDArray[np.float64], n_electrons: int
 ) -> NDArray[np.float64]:
     """
     Calculate RHF density matrix (real).
@@ -230,14 +243,13 @@ def calc_p_matrix(
     P : NDArray[np.float64]
         Density matrix.
     """
-    n_occ = n_electrons // 2 
+    n_occ = n_electrons // 2
     C_occ = C_matrix[:, :n_occ]
     return 2.0 * (C_occ @ C_occ.T)
 
 
 def calc_g_matrix(
-    P_matrix: NDArray[np.float64], 
-    eri: NDArray[np.float64]
+    P_matrix: NDArray[np.float64], eri: NDArray[np.float64]
 ) -> NDArray[np.float64]:
     """
     Calculate real G matrix.
@@ -254,18 +266,17 @@ def calc_g_matrix(
     G : NDArray[np.float64]
         G matrix.
     """
-    J = np.einsum('mnls,ls->mn', eri, P_matrix)
-    K = np.einsum('mlns,ls->mn', eri, P_matrix)
+    J = np.einsum("mnls,ls->mn", eri, P_matrix)
+    K = np.einsum("mlns,ls->mn", eri, P_matrix)
     return J - 0.5 * K
 
+
 def E_0(
-    P: NDArray[np.float64], 
-    H_core: NDArray[np.float64], 
-    F: NDArray[np.float64]
+    P: NDArray[np.float64], H_core: NDArray[np.float64], F: NDArray[np.float64]
 ) -> float:
     """
     Calculate real Hartree-Fock energy.
-    
+
     Parameters
     ----------
     P : NDArray[np.float64]
@@ -282,14 +293,15 @@ def E_0(
     """
     return 0.5 * np.sum(P * (H_core + F))
 
+
 def V_NN(
-    positions: NDArray[np.float64], 
-    charges: Union[NDArray[np.int32], Sequence[int]], 
-    units: Literal['Bohr', 'Angstrom'] = 'Bohr'
+    positions: NDArray[np.float64],
+    charges: Union[NDArray[np.int32], Sequence[int]],
+    units: Literal["Bohr", "Angstrom"] = "Bohr",
 ) -> float:
     """
     Calculate nuclear repulsion energy.
-    
+
     Parameters
     ----------
     positions : NDArray[np.float64]
@@ -304,7 +316,7 @@ def V_NN(
     float
         Nuclear repulsion energy.
     """
-    energy = np.float64(0.)
+    energy = np.float64(0.0)
     n_atoms = len(positions)
 
     for i in range(n_atoms):
@@ -312,20 +324,21 @@ def V_NN(
             dist = np.linalg.norm(positions[i] - positions[j])
             if dist > 1e-12:
                 energy += (charges[i] * charges[j]) / dist
-    
-    if units == 'Angstrom':
+
+    if units == "Angstrom":
         energy *= 0.529177249
-    
+
     return float(energy)
 
 
 # --- Complex SCF Helper Functions ---
 
+
 def scale_integrals(
-    T: NDArray[np.complex128], 
-    V: NDArray[np.complex128], 
-    eri: NDArray[np.complex128], 
-    theta: float
+    T: NDArray[np.complex128],
+    V: NDArray[np.complex128],
+    eri: NDArray[np.complex128],
+    theta: float,
 ) -> Tuple[NDArray[np.complex128], NDArray[np.complex128], NDArray[np.complex128]]:
     """
     Scale integrals by complex-scaling angle theta.
@@ -349,11 +362,18 @@ def scale_integrals(
     exp_t2 = np.exp(-2j * theta)
     exp_t1 = np.exp(-1j * theta)
     # Ensure output is complex128 even if input is float
-    return (T * exp_t2).astype(np.complex128), \
-           (V * exp_t1).astype(np.complex128), \
-           (eri * exp_t1).astype(np.complex128)
+    return (
+        (T * exp_t2).astype(np.complex128),
+        (V * exp_t1).astype(np.complex128),
+        (eri * exp_t1).astype(np.complex128),
+    )
 
-def guess_density_RHF(p_guess: Literal['core', 'ones', 'IMPORB'], dim, INPORB=None) -> NDArray[np.complex128]:
+
+def guess_density_RHF(
+    p_guess: Literal["core", "ones", "IMPORB"],
+    dim: int,
+    INPORB: Union[NDArray[np.complex128], NDArray[np.float64], None],
+) -> NDArray[np.complex128]:
     """
     Generate initial guess density (complex).
 
@@ -361,35 +381,43 @@ def guess_density_RHF(p_guess: Literal['core', 'ones', 'IMPORB'], dim, INPORB=No
     ----------
     dim : int
         Basis dimension.
-    method : {'core', 'ones'}
+    method : {'core', 'ones', 'IMPORB'}
         Guess method.
+    INPORB : {NDArray[np.complex128], NDArray[np.float64], None}
+        Imported guess orbitals.
 
     Returns
     -------
     P_guess : NDArray[np.complex128]
         Guess density matrix.
     """
-    if p_guess == 'INPORB':
-        assert INPORB is not None, 'Empty INPORB alpha for guess'
+    if p_guess == "INPORB":
+        assert INPORB is not None, "Empty INPORB alpha for guess"
 
-        assert isinstance(INPORB, np.array) and INPORB.shape == X.shape, f'Wrong type ({type(INPORB)}) or dimensions ({INPORB.shape}) of import guess orbitals, expexted {type(X)} and {X.shape}'
-        return np.copy(INPORB) 
+        assert (
+            isinstance(INPORB, np.array) and INPORB.shape == X.shape
+        ), f"Wrong type ({type(INPORB)}) or dimensions ({INPORB.shape}) of import guess orbitals, expexted {type(X)} and {X.shape}"
 
-    elif p_guess == 'core':
+        return np.copy(INPORB.astype(np.complex128))
+
+    elif p_guess == "core":
         return np.zeros((dim, dim), dtype=np.complex128)
-    
-    elif p_guess == 'ones':
+
+    elif p_guess == "ones":
         return np.ones((dim, dim), dtype=np.complex128)
-    
+
     else:
         raise ValueError("Invalid method. Choose 'core', 'ones' or 'IMPORB'.")
 
-def diagonalize_biorthogonal(F_prime: NDArray[np.complex128]) -> Tuple[
-    NDArray[np.complex128], 
-    NDArray[np.complex128], 
-    NDArray[np.complex128], 
-    NDArray[np.complex128], 
-    NDArray[np.complex128]
+
+def diagonalize_biorthogonal(
+    F_prime: NDArray[np.complex128],
+) -> Tuple[
+    NDArray[np.complex128],
+    NDArray[np.complex128],
+    NDArray[np.complex128],
+    NDArray[np.complex128],
+    NDArray[np.complex128],
 ]:
     """
     Diagonalize matrix using c-norm solution. Yields orthonormalized basis.
@@ -412,24 +440,74 @@ def diagonalize_biorthogonal(F_prime: NDArray[np.complex128]) -> Tuple[
     LFR : NDArray[np.complex128]
         Diagonal matrix (L @ F @ R).
     """
-    e_values, C_prime = np.linalg.eig(F_prime)
+
+    R_prime, _, e_values, C_prime = _diagonalize_gram(F_prime)
+
+    # e_values, R_prime = np.linalg.eigh(F_prime)
+
+    C_prime = R_prime
+    L_prime = R_prime.T
+
+    LR = L_prime @ R_prime
+
+    LFR = L_prime @ F_prime @ R_prime
+
+    diag_LFR = np.diag(np.diagonal(LFR))
+
+    # assert np.allclose(LFR, diag_LFR, atol=1E-8), "Matrix product L' @ F' @ R' is not diagonal"
+    # assert np.allclose(LR, np.eye(len(LR)), atol=1E-8)
+
+    return e_values, C_prime, L_prime, R_prime, LFR
+
+
+def _diagonalize_gram(F_prime):
+
+    if np.allclose(F_prime.T, F_prime) and np.linalg.norm(F_prime.imag) < 1e-14:
+        e_values, C_prime = np.linalg.eigh(F_prime)
+    else:
+        e_values, C_prime = np.linalg.eig(F_prime)
+
+    # e_values, C_prime = np.linalg.eig(F_prime)
 
     # Sort by real part of eigenvalues (standard for SCF stability)
     idx = e_values.argsort()
     e_values = e_values[idx]
     C_prime = C_prime[:, idx]
 
-    degeneracies = count_degen(e_values)
-    C_norm = orthonormalize_solutions(e_values, C_prime, degeneracies)
+    # degeneracies = count_degen(e_values)
+    # C_norm = orthonormalize_solutions(e_values, C_prime, degeneracies)
+    C_norm = orthonormalize_solutions2(e_values, C_prime)
 
-    R_prime = np.copy(C_norm)
-    L_prime = np.copy(C_norm.T) # Biorthogonal: L = C^{-1}, here approximated via ortho logic
-    
-    LFR = L_prime @ F_prime @ R_prime
+    C_norm_p = C_norm
 
-    return e_values, C_prime, L_prime, R_prime, LFR
+    R_prime = np.copy(C_norm_p)
+    L_prime = np.copy(C_norm_p.T)
 
-def count_degen(e_orb: NDArray[np.complex128]) -> Dict[complex, int]:
+    return R_prime, L_prime, e_values, C_prime
+
+
+# def count_degen(e_orb: NDArray[np.complex128]) -> Dict[complex, int]:
+#     """
+#     Count eigenvalue degeneracies.
+
+#     Parameters
+#     ----------
+#     e_orb : NDArray[np.complex128]
+#         Orbital energies.
+
+#     Returns
+#     -------
+#     Dict[complex, int]
+#         Degeneracy map.
+#     """
+#     counts: Dict[complex, int] = {}
+#     for item in e_orb:
+#         val = np.round(item, 5)
+#         counts[val] = counts.get(val, 0) + 1
+#     return counts
+
+
+def count_degen2(e_orb: NDArray[np.complex128]) -> Dict[complex, int]:
     """
     Count eigenvalue degeneracies.
 
@@ -445,12 +523,18 @@ def count_degen(e_orb: NDArray[np.complex128]) -> Dict[complex, int]:
     """
     counts: Dict[complex, int] = {}
     for item in e_orb:
-        # Rounding is crucial for float comparison
-        val = np.round(item, 10)
+        val = np.round(item, 5)
         counts[val] = counts.get(val, 0) + 1
-    return counts
 
-def c_projector(u: NDArray[np.complex128], v: NDArray[np.complex128]) -> NDArray[np.complex128]:
+    keys = np.array(list(counts.keys()))
+    degs = np.array(list(counts.values()))
+
+    return keys, degs
+
+
+def c_projector(
+    u: NDArray[np.complex128], v: NDArray[np.complex128]
+) -> NDArray[np.complex128]:
     """
     Calculate c-projection of v onto u.
 
@@ -466,11 +550,12 @@ def c_projector(u: NDArray[np.complex128], v: NDArray[np.complex128]) -> NDArray
     NDArray[np.complex128]
         Projected vector.
     """
-    num = np.dot(v, u) # c-product (no conjugation)
+    num = np.dot(v, u)  # c-product (no conjugation)
     den = np.dot(u, u)
     if abs(den) < 1e-14:
         return np.zeros_like(v)
     return (num / den) * u
+
 
 def c_norm(u: NDArray[np.complex128]) -> np.complex128:
     """
@@ -488,6 +573,7 @@ def c_norm(u: NDArray[np.complex128]) -> np.complex128:
     """
     return np.sqrt(np.dot(u, u))
 
+
 def gram_schmidt(v: NDArray[np.complex128]) -> NDArray[np.complex128]:
     """
     Apply Gram-Schmidt orthonormalization.
@@ -495,84 +581,198 @@ def gram_schmidt(v: NDArray[np.complex128]) -> NDArray[np.complex128]:
     Parameters
     ----------
     v : NDArray[np.complex128]
-        Input vectors (rows).
+        Input vectors as columns.
+
+    Returns
+    -------
+    NDArray[np.complex128]
+        Orthonormalized vectors as columns.
+    """
+    # initialize the space
+    dim, vectors = v.shape
+    e = np.zeros((dim, vectors), dtype=np.complex128)
+    u = np.zeros((dim, vectors), dtype=np.complex128)
+
+    # obtain first basis vector
+    u[:, 0] = v[:, 0].copy()
+    e[:, 0] = v[:, 0] / c_norm(v[:, 0])
+
+    # for every remaining vector, subtract the projection of the previous basis vectors
+    for i in range(1, vectors):
+        v_i = v[:, i]
+        proj = np.zeros(dim, dtype=np.complex128)
+        for j in range(i):
+            proj += c_projector(u[:, j], v_i)
+        u[:, i] = v_i - proj
+
+        # and normalize to get the next basis vector
+        e[:, i] = u[:, i] / c_norm(u[:, i])
+
+    return e
+
+
+def modified_gram_schmidt(v: NDArray[np.complex128]) -> NDArray[np.complex128]:
+    """
+    Apply Modified Gram-Schmidt orthonormalization.
+
+    Parameters
+    ----------
+    v : NDArray[np.complex128]
+        Input vectors as columns.
 
     Returns
     -------
     NDArray[np.complex128]
         Orthonormalized vectors.
     """
-    size, dim = v.shape
-    e = np.zeros((size, dim), dtype=np.complex128)
-    u = np.zeros((size, dim), dtype=np.complex128)
 
-    u[0] = v[0].copy()
-    e[0] = v[0] / c_norm(v[0])
+    # exctract number of dimensions and of vectors (array in column form has a shape ())
+    dim, vectors = v.shape
+    e = np.zeros((dim, vectors), dtype=np.complex128)
 
-    for i in range(1, size):
-        v_i = v[i]
-        proj = np.zeros(dim, dtype=np.complex128)
-        for j in range(i):
-            proj += c_projector(u[j], v_i) 
-        
-        u[i] = v_i - proj
-        e[i] = u[i] / c_norm(u[i])
-    
+    # copy the original vectors to modify them at each step
+    v_copy = v.astype(np.complex128)
+
+    for _ in range(2):
+        for i in range(vectors):
+            # normalize the i-th basis vector
+            threshold = 1e-14
+            v_copy[:, i].imag[np.abs(v_copy[:, i].imag) < threshold] = 0.0
+
+            # normalize
+            e[:, i] = v_copy[:, i] / c_norm(v_copy[:, i])
+
+            # remove component in this direction of all the remaining vectors
+            for j in range(i + 1, vectors):
+                proj = c_projector(e[:, i], v_copy[:, j])
+                v_copy[:, j] -= proj
+
     return e
 
-def orthonormalize_solutions(
-    e_orb: NDArray[np.complex128], 
-    C: NDArray[np.complex128], 
-    deg_dict: Dict[complex, int]
-) -> NDArray[np.complex128]:
-    """
-    Orthonormalize degenerate solutions.
 
-    Parameters
-    ----------
-    e_orb : NDArray[np.complex128]
-        Orbital energies.
-    C : NDArray[np.complex128]
-        Eigenvectors.
-    deg_dict : Dict[complex, int]
-        Degeneracy map.
+# def gram_schmidt(v: NDArray[np.complex128]) -> NDArray[np.complex128]:
+#     """
+#     Apply Gram-Schmidt orthonormalization.
 
-    Returns
-    -------
-    NDArray[np.complex128]
-        Normalized eigenvectors.
-    """
-    degeneracies = deg_dict.copy()
-    C_orth = C.copy()
-    
-    n_orb = len(e_orb)
-    i = 0
-    while i < n_orb:
-        val = np.round(e_orb[i], 10)
-        deg = degeneracies.get(val, 0)
-        
-        if deg > 1:
-            # Extract subspace
-            v = C[:, i : i + deg].T
-            # Orthogonalize
-            e = gram_schmidt(v)
-            # Place back
-            C_orth[:, i : i + deg] = e.T
-            i += deg
-        else:
-            i += 1
+#     Parameters
+#     ----------
+#     v : NDArray[np.complex128]
+#         Input vectors (rows).
 
-    # Normalize all columns
-    norms = np.array([c_norm(col) for col in C_orth.T])
-    return C_orth / norms
+#     Returns
+#     -------
+#     NDArray[np.complex128]
+#         Orthonormalized vectors.
+#     """
+#     size, dim = v.shape
+#     e = np.zeros((size, dim), dtype=np.complex128)
+#     u = np.zeros((size, dim), dtype=np.complex128)
+
+#     u[0] = v[0].copy()
+#     e[0] = v[0] / c_norm(v[0])
+
+#     for i in range(1, size):
+#         v_i = v[i]
+#         proj = np.zeros(dim, dtype=np.complex128)
+#         for j in range(i):
+#             proj += c_projector(u[j], v_i)
+
+#         u[i] = v_i - proj
+#         e[i] = u[i] / c_norm(u[i])
+
+#     return e
+
+
+# def orthonormalize_solutions(
+#     e_orb: NDArray[np.complex128],
+#     C: NDArray[np.complex128],
+#     deg_dict: Dict[complex, int],
+# ) -> NDArray[np.complex128]:
+#     """
+#     Orthonormalize degenerate solutions.
+
+#     Parameters
+#     ----------
+#     e_orb : NDArray[np.complex128]
+#         Orbital energies.
+#     C : NDArray[np.complex128]
+#         Eigenvectors.
+#     deg_dict : Dict[complex, int]
+#         Degeneracy map.
+
+#     Returns
+#     -------
+#     NDArray[np.complex128]
+#         Normalized eigenvectors.
+#     """
+#     degeneracies = deg_dict.copy()
+#     C_orth = C.copy()
+
+#     n_orb = len(e_orb)
+#     i = 0
+#     while i < n_orb:
+#         val = np.round(e_orb[i], 10)
+#         deg = degeneracies.get(val, 0)
+
+#         if deg > 1:
+#             # Extract subspace
+#             v = C[:, i : i + deg].T
+#             # Orthogonalize
+#             e = gram_schmidt(v)
+#             # Place back
+#             C_orth[:, i : i + deg] = e.T
+#             i += deg
+#         else:
+#             i += 1
+
+#     # Normalize all columns
+#     norms = np.array([c_norm(col) for col in C_orth.T])
+#     return C_orth / norms
+
+
+def orthonormalize_solutions2(eval, evec):
+    ener, n_deg = count_degen2(eval)
+    # print("Energy snd degeneracy in Fock eigenvalues:")
+
+    # for e, d in zip(ener, n_deg):
+    # print(f"{e:.6f}   {d}")
+
+    copyy = np.copy(evec)
+
+    distinct_evals = len(n_deg)
+    for i in range(distinct_evals):
+        # print(f"Processing degenerate set {ener[i]} with degeneracy {n_deg[i]}")
+        if n_deg[i] != 1:
+            # print(n_deg[0:i-1])
+            idx_str = sum(n_deg[0:i])
+            # print('Starting on column ', idx_str)
+            idx_end = idx_str + n_deg[i]
+            # print(evec[:, idx_str:idx_end].real)
+            v = modified_gram_schmidt(
+                evec[:, idx_str:idx_end]
+            )  # WIWOWIWOWIWO the issue was here looks like
+            copyy[:, idx_str:idx_end] = v
+
+        # else:
+        # print('Nothing to do\n')
+
+    # reorthonormalize all
+    copyy = modified_gram_schmidt(copyy)
+
+    # set to zero imaginary part below threshold
+
+    norms = np.array([c_norm(col) for col in copyy.T])
+
+    return copyy / norms
+
 
 def calc_p_matrix_comp(
-    l_matrix: NDArray[np.complex128], 
-    r_matrix: NDArray[np.complex128], 
+    l_matrix: NDArray[np.complex128],
+    r_matrix: NDArray[np.complex128],
     n_electrons: int,
     determinant: Optional[NDArray[np.int32]] = None,
     natural_occupation: bool = True,
-    mode: Literal['RHF', 'UHF'] = 'RHF'
+    mode: Literal["RHF", "UHF"] = "RHF",
 ) -> NDArray[np.complex128]:
     """
     Calculate complex density matrix.
@@ -597,24 +797,26 @@ def calc_p_matrix_comp(
     NDArray[np.complex128]
         Density matrix.
     """
-    assert n_electrons == sum(determinant) if determinant is not None else True, "n_electrons must match determinant sum"
+    assert (
+        n_electrons == sum(determinant) if determinant is not None else True
+    ), "n_electrons must match determinant sum"
 
     if determinant is None:
-            raise ValueError("Must provide determinant if natural_occupation is False")
+        raise ValueError("Must provide determinant if natural_occupation is False")
     det_arr = determinant
 
-    if mode == 'UHF':
+    if mode == "UHF":
         mask = (det_arr == 1).astype(np.complex128)
-        P = np.einsum('ma, a, an -> mn', r_matrix, mask, l_matrix)
+        P = np.einsum("ma, a, an -> mn", r_matrix, mask, l_matrix)
     else:
         mask = (det_arr == 2).astype(np.complex128)
-        P = 2.0 * np.einsum('ma, a, an->mn', r_matrix, mask, l_matrix )
+        P = 2.0 * np.einsum("ma, a, an->mn", r_matrix, mask, l_matrix)
 
     return P
 
+
 def calc_g_matrix_comp(
-    P_matrix: NDArray[np.complex128], 
-    eri: NDArray[np.complex128]
+    P_matrix: NDArray[np.complex128], eri: NDArray[np.complex128]
 ) -> NDArray[np.complex128]:
     """
     Calculate complex G matrix.
@@ -631,15 +833,14 @@ def calc_g_matrix_comp(
     NDArray[np.complex128]
         G matrix.
     """
-    J = np.einsum('mnls,ls->mn', eri, P_matrix)
-    K = np.einsum('mlns,ls->mn', eri, P_matrix)
+    J = np.einsum("mnls,ls->mn", eri, P_matrix)
+    K = np.einsum("mlns,ls->mn", eri, P_matrix)
     return J - 0.5 * K
 
+
 def E_0_comp(
-    P: NDArray[np.complex128],
-    H_core: NDArray[np.complex128],
-    F: NDArray[np.complex128]
- ) -> np.complex128:
+    P: NDArray[np.complex128], H_core: NDArray[np.complex128], F: NDArray[np.complex128]
+) -> np.complex128:
     """
     Calculate complex Hartree-Fock energy.
 
@@ -659,12 +860,13 @@ def E_0_comp(
     """
     return np.sum(P * (H_core + F)) * 0.5
 
+
 def E_0_unrestricted_comp(
-    P_alpha: NDArray[np.complex128], 
-    P_beta: NDArray[np.complex128], 
-    H_core: NDArray[np.complex128], 
-    F_alpha: NDArray[np.complex128], 
-    F_beta: NDArray[np.complex128]
+    P_alpha: NDArray[np.complex128],
+    P_beta: NDArray[np.complex128],
+    H_core: NDArray[np.complex128],
+    F_alpha: NDArray[np.complex128],
+    F_beta: NDArray[np.complex128],
 ) -> np.complex128:
     """
     Calculate complex UHF energy.
@@ -688,19 +890,21 @@ def E_0_unrestricted_comp(
         Total electronic energy.
     """
     E_alpha = np.sum(P_alpha * (H_core + F_alpha))
-    E_beta  = np.sum(P_beta  * (H_core + F_beta))
+    E_beta = np.sum(P_beta * (H_core + F_beta))
     return 0.5 * (E_alpha + E_beta)
+
 
 # --- Convergence Utilities ---
 
+
 def calc_residual_commutator(
-    F: NDArray[np.complex128], 
-    P: NDArray[np.complex128], 
+    F: NDArray[np.complex128],
+    P: NDArray[np.complex128],
     S: NDArray[np.complex128],
 ) -> NDArray[np.complex128]:
-    """ 
+    """
     Calculate residual commutator [F, P]S.
-    
+
     Parameters
     ----------
     F : NDArray[np.complex128]
@@ -717,11 +921,12 @@ def calc_residual_commutator(
     """
     return S @ P @ F - F @ P @ S
 
+
 def calc_diis_extrapolation(
-    residuals: Sequence[NDArray[np.complex128]], 
-    F_guesses: Sequence[NDArray[np.complex128]]
+    residuals: Sequence[NDArray[np.complex128]],
+    F_guesses: Sequence[NDArray[np.complex128]],
 ) -> Tuple[NDArray[np.complex128], NDArray[np.complex128]]:
-    """ 
+    """
     Calculate DIIS extrapolation.
 
     Parameters
@@ -738,7 +943,7 @@ def calc_diis_extrapolation(
     """
     n_guesses = len(residuals)
     eq_sis_dim = n_guesses + 1
-    
+
     B_matrix = np.zeros((eq_sis_dim, eq_sis_dim), dtype=np.complex128)
     B_matrix[-1, :] = 1
     B_matrix[:, -1] = 1
@@ -747,8 +952,8 @@ def calc_diis_extrapolation(
     for i in range(n_guesses):
         for j in range(n_guesses):
             # dot product of flattened arrays
-            B_matrix[i,j] = np.dot(residuals[i].ravel(), residuals[j].ravel())
-    
+            B_matrix[i, j] = np.dot(residuals[i].ravel(), residuals[j].ravel())
+
     solution = np.zeros(eq_sis_dim, dtype=np.complex128)
     solution[-1] = 1
 
@@ -759,17 +964,32 @@ def calc_diis_extrapolation(
 
     # Reconstruct
     coeffs = c[:-1]
-    
+
     F_conv = np.zeros_like(F_guesses[0])
     r_conv = np.zeros_like(residuals[0])
-    
+
     for k, coef in enumerate(coeffs):
         F_conv += coef * F_guesses[k]
         r_conv += coef * residuals[k]
 
     return F_conv, r_conv
 
-def calculate_P_next(F: NDArray[np.complex128], X: NDArray[np.complex128], n_electrons: int, det: NDArray[np.int32], mode: Literal['RHF', 'UHF'] = 'RHF') -> Tuple[NDArray[np.complex128], NDArray[np.complex128], NDArray[np.complex128], NDArray[np.complex128], NDArray[np.complex128], NDArray[np.complex128], NDArray[np.complex128]]:
+
+def calculate_P_next(
+    F: NDArray[np.complex128],
+    X: NDArray[np.complex128],
+    n_electrons: int,
+    det: NDArray[np.int32],
+    mode: Literal["RHF", "UHF"] = "RHF",
+) -> Tuple[
+    NDArray[np.complex128],
+    NDArray[np.complex128],
+    NDArray[np.complex128],
+    NDArray[np.complex128],
+    NDArray[np.complex128],
+    NDArray[np.complex128],
+    NDArray[np.complex128],
+]:
     """
     Calculate the next density matrix P_{n+1} given Fock matrix F_n and transformation matrix X.
 
@@ -781,14 +1001,14 @@ def calculate_P_next(F: NDArray[np.complex128], X: NDArray[np.complex128], n_ele
         Transformation matrix.
     n_electrons : int
         Number of electrons.
-    
+
     Returns
     -------
     Tuple containing:
         - P_1 (NDArray[np.float64][n, n]): Next density matrix
         - C_munu (NDArray[np.float64][n, n]): Molecular orbital coefficients.
         - e_values (NDArray[np.float64][n, n]): Orbital energies.
-    
+
     Notes
     ------
     Diagonalization algorithm used is np.linalg.eigh due to the matrix being symmetric.
@@ -797,9 +1017,25 @@ def calculate_P_next(F: NDArray[np.complex128], X: NDArray[np.complex128], n_ele
 
     F_prime = X @ F @ X.T
 
+    mat_norm = np.linalg.norm(F_prime)
+
+    # print(mat_norm)
+
+    F_prime /= mat_norm  # divide by the norm to avoid numerical instability
+
     e_values, C_prime, L_prime, R_prime, LFR = diagonalize_biorthogonal(F_prime)
 
-    # assert is_diagonal(LFR), "Matrix product L' @ F' @ R' is not diagonal"
+    e_values *= mat_norm
+
+    diag_LFR = np.diag(np.diagonal(LFR))
+
+    # try:
+    assert np.allclose(
+        LFR, diag_LFR, atol=1e-6
+    ), "Matrix product L' @ F' @ R' is not diagonal"
+
+    # except AssertionError:
+    #     plot_map(LFR-diag_LFR)
 
     # Obtain untransformed MO coefficients
     C_munu = X @ C_prime
@@ -810,15 +1046,71 @@ def calculate_P_next(F: NDArray[np.complex128], X: NDArray[np.complex128], n_ele
     P_LR = calc_p_matrix_comp(L_munu, R_munu, n_electrons, det, mode=mode)
     P_RR = np.copy(P_LR)
 
-
     return P_LR, e_values, C_munu, R_munu, L_munu, P_RR, C_prime
 
 
+def calculate_P_next_2(
+    F: NDArray[np.complex128],
+    S: NDArray[np.complex128],
+    n_electrons: int,
+    det: NDArray[np.int32],
+    mode: Literal["RHF", "UHF"] = "RHF",
+) -> Tuple[
+    NDArray[np.complex128],
+    NDArray[np.complex128],
+    NDArray[np.complex128],
+    NDArray[np.complex128],
+    NDArray[np.complex128],
+    NDArray[np.complex128],
+    NDArray[np.complex128],
+]:
+    """
+    Calculate the next density matrix P_{n+1} given Fock matrix F_n and transformation matrix X.
+
+    Parameters
+    ----------
+    F_0 : NDArray[np.float64] of dimension (n, n)
+        Fock matrix at iteration n.
+    X : NDArray[np.float64] of dimension (n, n)
+        Transformation matrix.
+    n_electrons : int
+        Number of electrons.
+
+    Returns
+    -------
+    Tuple containing:
+        - P_1 (NDArray[np.float64][n, n]): Next density matrix
+        - C_munu (NDArray[np.float64][n, n]): Molecular orbital coefficients.
+        - e_values (NDArray[np.float64][n, n]): Orbital energies.
+
+    Notes
+    ------
+    Diagonalization algorithm used is np.linalg.eigh due to the matrix being symmetric.
+    """
+    e_values, C_munu = scipy.linalg.eigh(F, S)
+
+    # Build new density matrix
+    P_LR = calc_p_matrix_comp(C_munu.T, C_munu, n_electrons, det, mode=mode)
+
+    return P_LR, e_values, C_munu
+
+
 # --- UHF helper functions ---
-def calculate_unrestricted_F_and_r_comp(P_alpha: NDArray[np.complex128], P_beta, S: NDArray[np.complex128], H_core: NDArray[np.complex128], eri: NDArray[np.complex128]) -> Tuple[NDArray[np.complex128], NDArray[np.complex128], NDArray[np.complex128], NDArray[np.complex128]]:
+def calculate_unrestricted_F_and_r_comp(
+    P_alpha: NDArray[np.complex128],
+    P_beta,
+    S: NDArray[np.complex128],
+    H_core: NDArray[np.complex128],
+    eri: NDArray[np.complex128],
+) -> Tuple[
+    NDArray[np.complex128],
+    NDArray[np.complex128],
+    NDArray[np.complex128],
+    NDArray[np.complex128],
+]:
     """
     Calculate Fock matrix F and residual r from P.
-    
+
     Parameters
     ----------
     P : NDArray[np.float64] of dimension (n, n)
@@ -829,7 +1121,7 @@ def calculate_unrestricted_F_and_r_comp(P_alpha: NDArray[np.complex128], P_beta,
         Core Hamiltonian matrix.
     eri : NDArray[np.float64] of dimension (n, n, n, n)
         Electron repulsion integrals.
-    
+
     Returns
     -------
     Tuple containing:
@@ -844,16 +1136,46 @@ def calculate_unrestricted_F_and_r_comp(P_alpha: NDArray[np.complex128], P_beta,
 
     return F_alpha.flatten(), r_alpha.flatten(), F_beta.flatten(), r_beta.flatten()
 
-def calc_g_matrix_spin_comp(P_alpha, P_beta, eri) -> Tuple[NDArray[np.complex128], NDArray[np.complex128]]:
+
+def calc_g_matrix_spin_comp(
+    P_alpha, P_beta, eri
+) -> Tuple[NDArray[np.complex128], NDArray[np.complex128]]:
 
     P_total = P_alpha + P_beta
     # J from total density
-    J = np.einsum('mnsl, ls -> mn', eri, P_total)
+    J = np.einsum("mnsl, ls -> mn", eri, P_total)
     # K from same-spin density
-    K_alpha = np.einsum('mlns, ls -> mn', eri, P_alpha)
-    K_beta  = np.einsum('mlns, ls -> mn', eri, P_beta)
+    K_alpha = np.einsum("mlns, ls -> mn", eri, P_alpha)
+    K_beta = np.einsum("mlns, ls -> mn", eri, P_beta)
 
     G_alpha = J - K_alpha
-    G_beta  = J - K_beta
+    G_beta = J - K_beta
 
     return G_alpha, G_beta
+
+
+def canonicalize(
+    C_munu: NDArray[np.complex128],
+    F: NDArray[np.complex128],
+    n_occ: int,
+) -> NDArray[np.complex128]:
+    F_mo = np.einsum("mu, uv, vn -> mn", C_munu.conj().T, F, C_munu)
+
+    F_vv = F_mo[n_occ:, n_occ:]
+
+    eps_virt, U_virt = np.linalg.eigh(F_vv)
+
+    U_full = block_diag(np.eye(n_occ), U_virt)
+
+    C_new = C_munu @ U_full
+    eps_occ = np.diag(F_mo)[:n_occ]
+    epsilon_new = np.concatenate([eps_occ, eps_virt])
+
+    return C_new, epsilon_new
+
+
+def sign_convention(matrix):
+    for i, col in enumerate(matrix.T):
+        if np.abs(max(col.real)) < np.abs(min(col.real)):
+            matrix[:, i] *= -1
+    return matrix

@@ -257,4 +257,5 @@ def test_qchem_huge() -> None:
 
 if __name__ == "__main__":
     test_theta_non_scaled()
+    test_qchem_21s()
     pass

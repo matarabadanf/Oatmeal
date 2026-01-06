@@ -1,13 +1,24 @@
+from typing import List
+from matplotlib.pylab import int32
 import numpy as np
 from numpy.typing import NDArray
 from typing import Literal, Tuple, Union
 from py_mods.src.SCF.scf_utils import (
-    transformation_matrix, calc_g_matrix_comp, E_0_comp, 
-    guess_density_RHF, validate_determinant, scale_integrals, 
-    calc_residual_commutator, calc_diis_extrapolation, calculate_P_next
+    transformation_matrix,
+    calc_g_matrix_comp,
+    E_0_comp,
+    guess_density_RHF,
+    validate_determinant,
+    scale_integrals,
+    calc_residual_commutator,
+    calc_diis_extrapolation,
+    calculate_P_next,
+    calculate_P_next_2,
+    sign_convention,
 )
 import matplotlib.pyplot as plt
 from dataclasses import dataclass
+
 
 @dataclass
 class CS_RHF_ContextClass:
@@ -49,25 +60,26 @@ class CS_RHF_ContextClass:
     conv_ITER_START : int
         Iteration to start acceleration.
     """
-    # Required 
+
+    # Required
     S: NDArray[np.float64]
     T: NDArray[np.float64]
     V: NDArray[np.float64]
     eri: NDArray[np.float64]
     n_electrons: int
 
-    # Optional 
-    theta: float = 0.
+    # Optional
+    theta: float = 0.0
     occupation: Union[int, NDArray[np.int32], None] = None
     max_iter: int = 100
-    threshold: float = 1E-12
-    p_guess: Literal['core', 'ones', 'IMPORB'] = 'core'
+    threshold: float = 1e-12
+    p_guess: Literal["core", "ones", "IMPORB"] = "core"
     guess_MAX_ITER: Union[int, None] = None
     INPORB: Union[NDArray[np.float64], NDArray[np.complex128], None] = None
     verbose: bool = False
-    conv_type: Literal[None, 'DIIS', 'CROP'] = 'DIIS'
-    conv_MEM: int = 8
-    conv_ITER_START: int = 12
+    conv_type: Literal[None, "DIIS", "CROP"] = "DIIS"
+    conv_MEM: int = 4
+    conv_ITER_START: int = 4
 
 
 @dataclass
@@ -97,27 +109,27 @@ class CS_RHF_ResultsClass:
         Initial density guess.
     P : NDArray[np.complex128]
         Final LR density matrix.
-    R_munu : NDArray[np.complex128]
-        Right MO coefficients.
-    L_munu : NDArray[np.complex128]
-        Left MO coefficients.
+    C_munu : NDArray[np.complex128]
+        Final MO coefficients.
     error : float
         Final residual norm.
     iterations : int
         Total iterations performed.
     """
+
     context: CS_RHF_ContextClass
     converged: bool
     E_RHF: np.complex128
     e_orb: NDArray[np.complex128]
-    n_elec: float
+    n_elec: int32
+    det: NDArray[np.int32]
+    H_core: NDArray[np.complex128]
     X: NDArray[np.complex128]
     F_final: NDArray[np.complex128]
     C_prime: NDArray[np.complex128]
     P_guess: NDArray[np.complex128]
     P: NDArray[np.complex128]
-    R_munu: NDArray[np.complex128]
-    L_munu: NDArray[np.complex128]
+    C_munu: NDArray[np.complex128]
     error: float
     iterations: int
 
@@ -129,163 +141,509 @@ def CS_RHF(ctx: CS_RHF_ContextClass) -> CS_RHF_ResultsClass:
     Parameters
     ----------
     ctx : CS_RHF_ContextClass
-        Calculation parameters and integrals.
+        Calculation parameters & integrals.
 
     Returns
     -------
     CS_RHF_ResultsClass
         Calculation results.
     """
-    # unpacking
-    S = ctx.S.astype(np.complex128)
-    T = ctx.T.astype(np.complex128)
-    V = ctx.V.astype(np.complex128)
-    eri = ctx.eri.astype(np.complex128)
-    n_electrons = ctx.n_electrons
-    theta = ctx.theta
-    verbose = ctx.verbose
-    conv_ITER_START = ctx.conv_ITER_START
-    conv_MEM = ctx.conv_MEM
-    conv_type = ctx.conv_type
-    occupation = ctx.occupation
-    max_iter = ctx.max_iter
-    threshold = ctx.threshold
-    p_guess = ctx.p_guess
-    guess_MAX_ITER = ctx.guess_MAX_ITER
-    INPORB = ctx.INPORB
+    assert (
+        len(ctx.T) == len(ctx.V) == len(ctx.S)
+    ), "Matrices T, V, S must have the same dimensions"
+    assert ctx.n_electrons % 2 == 0, "RHF can only be closed-shell systems"
 
-    
-    assert len(T) == len(V) == len(S), "Matrices T, V, S must have the same dimensions"
-    assert n_electrons % 2 == 0, "RHF can only be closed-shell systems"
-    
-    # setup
-    conv_REQUESTED = True if conv_type is not None else False
-    conv_ITER_START = min(conv_ITER_START+1,  conv_MEM) if  conv_MEM >= conv_ITER_START else max(conv_ITER_START+1,  conv_MEM)
-    
-    
-    # Transform & Validate
-    dim = len(S)
-    X = transformation_matrix(S).astype(np.complex128)
-    det, _ = validate_determinant(n_electrons, occupation, dim)
+    # Convergence acceleration setup
+    conv_ITER_START, conv_REQUESTED = setup_conv_acc(
+        ctx.conv_MEM, ctx.conv_type, ctx.conv_ITER_START
+    )
 
-    # Scaling
-    T_scaled, V_scaled, eri_scaled = scale_integrals(T, V, eri, theta)
-    H_core = T_scaled + V_scaled
+    # Transform & Validate inputed matrices & determinant
+    dim, X, det, eri_scaled, H_core, core_mask = setup_mat_and_occ(
+        ctx.S, ctx.T, ctx.V, ctx.eri, ctx.n_electrons, ctx.theta, ctx.occupation
+    )
 
-    # Guess
-    P = guess_density_RHF(p_guess, dim, INPORB)
+    # Guess density and initialize E0
+    P, E_prev = initialize_P_and_E(
+        ctx, ctx.theta, ctx.verbose, ctx.p_guess, ctx.INPORB, dim
+    )
 
-    # State variables
-    E_prev = 0.0 + 0.0j
-    use_conv = False 
-    converged = False
-    F_guess = []
-    residuals = []
+    # Initialize variables
+    use_conv_acc, F_guess, residuals, F_next, error, converged, C_munu, e_orb = (
+        initialize_scf_variables(dim, H_core)
+    )
 
-    # Placeholders for results
-    F_next = np.zeros_like(H_core)
-    e_orb = np.zeros(dim, dtype=np.complex128)
-    C_prime = np.zeros((dim, dim), dtype=np.complex128)
-    L_munu = np.zeros_like(C_prime)
-    R_munu = np.zeros_like(C_prime)
-    
-    iter_idx = 0
+    if ctx.verbose:
+        print_table_header()
 
-    if verbose:
-        print('-'*128)
-        print('|   Iter     |                   E_iter                      |                   Delta_e                   |      norm(e_i)      |')
-        print('-'*128)
-
-    for iter_idx in range(max_iter):
-        F, r = calculate_F_and_r_comp(P, S, H_core, eri_scaled)
-        
-        error = np.linalg.norm(r.ravel())
+    for iter_idx in range(ctx.max_iter):
+        # Calculate next Fock matrix, associated error, and RHF energy
+        F, r = calculate_F_and_r_comp(P, ctx.S, H_core, eri_scaled)
         E_RHF = E_0_comp(P, H_core, F)
+
         E_diff = E_RHF - E_prev
+        E_prev = E_RHF
 
-        if verbose:
-            print(f'{iter_idx:5}     {E_RHF:45.16f}     {E_diff:45.16f}     {error:8.4E}')
-        
+        if ctx.verbose:
+            print_cycle_data(iter_idx, r, E_RHF, E_diff)
+
         # Check convergence
-        if iter_idx > 1 and error < threshold:
-            converged = True
-            if verbose:
-                print(f'Convergence achieved after {iter_idx} iterations.')
-            
-            # Final diagonalization
-            P, e_orb, R_munu, *_ = calculate_P_next(F_next, X, n_electrons, det)
-
-            F_next = F 
+        converged = is_converged(ctx.verbose, ctx.threshold, iter_idx, r)
+        if converged:
             break
 
         # History storage
-        F_guess.append(F)
-        residuals.append(r)
+        update_CONV_MEM(ctx.conv_MEM, F_guess, residuals, F, r)
+        P_old = P.copy()
 
-        if len(F_guess) > conv_MEM:
-            F_guess.pop(0)
-            residuals.pop(0)
-        
-        # Update F_next
-        if not use_conv:
-            F_next = F 
-        else:
-            try:
-                F_opt, r_opt = calc_diis_extrapolation(residuals, F_guess)
-                F_next = F_opt
-                
-                if conv_type == 'CROP':
-                    F_guess[-1] = F_opt
-                    residuals[-1] = r_opt  
-            except np.linalg.LinAlgError:
-                if verbose:
-                    print('!!!!!!!!!!!!!!!! CONVERGENCE ACCELERATION CAUSED A SINGULAR MATRIX. REVERTING TO STANDARD SCF !!!!!!!!!!!!!!!')
-                use_conv = False 
-                F_next = F
+        # Update F_next with or without convergence acceleration
+        F_next = update_F_matrix(
+            ctx.verbose, ctx.conv_type, use_conv_acc, F_guess, residuals, F
+        )
 
         # Compute next Density
-        P_old = P.copy()
-        P, e_orb, R_munu, *_ = calculate_P_next(F_next, X, n_electrons, det)
+        P, e_orb, C_munu, C_prime = update_density(
+            ctx.n_electrons, X, det, core_mask, F_next
+        )
 
-        # Stability Patch: Enforce real if theta=0
-        if theta == 0.0:
-            P = P.real.astype(np.complex128)
-            L_munu = L_munu.real.astype(np.complex128)
-            R_munu = R_munu.real.astype(np.complex128)
+        # Enforce real if theta=0
+        if ctx.theta == 0.0:
+            P, C_munu = clear_imaginary(ctx.theta, P, C_munu)
 
-        E_prev = E_RHF 
+        # Check activation of convergence acceleration
+        use_conv_acc = conv_acc_criteria_met(
+            ctx.verbose, conv_ITER_START, ctx.conv_type, conv_REQUESTED, iter_idx
+        )
 
-        # Activate DIIS
-        if iter_idx == conv_ITER_START and conv_REQUESTED:
-            use_conv = True 
-            if verbose:
-                print('-'*30,  f'   STARTED {conv_type}  ', '-' *30)
+    # Final update diagonalization
+    P, e_orb, C_munu, C_prime = update_density(
+        ctx.n_electrons, X, det, core_mask, F_next
+    )
+
+    F_next = F
 
     return CS_RHF_ResultsClass(
         context=ctx,
         converged=converged,
         E_RHF=E_RHF,
         e_orb=e_orb,
-        n_elec=float(n_electrons),
+        n_elec=np.int32(ctx.n_electrons),
+        det=det,
+        H_core=H_core,
         X=X,
         F_final=F_next,
         C_prime=C_prime,
         P_guess=P_old if iter_idx > 0 else P,
         P=P,
-        R_munu=R_munu,
-        L_munu=R_munu.T,
+        C_munu=C_munu,
         error=float(error),
-        iterations=iter_idx
+        iterations=iter_idx,
     )
 
-def calculate_F_and_r_comp(
-    P: NDArray[np.complex128], 
-    S: NDArray[np.complex128], 
-    H_core: NDArray[np.complex128], 
-    eri: NDArray[np.complex128]
+
+def is_converged(
+    verbose: bool, threshold: float, iter_idx: int, r: NDArray[np.complex128]
+) -> bool:
+    """
+    Check convergence based on residual norms.
+
+    Parameters
+    ----------
+    verbose : bool
+        If True, print status.
+    threshold : float
+        Convergence threshold.
+    iter_idx : int
+        Current iteration index.
+    r : NDArray[np.complex128]
+        Residual matrix.
+
+    Returns
+    -------
+    converged : bool
+        True if converged, else False.
+    """
+    converged: bool = False
+    error_re: float = np.max(np.abs(r.real))
+    error_im: float = np.max(np.abs(r.imag))
+    if iter_idx > 1 and error_re < threshold and error_im < threshold:
+        # if iter_idx > 1 and abs(E_diff) < threshold:
+        converged = True
+        if verbose:
+            print(f"Convergence achieved after {iter_idx} iterations.")
+    return converged
+
+
+def initialize_P_and_E(
+    ctx: CS_RHF_ContextClass,
+    theta: float,
+    verbose: bool,
+    p_guess: Literal["core", "ones", "IMPORB"],
+    INPORB: Union[NDArray[np.float64], NDArray[np.complex128], None],
+    dim: int,
+) -> Tuple[NDArray[np.complex128], np.complex128]:
+    """
+    Initialize density matrix and previous energy.
+
+    Parameters
+    ----------
+    ctx : CS_RHF_ContextClass
+        Calculation parameters & integrals.
+    theta : float
+        Complex-scaling angle.
+    verbose : bool
+        If True, print status.
+    p_guess : {'core', 'ones', 'IMPORB'}
+        Initial density guess type.
+    INPORB : NDArray or None
+        Imported orbitals for guess.
+    dim : int
+        Dimension of matrices.
+
+    Returns
+    -------
+    P : NDArray[np.complex128]
+        Initial density matrix.
+    E_prev : np.complex128
+        Initial previous energy.
+    """
+    if theta != 0.0:
+        P, unscaled_E_RHF = compute_unscaled_density(ctx, verbose)
+        E_prev = np.complex128(unscaled_E_RHF)
+
+        return P, E_prev
+    else:
+        P = guess_density_RHF(p_guess, dim, INPORB)
+        E_prev = np.complex128(0.0)
+
+    return P, E_prev
+
+
+def print_cycle_data(
+    iter_idx: int,
+    r: NDArray[np.complex128],
+    E_RHF: np.complex128,
+    E_diff: np.complex128,
+) -> None:
+    """
+    Print SCF iteration data.
+
+    Parameters
+    ----------
+    iter_idx : int
+        Current iteration index.
+    r : NDArray[np.complex128]
+        Residual matrix.
+    E_RHF : np.complex128
+        Current RHF energy.
+    E_diff : np.complex128
+        Energy difference from previous iteration.
+
+    Returns
+    -------
+    None
+    """
+    error_re, error_im = np.max(np.abs(r.real)), np.max(np.abs(r.imag))
+    print(
+        f"{iter_idx:5}     {E_RHF:24.6E}     {E_diff:24.6E}     {error_re:8.4E}     {error_im:8.4E}j"
+    )
+
+
+def update_density(
+    n_electrons: int,
+    X: NDArray[np.complex128],
+    det: NDArray[np.int32],
+    core_mask: NDArray[np.bool],
+    F_next: NDArray[np.complex128],
+) -> Tuple[
+    NDArray[np.complex128],
+    NDArray[np.complex128],
+    NDArray[np.complex128],
+    NDArray[np.complex128],
+]:
+    """
+    Update density matrix and related quantities. For specifics, see calculate_P_next.
+
+    Parameters
+    ----------
+    n_electrons : int
+        Total electron count.
+    X : NDArray[np.complex128]
+        Transformation matrix.
+    det : NDArray[np.int32]
+        Occupation determinant.
+    core_mask : NDArray[np.bool]
+        Mask to mitigate numerical noise.
+    F_next : NDArray[np.complex128]
+        Next Fock matrix.
+
+    Returns
+    -------
+    P : NDArray[np.complex128]
+        Updated density matrix.
+    e_orb : NDArray[np.complex128]
+        Updated orbital energies.
+    C_munu : NDArray[np.complex128]
+        Updated MO coefficients.
+    C_prime : NDArray[np.complex128]
+        Updated transformed eigenvectors.
+
+    Notes
+    -----
+    - This function applies a core mask to the density matrix to reduce numerical noise,
+    where it is understood that different angular momentum matrix elements must be 0.
+    """
+
+    P, e_orb, C_munu, *_, C_prime = calculate_P_next(F_next, X, n_electrons, det)
+
+    # P, e_orb, C_munu = calculate_P_next_2(
+    #     F_next, S, n_electrons, det,
+    # )
+
+    P = P * core_mask
+    C_munu = sign_convention(C_munu)
+    return P, e_orb, C_munu, C_prime
+
+
+def initialize_scf_variables(dim: int, H_core: NDArray[np.complex128]) -> Tuple:
+    """
+    Initialize SCF iteration variables.
+
+    Parameters
+    ----------
+    dim : int
+        Dimension of matrices.
+    H_core : NDArray[np.complex128]
+        Core Hamiltonian.
+
+    Returns
+    -------
+    Tuple containing initialized SCF variables.
+    """
+    use_conv_acc: bool = False
+    converged: bool = False
+    F_guess: List[NDArray[np.complex128]] = []
+    residuals: List[NDArray[np.complex128]] = []
+    F_next: NDArray[np.complex128] = np.zeros_like(H_core)
+    e_orb: NDArray[np.complex128] = np.zeros(dim, dtype=np.complex128)
+    C_prime: NDArray[np.complex128] = np.zeros((dim, dim), dtype=np.complex128)
+    C_munu: NDArray[np.complex128] = np.zeros_like(C_prime, dtype=np.complex128)
+    error: complex = 1e10
+
+    return use_conv_acc, F_guess, residuals, F_next, error, converged, C_munu, e_orb
+
+
+def setup_mat_and_occ(
+    S: NDArray[np.float64],
+    T: NDArray[np.complex128],
+    V: NDArray[np.complex128],
+    eri: NDArray[np.complex128],
+    n_electrons: int,
+    theta: float,
+    occupation: Union[int, NDArray[np.int32], None],
+) -> Tuple:
+    """
+    Setup matrices and occupation determinant.
+
+    Parameters
+    ----------
+    S : NDArray[np.float64]
+        Overlap matrix.
+    T : NDArray[np.complex128]
+        Kinetic energy matrix.
+    V : NDArray[np.complex128]
+        Nuclear attraction matrix.
+    eri : NDArray[np.complex128]
+        Electron repulsion integrals.
+    n_electrons : int
+        Total electron count.
+    theta : float
+        Complex-scaling angle.
+    occupation : int or NDArray[np.int32] or None
+        Occupation vector. If -1/None, build default.
+
+    Returns
+    -------
+    Tuple containing dimension, transformation matrix, occupation determinant,
+    scaled integrals, core Hamiltonian, and core mask.
+    """
+    dim = len(S)
+    X = transformation_matrix(S.astype(np.complex128)).astype(np.complex128)
+    det, _ = validate_determinant(n_electrons, occupation, dim)
+
+    T_scaled, V_scaled, eri_scaled = scale_integrals(T, V, eri, theta)
+    H_core = T_scaled + V_scaled
+    core_mask = np.abs(H_core) > 1e-10
+    return dim, X, det, eri_scaled, H_core, core_mask
+
+
+def setup_conv_acc(
+    conv_MEM: int,
+    conv_type: Literal[None, "DIIS", "CROP"],
+    conv_ITER_START: int,
+) -> Tuple[int, bool]:
+    """
+    Setup convergence acceleration parameters.
+
+    Parameters
+    ----------
+    """
+    if conv_type not in [None, "DIIS", "CROP"]:
+        print(
+            "Convergence assist must be either None, 'DIIS', or 'CROP'. Reverted to no convergence acceleration"
+        )
+        return int(1e10), False
+
+    conv_REQUESTED = conv_type is not None
+    conv_ITER_START = (
+        min(conv_ITER_START + 1, conv_MEM)
+        if conv_MEM >= conv_ITER_START
+        else max(conv_ITER_START + 1, conv_MEM)
+    )
+
+    return (conv_ITER_START, conv_REQUESTED)
+
+
+def compute_unscaled_density(
+    ctx: CS_RHF_ContextClass, verbose: bool
+) -> Tuple[NDArray[np.complex128], np.complex128]:
+    """
+    Compute unscaled density matrix for theta=0.
+
+    Parameters
+    ----------
+    ctx : CS_RHF_ContextClass
+        Original context with integrals and parameters.
+    verbose : bool
+        If True, print status.
+
+    Returns
+    -------
+    P : NDArray[np.complex128]
+        Unscaled density matrix.
+    E_RHF : np.complex128
+        Unscaled RHF energy.
+    """
+    if verbose:
+        print("Converging unscaled case:")
+    unscaled_ctx = CS_RHF_ContextClass(
+        S=ctx.S,
+        T=ctx.T,
+        V=ctx.V,
+        eri=ctx.eri,
+        n_electrons=ctx.n_electrons,
+        theta=0.0,
+        occupation=ctx.occupation,
+        max_iter=ctx.max_iter,
+        threshold=ctx.threshold,
+        p_guess=ctx.p_guess,
+        guess_MAX_ITER=ctx.guess_MAX_ITER,
+        INPORB=ctx.INPORB,
+        verbose=ctx.verbose,
+        conv_type=ctx.conv_type,
+        conv_MEM=ctx.conv_MEM,
+        conv_ITER_START=10,
+    )
+
+    unscaled_res = CS_RHF(unscaled_ctx)
+
+    if verbose:
+        print("Unscaled energy: ", unscaled_res.E_RHF)
+        print("\n\n\nConverging scaled case from unscaled density as reference:")
+
+    P = unscaled_res.P
+    return P, unscaled_res.E_RHF
+
+
+def print_table_header():
+    """
+    Print SCF iteration table header.
+
+    Returns
+    -------
+    None
+    """
+    print("-" * 128)
+    print(
+        "|   Iter     |                   E_iter                      |                   Delta_e                   |      norm(e_i)      |"
+    )
+    print("-" * 128)
+
+
+def clear_imaginary(
+    theta: float,
+    P: NDArray[np.complex128],
+    C_munu: NDArray[np.complex128],
 ) -> Tuple[NDArray[np.complex128], NDArray[np.complex128]]:
     """
-    Calculate Fock matrix and Residual.
+    Clear imaginary components if theta is zero by recasting real part as complex.
+
+    Parameters
+    ----------
+    theta : float
+        Complex-scaling angle.
+    P : NDArray[np.complex128]
+        Density matrix.
+    """
+    if theta == 0.0:
+        P = P.real.astype(np.complex128)
+        C_munu = C_munu.real.astype(np.complex128)
+    return P, C_munu
+
+
+def conv_acc_criteria_met(
+    verbose: bool,
+    conv_ITER_START: int,
+    conv_type: Literal[None, "DIIS", "CROP"],
+    conv_REQUESTED: bool,
+    iter_idx: int,
+) -> bool:
+    use_conv_acc = False
+    if iter_idx == conv_ITER_START and conv_REQUESTED:
+        use_conv_acc = True
+        if verbose:
+            print("-" * 30, f"   STARTED {conv_type}  ", "-" * 30)
+    return use_conv_acc
+
+
+def update_CONV_MEM(conv_MEM, F_guess, residuals, F, r):
+    F_guess.append(F)
+    residuals.append(r)
+
+    if len(F_guess) > conv_MEM:
+        F_guess.pop(0)
+        residuals.pop(0)
+
+
+def update_F_matrix(verbose, conv_type, use_conv_acc, F_guess, residuals, F):
+    if not use_conv_acc:
+        F_next = F
+    else:
+        try:
+            F_opt, r_opt = calc_diis_extrapolation(residuals, F_guess)
+            F_next = F_opt
+
+            if conv_type == "CROP":
+                F_guess[-1] = F_opt
+                residuals[-1] = r_opt
+        except np.linalg.LinAlgError:
+            if verbose:
+                print(
+                    "!!!!!!!!!!!!!!!! CONVERGENCE ACCELERATION CAUSED A SINGULAR MATRIX. REVERTING TO STANDARD SCF !!!!!!!!!!!!!!!"
+                )
+            use_conv_acc = False
+            F_next = F
+    return F_next
+
+
+def calculate_F_and_r_comp(
+    P: NDArray[np.complex128],
+    S: NDArray[np.complex128],
+    H_core: NDArray[np.complex128],
+    eri: NDArray[np.complex128],
+) -> Tuple[NDArray[np.complex128], NDArray[np.complex128]]:
+    """
+    Calculate Fock matrix & Residual.
 
     Parameters
     ----------
@@ -324,7 +682,7 @@ def RHF_theta_traj(max_theta, n_points, cxt: CS_RHF_ContextClass):
     Returns
     -------
     thetas, energies : Tuple[NDArray, NDArray]
-        Sampled angles and energies.
+        Sampled angles & energies.
     """
     thetas = np.linspace(0, max_theta, n_points)
     energies = []
@@ -334,11 +692,12 @@ def RHF_theta_traj(max_theta, n_points, cxt: CS_RHF_ContextClass):
         if res.converged:
             energies.append(res.E_RHF)
         else:
-            print(f'Traj {th} did not converge.')
+            print(f"Traj {th} did not converge.")
         if cxt.verbose and res.converged:
-            print(f'Converged point at theta = {th:6.4f} : E = {res.E_RHF:12.8f}') 
+            print(f"Converged point at theta = {th:6.4f} : E = {res.E_RHF:12.8f}")
 
     return thetas, np.array(energies, dtype=np.complex128)
+
 
 def plot_theta_traj(energies):
     """
@@ -351,16 +710,17 @@ def plot_theta_traj(energies):
     """
     reals = [energy.real for energy in energies]
     imags = [energy.imag for energy in energies]
-    plt.plot(reals, imags, marker='o')
-    plt.xlabel('Re(E)')
-    plt.ylabel('Im(E)')
-    plt.title('Complex Scaled RHF Energy vs Theta')
-    plt.ticklabel_format(style='sci', axis='both', scilimits=(0,0))
-    plt.ticklabel_format(style='sci')
+    plt.plot(reals, imags, marker="o")
+    plt.xlabel("Re(E)")
+    plt.ylabel("Im(E)")
+    plt.title("Complex Scaled RHF Energy vs Theta")
+    plt.ticklabel_format(style="sci", axis="both", scilimits=(0, 0))
+    plt.ticklabel_format(style="sci")
     plt.grid(True, alpha=0.3)
     plt.show()
 
-def plot_theta_orbital_energies(energies, theta, xrange=[0,0]):
+
+def plot_theta_orbital_energies(energies, theta, xrange=[0, 0]):
     """
     Scatter plot orbital energies.
 
@@ -375,18 +735,18 @@ def plot_theta_orbital_energies(energies, theta, xrange=[0,0]):
     """
     reals = [energy.real for energy in energies]
     imags = [energy.imag for energy in energies]
-    if xrange != [0,0]:
+    if xrange != [0, 0]:
         plt.xlim(xrange)
         reals = [re for re in reals if re < xrange[1]]
-        imags = imags[0:len(reals)]
+        imags = imags[0 : len(reals)]
 
-    plt.scatter(reals, imags, marker='o')
-    plt.xlabel('Re(Orbital Energies)')
-    plt.ylabel('Im(Orbital Energies)')
-    plt.ticklabel_format(style='sci')
-    plt.title(f'Complex Scaled RHF Orbital Energies at Theta={theta}')
-    plt.axhline(y=0, color='k', linestyle='-', alpha=0.3)
-    plt.axvline(x=0, color='k', linestyle='-', alpha=0.3)
+    plt.scatter(reals, imags, marker="o")
+    plt.xlabel("Re(Orbital Energies)")
+    plt.ylabel("Im(Orbital Energies)")
+    plt.ticklabel_format(style="sci")
+    plt.title(f"Complex Scaled RHF Orbital Energies at Theta={theta}")
+    plt.axhline(y=0, color="k", linestyle="-", alpha=0.3)
+    plt.axvline(x=0, color="k", linestyle="-", alpha=0.3)
 
     plt.grid(True, alpha=0.3)
     plt.show()
