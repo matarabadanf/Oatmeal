@@ -1,18 +1,9 @@
-from re import I
-from pyscf import gto, scf, mp, ao2mo
-import numpy as np
-from pathlib import Path
-
-# from py_mods.src.SCF.CSUHF import CS_UHF_ContextClass, CS_UHF
-from py_mods.src.SCF.CSRHF import CS_RHF, CS_RHF_ContextClass
-from py_mods.src.SCF.plot_utilities import plot_map
-from Dev.CSMP2_dev import CS_MP2
-
-# from Dev.naive_MP2 import CS_MP2
+from pyscf import gto, scf, mp
+from py_mods.src.SCF.CSRHF import CS_RHF
+from py_mods.src.MP2.CSMP2 import CS_MP2
 from py_mods.src.SCF.external import RHF_context_from_pyscf
-import matplotlib.pyplot as plt
-
 from pyscf.tools import molden
+
 large_basis = """
 He    S
       5.285000E+02           0.000000E+00           9.400000E-04           0.000000E+00           0.000000E+00
@@ -102,27 +93,7 @@ print(mf.mo_energy-RHF_res.e_orb.real)
 mf.mo_coeff = RHF_res.C_munu.real
 molden.from_scf(mf, 'new_Ar_orbs.molden')
 
-# plot_map(RHF_res.C_munu.real, title='Imp MOs', filename='Implem_mos.jpg')
-
-# RHF_res.C_munu[:, [5, 6]] = RHF_res.C_munu[:, [6, 5]]
-# RHF_res.C_munu[:, [10, 13]] = RHF_res.C_munu[:, [13, 10]]
-# RHF_res.C_munu[:, 5] *= -1
-
-# Not Forcing this swap of colums the error in correlation energy for He/cc-pvtz is  0.0012775690626617084
-#     Forcing this swap of colums the error in correlation energy for He/cc-pvtz is -0.0003459117340629397
-# Not forcing swap and without canonicalization step of coeffs, error value here is -0.0003459117340629050
-
-
-# plot_map(RHF_res.C_munu.real - mf.mo_coeff)
-
-# plot_map(RHF_res.C_munu.real, title='Imp MOs reordered', filename='Implem_mos_reordered.jpg')
-# mf.mo_coeff = RHF_res.C_munu.real
-# molden.from_scf(mf, 'hf_self_forced_cc-pvtz.molden')
-
 mp_results = CS_MP2(RHF_res)
-
-# The energy result difference is 1.3E-17 with forced MO coefficients and enregies
-# The energy result difference is 0.00145 with self-obtained MO coefficients and orbitals
 
 print(f"\n\nMP2 calc: {mp_results.E_MP2}, E_corr = {mp_results.E_corr}")
 print(f"MP2 pyscf: {mymp.e_tot}, E_corr = {mymp.e_corr}")

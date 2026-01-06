@@ -143,20 +143,20 @@ def CS_MP2_UHF(CS_UHF_Context: CS_UHF_ResultsClass) -> CS_MP2_Results:
     mp_type = "RMP2"
 
     # naive approach: no symm
-    R_alph = CS_UHF_Context.R_alpha
-    R_beta = CS_UHF_Context.R_beta
+    C_alph = CS_UHF_Context.C_alpha
+    C_beta = CS_UHF_Context.C_beta
 
     if np.isclose(CS_UHF_Context.context.theta, 0.0):
-        R_alph = R_alph.real
-        R_beta = R_beta.real
+        C_alph = C_alph.real
+        C_beta = C_beta.real
 
-    n_spatorb = len(R_alph)
+    n_spatorb = len(C_alph)
     n_spinorb = n_spatorb * 2
 
     # Build the whole C_ab matrix with alpha and beta blocks
     C_ab = np.zeros([n_spinorb, n_spinorb])
-    C_ab[:n_spatorb, :n_spatorb] = R_alph
-    C_ab[n_spatorb:, n_spatorb:] = R_beta
+    C_ab[:n_spatorb, :n_spatorb] = C_alph
+    C_ab[n_spatorb:, n_spatorb:] = C_beta
 
     # rest of info
     e_alph = CS_UHF_Context.e_alpha
@@ -179,15 +179,15 @@ def CS_MP2_UHF(CS_UHF_Context: CS_UHF_ResultsClass) -> CS_MP2_Results:
 
     # alpha-alpha ERI MO block
     aa_mo_chem = ao_to_ovov_generalized(
-        eris_ao, R_alph[:, o_ia], R_alph[:, v_ia], R_alph[:, o_ia], R_alph[:, v_ia]
+        eris_ao, C_alph[:, o_ia], C_alph[:, v_ia], C_alph[:, o_ia], C_alph[:, v_ia]
     )  # (aa|aa) = <aa|aa>. Indices must be OVOV in chemists notation.
 
     bb_mo_chem = ao_to_ovov_generalized(
-        eris_ao, R_beta[:, o_ib], R_beta[:, v_ib], R_beta[:, o_ib], R_beta[:, v_ib]
+        eris_ao, C_beta[:, o_ib], C_beta[:, v_ib], C_beta[:, o_ib], C_beta[:, v_ib]
     )  # (bb|bb) = <bb|bb>. Indices must be OVOV in chemists notation.
 
     ab_mo_chem = ao_to_ovov_generalized(
-        eris_ao, R_alph[:, o_ia], R_alph[:, v_ia], R_beta[:, o_ib], R_beta[:, v_ib]
+        eris_ao, C_alph[:, o_ia], C_alph[:, v_ia], C_beta[:, o_ib], C_beta[:, v_ib]
     )  # (aa|bb) = <ab|ab>. Indices must be OVOV in chemists notation.
 
     # Now we have three tensors of dimensions
@@ -286,7 +286,7 @@ def CS_MP2_UHF(CS_UHF_Context: CS_UHF_ResultsClass) -> CS_MP2_Results:
 
     E_corr = aa_mp2 + bb_mp2 + ab_mp2
 
-    E_MP2 = E_corr + CS_UHF_Context.E_UHF
+    E_MP2 = CS_UHF_Context.E_UHF - E_corr
 
     returnClass = CS_MP2_Results(CS_UHF_Context, E_MP2, E_corr, mp_type, None, None)
 
