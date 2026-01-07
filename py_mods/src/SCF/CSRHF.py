@@ -1,8 +1,7 @@
-from typing import List
 from matplotlib.pylab import int32
 import numpy as np
 from numpy.typing import NDArray
-from typing import Literal, Tuple, Union
+from typing import Literal, Tuple, Union, List 
 from py_mods.src.SCF.scf_utils import (
     transformation_matrix,
     calc_g_matrix_comp,
@@ -13,7 +12,6 @@ from py_mods.src.SCF.scf_utils import (
     calc_residual_commutator,
     calc_diis_extrapolation,
     calculate_P_next,
-    calculate_P_next_2,
     sign_convention,
 )
 import matplotlib.pyplot as plt
@@ -80,6 +78,7 @@ class CS_RHF_ContextClass:
     conv_type: Literal[None, "DIIS", "CROP"] = "DIIS"
     conv_MEM: int = 4
     conv_ITER_START: int = 4
+    _eigensolver: Literal['eig', 'eigh'] = 'eigh'
 
 
 @dataclass
@@ -132,7 +131,7 @@ class CS_RHF_ResultsClass:
     C_munu: NDArray[np.complex128]
     error: float
     iterations: int
-
+    scaled_eris: NDArray[np.complex128]
 
 def CS_RHF(ctx: CS_RHF_ContextClass) -> CS_RHF_ResultsClass:
     """
@@ -153,15 +152,22 @@ def CS_RHF(ctx: CS_RHF_ContextClass) -> CS_RHF_ResultsClass:
     ), "Matrices T, V, S must have the same dimensions"
     assert ctx.n_electrons % 2 == 0, "RHF can only be closed-shell systems"
 
+    assert ctx._eigensolver in ['eig', 'eigh', 'genh'], "Eigensolver must be either 'eig' or 'eigh"
+
+    _eigensolver = ctx._eigensolver
+
     # Convergence acceleration setup
     conv_ITER_START, conv_REQUESTED = setup_conv_acc(
         ctx.conv_MEM, ctx.conv_type, ctx.conv_ITER_START
     )
 
     # Transform & Validate inputed matrices & determinant
-    dim, X, det, eri_scaled, H_core, core_mask = setup_mat_and_occ(
-        ctx.S, ctx.T, ctx.V, ctx.eri, ctx.n_electrons, ctx.theta, ctx.occupation
+    dim, X, det, eri_scaled, H_core, core_mask, _eigensolver = setup_mat_and_occ(
+        ctx.S, ctx.T, ctx.V, ctx.eri, ctx.n_electrons, ctx.theta, ctx.occupation, _eigensolver
     )
+
+    ctx._eigensolver = _eigensolver
+    
 
     # Guess density and initialize E0
     P, E_prev = initialize_P_and_E(
@@ -236,8 +242,9 @@ def CS_RHF(ctx: CS_RHF_ContextClass) -> CS_RHF_ResultsClass:
         P_guess=P_old if iter_idx > 0 else P,
         P=P,
         C_munu=C_munu,
-        error=float(error),
+        error=r,
         iterations=iter_idx,
+        scaled_eris=eri_scaled,
     )
 
 
@@ -441,6 +448,7 @@ def setup_mat_and_occ(
     n_electrons: int,
     theta: float,
     occupation: Union[int, NDArray[np.int32], None],
+    _eigensolver: Literal['eigh', 'eig']
 ) -> Tuple:
     """
     Setup matrices and occupation determinant.
@@ -461,11 +469,12 @@ def setup_mat_and_occ(
         Complex-scaling angle.
     occupation : int or NDArray[np.int32] or None
         Occupation vector. If -1/None, build default.
+    
 
     Returns
     -------
     Tuple containing dimension, transformation matrix, occupation determinant,
-    scaled integrals, core Hamiltonian, and core mask.
+    scaled integrals, core Hamiltonian, core mask, and eigensolver configuration.
     """
     dim = len(S)
     X = transformation_matrix(S.astype(np.complex128)).astype(np.complex128)
@@ -474,7 +483,11 @@ def setup_mat_and_occ(
     T_scaled, V_scaled, eri_scaled = scale_integrals(T, V, eri, theta)
     H_core = T_scaled + V_scaled
     core_mask = np.abs(H_core) > 1e-10
-    return dim, X, det, eri_scaled, H_core, core_mask
+
+    if theta != 0: 
+        _eigensolver = 'eig'
+    
+    return dim, X, det, eri_scaled, H_core, core_mask, _eigensolver
 
 
 def setup_conv_acc(

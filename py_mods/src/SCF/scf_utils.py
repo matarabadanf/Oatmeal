@@ -441,7 +441,7 @@ def diagonalize_biorthogonal(
         Diagonal matrix (L @ F @ R).
     """
 
-    R_prime, _, e_values, C_prime = _diagonalize_gram(F_prime)
+    R_prime, _, e_values, C_prime = _diagonalize_gram(F_prime, None)
 
     # e_values, R_prime = np.linalg.eigh(F_prime)
 
@@ -460,14 +460,20 @@ def diagonalize_biorthogonal(
     return e_values, C_prime, L_prime, R_prime, LFR
 
 
-def _diagonalize_gram(F_prime):
+def _diagonalize_gram(
+    F_prime: Union[NDArray[np.complex128], NDArray[np.float64]],
+    solver: Literal["eig", "eigh"],
+) -> Tuple:
 
-    if np.allclose(F_prime.T, F_prime) and np.linalg.norm(F_prime.imag) < 1e-14:
+    if (
+        np.allclose(F_prime.T, F_prime) and np.linalg.norm(F_prime.imag) < 1e-14
+    ) or solver == "eigh":
         e_values, C_prime = np.linalg.eigh(F_prime)
+
     else:
         e_values, C_prime = np.linalg.eig(F_prime)
 
-    # e_values, C_prime = np.linalg.eig(F_prime)
+    e_values, C_prime = np.linalg.eig(F_prime)
 
     # Sort by real part of eigenvalues (standard for SCF stability)
     idx = e_values.argsort()

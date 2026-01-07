@@ -68,7 +68,7 @@ def CS_MP2_RHF(CS_RHF_Context: CS_RHF_ResultsClass) -> CS_MP2_Results:
 
     # rest of info
     e_orb = CS_RHF_Context.e_orb
-    eris_ao = CS_RHF_Context.context.eri
+    eris_ao = CS_RHF_Context.scaled_eris
     n_occ: int = int(CS_RHF_Context.n_elec // 2)
     n_tot: int = len(CS_RHF_Context.context.S)
     n_virt: int = n_tot - n_occ
@@ -161,7 +161,7 @@ def CS_MP2_UHF(CS_UHF_Context: CS_UHF_ResultsClass) -> CS_MP2_Results:
     # rest of info
     e_alph = CS_UHF_Context.e_alpha
     e_beta = CS_UHF_Context.e_beta
-    eris_ao = CS_UHF_Context.context.eri
+    eris_ao = CS_UHF_Context.scaled_eris
     det_a = CS_UHF_Context.det[0]
     det_b = CS_UHF_Context.det[1]
 

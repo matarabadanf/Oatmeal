@@ -231,7 +231,7 @@ def CS_UHF(context: CS_UHF_ContextClass) -> CS_UHF_ResultsClass:
         mult = int(0) if n_electrons % 2 == 0 else int(1)
     assert (
         n_electrons - mult
-    ) % 2 != 1, f"It is not possible to have {mult} unpaired electrons with { n_electrons} electrons."
+    ) % 2 != 1, f"It is not possible to have {mult} unpaired electrons with {n_electrons} electrons."
 
     # Otain transformation matrix and validate occupation determinant
     dim = len(S)
