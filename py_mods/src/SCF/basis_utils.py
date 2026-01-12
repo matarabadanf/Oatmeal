@@ -9,7 +9,7 @@ def even_tempered_exponents(
 
     exponents = np.zeros(k)
 
-    print(np.log(alpha_1), np.log(epsilon))
+    # print(np.log(alpha_1), np.log(epsilon))
 
     for i in range(k):
         exponents[i] = alpha_1 * epsilon ** (i)
