@@ -1,7 +1,8 @@
 import numpy as np
 from numpy.typing import NDArray
 from typing import Literal, Tuple, Union
-from py_mods.src.SCF.CSRHF import CS_RHF, CS_RHF_ContextClass
+from py_mods.src.SCF.CSRHF import CS_RHF
+from py_mods.src.SCF.types import CSRHFContext
 from py_mods.src.SCF.scf_utils import (
     transformation_matrix,
     E_0_unrestricted_comp,
@@ -461,7 +462,7 @@ def guess_density_UHF(
 
         else:
             guess_iter = 12
-            guess_context = CS_RHF_ContextClass(
+            guess_context = CSRHFContext(
                 S.real,
                 T.real,
                 V.real,

@@ -2,10 +2,8 @@ import numpy as np
 from numpy.typing import NDArray
 from typing import Literal, Union
 from dataclasses import dataclass
-from py_mods.src.SCF.CSRHF import CS_RHF_ResultsClass
+from py_mods.src.SCF.types import CSRHFResults as CS_RHF_ResultsClass
 from py_mods.src.SCF.CSUHF import CS_UHF_ResultsClass
-from py_mods.src.SCF.plot_utilities import plot_map
-from time import time
 
 
 @dataclass

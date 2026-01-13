@@ -1,10 +1,11 @@
 import numpy as np
 import pytest
 
-# from py_mods.src.SCF.CSRHF import CS_RHF, RHF_theta_traj, CS_RHF_ContextClass
-from py_mods.src.SCF.CSRHF import CS_RHF, RHF_theta_traj, CS_RHF_ContextClass
+# from py_mods.src.SCF.CSRHF import CS_RHF, RHF_theta_traj, CSRHFContext
+from py_mods.src.SCF.CSRHF import CS_RHF, RHF_theta_traj
+from py_mods.src.SCF.types import CSRHFContext
 from py_mods.src.SCF.CSUHF import UHF_theta_traj, CS_UHF_ContextClass
-from py_mods.src.SCF.RHF import RHF
+from py_mods.src.SCF._drafts.RHF import RHF
 from pathlib import Path
 
 data_path = Path(__file__).parent / "data"
@@ -50,7 +51,7 @@ def test_theta_zero() -> None:
         abs(E_hf - E_hf_sto3g_li) < 1e-8
     ), f"SCF energy does not match reference value {E_hf} != {E_hf_sto3g_li}"
 
-    Li_cxt = CS_RHF_ContextClass(
+    Li_cxt = CSRHFContext(
         S=S_sto3g_li,
         T=T_sto3g_li,
         V=V_sto3g_li,
@@ -93,7 +94,7 @@ def test_theta_non_scaled() -> None:
         abs(E_hf - E_hf_29s_He) < 1e-8
     ), f"SCF energy does not match reference value {E_hf} != {E_hf_29s_He}"
 
-    even_s29_ctx = CS_RHF_ContextClass(
+    even_s29_ctx = CSRHFContext(
         S=S_29s_He,
         T=T_29s_He,
         V=V_29s_He,
@@ -119,7 +120,7 @@ def test_theta_18_scaled() -> None:
     eri_29s_He = np.load(f"{data_path}/He_eri_29s.npy")
     E_hf_29s_He = -2.8616799930014833 + 0j
 
-    He_29s_context = CS_RHF_ContextClass(
+    He_29s_context = CSRHFContext(
         S=S_29s_He,
         T=T_29s_He,
         V=V_29s_He,
@@ -147,7 +148,7 @@ def test_theta_excited_non_scaled() -> None:
     eri_29s_He = np.load(f"{data_path}/He_eri_29s.npy")
     E_hf_29s_He = -0.7126661655570355 + 0j
 
-    He_29s_2s2 = CS_RHF_ContextClass(
+    He_29s_2s2 = CSRHFContext(
         S=S_29s_He,
         T=T_29s_He,
         V=V_29s_He,
@@ -177,7 +178,7 @@ def test_theta_excited_non_scaled_huge_basis() -> None:
     eri_aug_5Z_He = np.load(f"{data_path}/He_eri_aug-cc-pv(5+d)z.npy")
     E_hf_aug_5Z_He = -0.7191606246115501 + 3.8786763672415536e-18j
 
-    He_29s_2s2 = CS_RHF_ContextClass(
+    He_29s_2s2 = CSRHFContext(
         S=S_aug_5Z_He,
         T=T_aug_5Z_He,
         V=V_aug_5Z_He,
@@ -207,7 +208,7 @@ def test_theta_excited_18_scaled_huge_basis() -> None:
     eri_aug_5Z_He = np.load(f"{data_path}/He_eri_aug-cc-pv(5+d)z.npy")
     E_hf_aug_5Z_He = -0.7193108482175761 - 0.00015642424740663213j  # theta = 0.05
 
-    He_29s_2s2 = CS_RHF_ContextClass(
+    He_29s_2s2 = CSRHFContext(
         S=S_aug_5Z_He,
         T=T_aug_5Z_He,
         V=V_aug_5Z_He,
@@ -246,7 +247,7 @@ def test_qchem_21s() -> None:
     w, k2 = load_traj(f"{qchem_path}/He_2s2_eventemp_qchem.dat")
 
     # Test for the 1s2 case of both RHF and UHF
-    H2_RHF_context = CS_RHF_ContextClass(
+    H2_RHF_context = CSRHFContext(
         S_even_H2,
         T_even_H2,
         V_even_H2,
@@ -311,7 +312,7 @@ def test_qchem_huge() -> None:
     w, k = load_traj(f"{qchem_path}/He_1s2_augqz_qchem.dat")
     w, k2 = load_traj(f"{qchem_path}/He_2s2_augqz_qchem.dat")
 
-    cxt_He_5Z = CS_RHF_ContextClass(
+    cxt_He_5Z = CSRHFContext(
         S=S_aug_5Z_He,
         T=T_aug_5Z_He,
         V=V_aug_5Z_He,

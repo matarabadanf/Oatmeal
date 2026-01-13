@@ -1,5 +1,5 @@
 from typing import Union
-from py_mods.src.SCF.CSRHF import CS_RHF_ContextClass
+from py_mods.src.SCF.types import CSRHFContext
 from py_mods.src.SCF.CSUHF import CS_UHF_ContextClass
 from pyscf import gto
 from pyscf.lib.exceptions import BasisNotFoundError
@@ -30,7 +30,7 @@ def RHF_context_from_pyscf(
     overlap = mol.intor("int1e_ovlp")
     eri = mol.intor("int2e")
 
-    return_class = CS_RHF_ContextClass(overlap, kin, vnuc, eri, n_electrons=n_elec)
+    return_class = CSRHFContext(overlap, kin, vnuc, eri, n_electrons=n_elec)
 
     return return_class
 
