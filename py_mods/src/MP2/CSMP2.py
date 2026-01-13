@@ -293,7 +293,9 @@ def CS_MP2_UHF(CS_UHF_Context: CS_UHF_ResultsClass) -> CS_MP2_Results:
     return returnClass
 
 
-def ao_to_ovov(C_munu, eris_ao, o: slice, v: slice):
+def ao_to_ovov(
+    C_munu: NDArray[np.complex128], eris_ao: NDArray[np.complex128], o: slice, v: slice
+) -> NDArray[np.complex128]:
     # (ia|jb) = L_mi L_nj (mn|ls) R_la R_sb
     tmp = np.einsum("mP, mnls -> Pnls", C_munu[:, o], eris_ao)
     tmp = np.einsum("lR, PQls -> PQRs", C_munu[:, o], tmp)
@@ -302,7 +304,13 @@ def ao_to_ovov(C_munu, eris_ao, o: slice, v: slice):
     return eris_mo_ovov
 
 
-def ao_to_ovov_generalized(eris_ao, c1, c2, c3, c4):
+def ao_to_ovov_generalized(
+    eris_ao: NDArray[np.complex128],
+    c1: NDArray[np.complex128],
+    c2: NDArray[np.complex128],
+    c3: NDArray[np.complex128],
+    c4: NDArray[np.complex128],
+) -> NDArray[np.complex128]:
     # (ia|jb) =  L_mi  L_nj (mn|ls)  R_la  R_sb
     # (ia|jb) = c1_mi c2_nj (mn|ls) c3_la c4_sb
 

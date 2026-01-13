@@ -83,8 +83,12 @@ class CS_UHF_ContextClass:
     break_symm: bool = False
     verbose: bool = False
     conv_type: Literal[None, "DIIS", "CROP"] = "DIIS"
-    conv_MEM: int = 8
+    conv_MEM: int = 10
     conv_ITER_START: int = 12
+
+    # Internal
+    _eigensolver: Literal["eig", "eigh"] = "eigh"
+    _convergence_criteria: Literal["norm", "max"] = "max"
 
 
 @dataclass
@@ -159,9 +163,10 @@ class CS_UHF_ResultsClass(object):
     S_diagnostics: _UHF_SpinDiagnosticsClass
     error: float
     iterations: int
+    scaled_eris: NDArray[np.complex128]
 
 
-def CS_UHF(context: CS_UHF_ContextClass) -> CS_UHF_ResultsClass:
+def CS_UHF(ctx: CS_UHF_ContextClass) -> CS_UHF_ResultsClass:
     """
     Perform a Complex Scaled RHF calculation.
 
@@ -191,77 +196,55 @@ def CS_UHF(context: CS_UHF_ContextClass) -> CS_UHF_ResultsClass:
 
     ^* CROP algorithm does not compute the new trial as t_opt + w_opt, as it breaks convergence here.
     """
-    # unpacking
-    S = context.S.astype(np.complex128)
-    T = context.T.astype(np.complex128)
-    V = context.V.astype(np.complex128)
-    eri = context.eri.astype(np.complex128)
-    n_electrons = context.n_electrons
-    theta = context.theta
-    mult = context.mult
-    verbose = context.verbose
-    conv_ITER_START = context.conv_ITER_START
-    conv_MEM = context.conv_MEM
-    conv_type = context.conv_type
-    occupation = context.occupation
-    max_iter = context.max_iter
-    threshold = context.threshold
-    p_guess = context.p_guess
-    guess_MAX_ITER = context.guess_MAX_ITER
-    INPORB = context.INPORB
-    break_symm = context.break_symm
 
-    assert len(T) == len(V) == len(S), "Matrices T, V, S must have the same dimensions"
-    # assert n_electrons % 2 != 0, "For closed-shell calculations use RHF routine."
-    assert conv_type in [
-        None,
-        "DIIS",
-        "CROP",
-    ], "Convergence assist must be either None, DIIS, or CROP"
+    validate_context_input(ctx)
 
     # setup
-    conv_REQUESTED = True if conv_type is not None else False
-    conv_ITER_START = (
-        min(conv_ITER_START + 1, conv_MEM)
-        if conv_MEM >= conv_ITER_START
-        else max(conv_ITER_START + 1, conv_MEM)
+    conv_REQUESTED = ctx.conv_type is not None
+    ctx.conv_ITER_START = (
+        min(ctx.conv_ITER_START + 1, ctx.conv_MEM)
+        if ctx.conv_MEM >= ctx.conv_ITER_START
+        else max(ctx.conv_ITER_START + 1, ctx.conv_MEM)
     )
 
-    if mult is None:
-        mult = int(0) if n_electrons % 2 == 0 else int(1)
-    assert (
-        n_electrons - mult
-    ) % 2 != 1, f"It is not possible to have {mult} unpaired electrons with {n_electrons} electrons."
-
     # Otain transformation matrix and validate occupation determinant
-    dim = len(S)
-    X = np.array(transformation_matrix(S), dtype=np.complex128)
+    dim = len(ctx.S)
+    X = np.array(transformation_matrix(ctx.S), dtype=np.complex128)
     det_alpha, det_beta, _ = validate_unrestricted_determinant(
-        n_electrons, occupation, dim, mult
+        ctx.n_electrons, ctx.occupation, dim, ctx.mult
     )
     alpha_elec = sum(det_alpha)
     beta_elec = sum(det_beta)
 
-    if verbose:
+    if ctx.verbose:
         print("\n\nAlpha occupation: ", det_alpha)
         print("Beta  occupation: ", det_beta)
 
     # rescaling the integrals
-    T_scaled, V_scaled, eri_scaled = scale_integrals(T, V, eri, theta)
+    T_scaled, V_scaled, eri_scaled = scale_integrals(ctx.T, ctx.V, ctx.eri, ctx.theta)
     H_core = T_scaled + V_scaled
 
     # Guess initial density matrix
     P_alph = guess_density_UHF(
-        p_guess, n_electrons, dim, S, T, V, eri, X, guess_MAX_ITER, INPORB
+        ctx.p_guess,
+        ctx.n_electrons,
+        dim,
+        ctx.S,
+        ctx.T,
+        ctx.V,
+        ctx.eri,
+        X,
+        ctx.guess_MAX_ITER,
+        ctx.INPORB,
     )
 
     # P_alph *= S # this leads to a closer guess to the PySCF one
     P_beta = np.copy(P_alph)
 
     if (
-        break_symm
+        ctx.break_symm
     ):  # note that breaking symmetry will only make sense when the guess is not zeros
-        P_beta[:n_electrons, :n_electrons] = 0
+        P_beta[: ctx.n_electrons, : ctx.n_electrons] = 0
 
     P_guess_alpha = np.copy(P_alph)
     P_guess_beta = np.copy(P_beta)
@@ -275,10 +258,10 @@ def CS_UHF(context: CS_UHF_ContextClass) -> CS_UHF_ResultsClass:
     residuals_alph = []
     residuals_beta = []
 
-    mem_iter = max_iter
+    mem_iter = ctx.max_iter
     conv_thresh = 1e-4
 
-    if verbose:
+    if ctx.verbose:
         print("-" * 128)
         print(
             "|   Iter   |               E_iter                  |                       Delta_e                   |        norm(e_i)        |"
@@ -286,10 +269,10 @@ def CS_UHF(context: CS_UHF_ContextClass) -> CS_UHF_ResultsClass:
         print("-" * 128)
 
     # SCF loop
-    for iteration in range(max_iter):
+    for iteration in range(ctx.max_iter):
         # calculate F_n and r_n from P_n
         F_alph, r_alph, F_beta, r_beta = calculate_unrestricted_F_and_r_comp(
-            P_alph, P_beta, S, H_core, eri_scaled
+            P_alph, P_beta, ctx.S, H_core, eri_scaled
         )
 
         error_alph = float(np.linalg.norm(r_alph.flatten()))
@@ -307,17 +290,17 @@ def CS_UHF(context: CS_UHF_ContextClass) -> CS_UHF_ResultsClass:
 
         E_diff = E_UHF - E_prev
 
-        if verbose:
+        if ctx.verbose:
             print(
                 f"{iteration:5}     {E_UHF:45.16f}     {E_diff:45.16f}     {error:8.4E}"
             )
 
         # Check convergence
-        if iteration > 5 and error < threshold:
+        if iteration > 5 and error < ctx.threshold:
             converged = True
-            if verbose:
+            if ctx.verbose:
                 print(
-                    f"Convergence achieved after {iteration} iterations.\n\n:: Final SCF energy = {E_UHF:5}\n\nFinal SCF energy in parseable format\n%% {E_UHF.real:.14E} {E_UHF.imag:.14E} {theta:.6f}"
+                    f"Convergence achieved after {iteration} iterations.\n\n:: Final SCF energy = {E_UHF:5}\n\nFinal SCF energy in parseable format\n%% {E_UHF.real:.14E} {E_UHF.imag:.14E} {ctx.theta:.6f}"
                 )
             P_alph, e_alph, C_alph, *_ = calculate_P_next(
                 F_next_alph, X, alpha_elec, det_alpha, mode="UHF"
@@ -334,7 +317,7 @@ def CS_UHF(context: CS_UHF_ContextClass) -> CS_UHF_ResultsClass:
         residuals_alph.append(r_alph)
         residuals_beta.append(r_beta)
 
-        if len(F_guess_alph) > conv_MEM:
+        if len(F_guess_alph) > ctx.conv_MEM:
             F_guess_alph.pop(0)
             F_guess_beta.pop(0)
             residuals_alph.pop(0)
@@ -358,7 +341,7 @@ def CS_UHF(context: CS_UHF_ContextClass) -> CS_UHF_ResultsClass:
                 F_next_alph = F_opt_alph
                 F_next_beta = F_opt_beta
 
-                if conv_type == "CROP":
+                if ctx.conv_type == "CROP":
                     F_guess_alph[-1] = F_opt_alph
                     F_guess_beta[-1] = F_opt_beta
                     residuals_alph[-1] = r_opt_alpha
@@ -369,7 +352,7 @@ def CS_UHF(context: CS_UHF_ContextClass) -> CS_UHF_ResultsClass:
                     F_next_alph = F_opt_alph  # + r_opt_alpha
                     F_next_beta = F_opt_beta  # + r_opt_beta
             except np.linalg.LinAlgError:
-                if verbose:
+                if ctx.verbose:
                     print(
                         "!!!!!!!!!!!!!!!! CONVERGENCE ACCELERATION CAUSED A SINGULAR MATRIX. REVERTING TO STANDARD SCF !!!!!!!!!!!!!!!"
                     )
@@ -383,7 +366,7 @@ def CS_UHF(context: CS_UHF_ContextClass) -> CS_UHF_ResultsClass:
             F_next_beta, X, beta_elec, det_beta, mode="UHF"
         )
 
-        if theta == 0.0:
+        if ctx.theta == 0.0:
             P_alph = P_alph.real.astype(np.complex128)
             C_alph = C_alph.real.astype(np.complex128)
 
@@ -394,26 +377,26 @@ def CS_UHF(context: CS_UHF_ContextClass) -> CS_UHF_ResultsClass:
 
         # Check Convergence Algorithm activation
         if (
-            iteration == conv_ITER_START and conv_REQUESTED
+            iteration == ctx.conv_ITER_START and conv_REQUESTED
         ):  #  and error < conv_thresh and not use_conv:
             use_conv = True
-            if verbose:
-                print("-" * 30, f"   STARTED {conv_type}  ", "-" * 30)
+            if ctx.verbose:
+                print("-" * 30, f"   STARTED {ctx.conv_type}  ", "-" * 30)
 
-    S_diagnostics = calculate_s2_expectation(P_alph, P_beta, S, verbose)
+    S_diagnostics = calculate_s2_expectation(P_alph, P_beta, ctx.S, ctx.verbose)
 
-    n_alpha = np.trace(P_alph.real @ S)
-    n_beta = np.trace(P_beta.real @ S)
+    n_alpha = np.trace(P_alph.real @ ctx.S)
+    n_beta = np.trace(P_beta.real @ ctx.S)
 
     assert (
-        abs(n_alpha + n_beta - n_electrons) < 1e-10
+        abs(n_alpha + n_beta - ctx.n_electrons) < 1e-10
     ), "Number of electrons was not conserved in the calculation"
 
     # C_alph, _ = canonicalize(C_alph, F_next_alph.reshape(X.shape))
     # C_beta, _ = canonicalize(C_beta, F_next_beta.reshape(X.shape))
 
     ResultClass = CS_UHF_ResultsClass(
-        context=context,
+        context=ctx,
         converged=converged,
         E_UHF=E_UHF,
         e_alpha=e_alph,
@@ -435,9 +418,28 @@ def CS_UHF(context: CS_UHF_ContextClass) -> CS_UHF_ResultsClass:
         S_diagnostics=S_diagnostics,
         error=error,
         iterations=iteration,
+        scaled_eris=eri_scaled,
     )
 
     return ResultClass
+
+
+def validate_context_input(ctx):
+    if not (len(ctx.T) == len(ctx.V) == len(ctx.S)):
+        raise ValueError(
+            f"Matrices T, V, S must have the same dimensions. Got N_S={len(ctx.S)}, N_T={len(ctx.T)}, N_V={len(ctx.V)}"
+        )
+
+    if ctx.conv_type not in (None, "DIIS", "CROP"):
+        raise ValueError("Convergence assist must be either None, 'DIIS', or 'CROP'")
+
+    if ctx.mult is None:
+        ctx.mult = 0 if ctx.n_electrons % 2 == 0 else 1
+
+    if ((ctx.n_electrons - ctx.mult) % 2) == 1:
+        raise ValueError(
+            f"It is not possible to have {ctx.mult} unpaired electrons with {ctx.n_electrons} electrons."
+        )
 
 
 def guess_density_UHF(
