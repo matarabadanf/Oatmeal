@@ -155,3 +155,68 @@ class CSRHFResults:
     error: float
     iterations: int
     scaled_eris: NDArray[np.complex128]
+
+
+def allocate_rhf_extended_context(ctx: CSRHFContext) -> CSRHFConstants:
+
+    dim = len(ctx.S)
+    X = np.zeros((dim, dim), dtype=np.complex128)
+    det = np.zeros(dim, dtype=np.int32)
+    eri_scaled = np.zeros((dim, dim, dim, dim), dtype=np.complex128)
+    H_core = np.zeros((dim, dim), dtype=np.complex128)
+    core_mask = np.zeros((dim, dim), dtype=np.bool)
+    _eigensolver = ctx._eigensolver
+
+    return CSRHFConstants(
+        dim=dim,
+        X=X,
+        det=det,
+        eri_scaled=eri_scaled,
+        H_core=H_core,
+        core_mask=core_mask,
+        _eigensolver=_eigensolver,
+    )
+
+
+def allocate_rhf_state(ctx: CSRHFContext) -> CSRHFState:
+    iteration = 0
+    P = np.zeros((len(ctx.S), len(ctx.S)), dtype=np.complex128)
+    E_prev = np.complex128(0.0)
+    use_conv_acc = False
+    F_guess: List[NDArray[np.complex128]] = []
+    residuals: List[NDArray[np.complex128]] = []
+    F_next = np.zeros((len(ctx.S), len(ctx.S)), dtype=np.complex128)
+    error: complex = 1e10
+    converged: bool = False
+    C_munu = np.zeros((len(ctx.S), len(ctx.S)), dtype=np.complex128)
+    e_orb = np.zeros(len(ctx.S), dtype=np.complex128)
+    C_prime = np.zeros((len(ctx.S), len(ctx.S)), dtype=np.complex128)
+    F = np.zeros((len(ctx.S), len(ctx.S)), dtype=np.complex128)
+    r = np.zeros((len(ctx.S), len(ctx.S)), dtype=np.complex128)
+    E_RHF = np.complex128(0.0)
+    E_diff = np.complex128(0.0)
+    P_old = np.zeros((len(ctx.S), len(ctx.S)), dtype=np.complex128)
+
+    return CSRHFState(
+        iteration=iteration,
+        P=P,
+        E_prev=E_prev,
+        use_conv_acc=use_conv_acc,
+        F_guess=F_guess,
+        residuals=residuals,
+        F_next=F_next,
+        error=error,
+        converged=converged,
+        C_munu=C_munu,
+        e_orb=e_orb,
+        C_prime=C_prime,
+        F=F,
+        r=r,
+        E_RHF=E_RHF,
+        E_diff=E_diff,
+        P_old=P_old,
+    )
+
+
+if __name__ == "__main__":
+    pass

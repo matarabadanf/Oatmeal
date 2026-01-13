@@ -1,6 +1,6 @@
 import numpy as np
 from py_mods.src.SCF._drafts.RHF import RHF
-from py_mods.src.SCF.scf_utils import V_NN
+from py_mods.src.SCF.scf_kernels import V_NN
 from pathlib import Path
 
 data_path = Path(__file__).parent / "data"

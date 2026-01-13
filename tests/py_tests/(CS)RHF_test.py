@@ -1,8 +1,6 @@
 import numpy as np
 import pytest
-
-# from py_mods.src.SCF.CSRHF import CS_RHF, RHF_theta_traj, CSRHFContext
-from py_mods.src.SCF.CSRHF import CS_RHF, RHF_theta_traj
+from py_mods.src.SCF.CSRHF import CS_RHF, rhf_theta_traj
 from py_mods.src.SCF.types import CSRHFContext
 from py_mods.src.SCF.CSUHF import UHF_theta_traj, CS_UHF_ContextClass
 from py_mods.src.SCF._drafts.RHF import RHF
@@ -270,7 +268,7 @@ def test_qchem_21s() -> None:
         conv_type="CROP",
     )
 
-    traj_energies = RHF_theta_traj(max_theta, n_points, H2_RHF_context)
+    traj_energies = rhf_theta_traj(max_theta, n_points, H2_RHF_context)
     assert (
         abs(np.mean(traj_energies[1] - k)) < 1e-8 + 1e-8j
     ), f"Mean error is too large in 1s2 RHF: {abs(np.mean(traj_energies[1]-k))}"
@@ -287,7 +285,7 @@ def test_qchem_21s() -> None:
     H2_RHF_context.occupation = np.array([0, 2, 0])
     H2_context.occupation = (np.array([0, 1, 0]), np.array([0, 1, 0]))
 
-    traj_energies = RHF_theta_traj(max_theta, n_points, H2_RHF_context)
+    traj_energies = rhf_theta_traj(max_theta, n_points, H2_RHF_context)
     assert (
         abs(np.mean(traj_energies[1] - k2)) < 1e-8 + 1e-8j
     ), f"Mean error is too large in 2s2 RHF: {abs(np.mean(traj_energies[1]-k))}"
@@ -326,14 +324,14 @@ def test_qchem_huge() -> None:
     )
 
     # TEST: SCF convergence for He in aug-cc-pv(5+d)z, compared with the CS algorithm at theta = 0
-    traj_cls_ener = RHF_theta_traj(max_theta, n_points, cxt_He_5Z)
+    traj_cls_ener = rhf_theta_traj(max_theta, n_points, cxt_He_5Z)
     assert (
         np.mean(traj_cls_ener[1] - k) < 1e-8 + 1e-8j
     ), f"Mean error is {np.mean(traj_cls_ener-k) }"
 
     # and for the excited state
     cxt_He_5Z.occupation = np.array([0, 2, 0])
-    traj_cls_ener = RHF_theta_traj(max_theta, n_points, cxt_He_5Z)
+    traj_cls_ener = rhf_theta_traj(max_theta, n_points, cxt_He_5Z)
     assert (
         np.mean(traj_cls_ener[1] - k2) < 1e-8 + 1e-8j
     ), f"Mean error is {np.mean(traj_cls_ener-k) }"

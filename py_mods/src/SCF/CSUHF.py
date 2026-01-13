@@ -3,17 +3,24 @@ from numpy.typing import NDArray
 from typing import Literal, Tuple, Union
 from py_mods.src.SCF.CSRHF import CS_RHF
 from py_mods.src.SCF.types import CSRHFContext
-from py_mods.src.SCF.scf_utils import (
-    transformation_matrix,
+from dataclasses import dataclass
+
+from py_mods.src.SCF.scf_kernels import (
     E_0_unrestricted_comp,
     guess_density_RHF,
-    validate_unrestricted_determinant,
     scale_integrals,
     calc_diis_extrapolation,
     calculate_P_next,
     calculate_unrestricted_F_and_r_comp,
 )
-from dataclasses import dataclass
+
+from py_mods.src.SCF.utils import (
+    validate_unrestricted_determinant,
+)
+
+from py_mods.src.SCF.linalg import (
+    transformation_matrix,
+)
 
 
 @dataclass

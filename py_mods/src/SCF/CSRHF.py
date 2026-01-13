@@ -1,17 +1,24 @@
 import numpy as np
 from numpy.typing import NDArray
-from typing import Literal, Tuple, List
+from typing import Literal, Tuple
 import matplotlib.pyplot as plt
-from py_mods.src.SCF.scf_utils import (
-    transformation_matrix,
+from py_mods.src.SCF.scf_kernels import (
     calc_g_matrix_comp,
     E_0_comp,
     guess_density_RHF,
-    validate_determinant,
     scale_integrals,
     calc_residual_commutator,
     calc_diis_extrapolation,
     calculate_P_next,
+)
+
+from py_mods.src.SCF.utils import (
+    validate_determinant,
+    validate_rhf_context_input,
+)
+
+from py_mods.src.SCF.linalg import (
+    transformation_matrix,
     sign_convention,
 )
 
@@ -20,6 +27,8 @@ from py_mods.src.SCF.types import (
     CSRHFResults,
     CSRHFState,
     CSRHFConstants,
+    allocate_rhf_extended_context,
+    allocate_rhf_state,
 )
 
 
@@ -37,18 +46,18 @@ def CS_RHF(ctx: CSRHFContext) -> CSRHFResults:
     CSRHFResults
         Calculation results.
     """
-    validate_context_input(ctx)
+    validate_rhf_context_input(ctx)
 
     # Allocate extended context and RHF state
-    ext_ctx = allocate_extended_context(ctx)
+    ext_ctx = allocate_rhf_extended_context(ctx)
     rhf_state = allocate_rhf_state(ctx)
 
     # Transform & Validate inputed matrices & determinant
-    setup_extended_context(ctx, ext_ctx)
+    initialize_rhf_extended_context(ctx, ext_ctx)
 
     # Guess density and initialize E0
-    initialize_P_and_E(ctx, rhf_state)
-    initialize_state_variables(ext_ctx, rhf_state)
+    initialize_rhf_P_and_E(ctx, rhf_state)
+    initialize_rhf_state_variable(ext_ctx, rhf_state)
 
     if ctx.verbose:
         print_table_header()
@@ -56,8 +65,8 @@ def CS_RHF(ctx: CSRHFContext) -> CSRHFResults:
     for iter_idx in range(ctx.max_iter):
         rhf_state.iteration += 1
         # Calculate next Fock matrix, associated error, and RHF energy
-        update_F_and_r_comp(ctx, ext_ctx, rhf_state)
-        update_RHF_energy(ext_ctx, rhf_state)
+        update_rhf_F_and_r_comp(ctx, ext_ctx, rhf_state)
+        update_rhf_energy(ext_ctx, rhf_state)
 
         if ctx.verbose:
             print_cycle_data(ctx._convergence_criteria, rhf_state)
@@ -68,14 +77,14 @@ def CS_RHF(ctx: CSRHFContext) -> CSRHFResults:
             break
 
         # History storage
-        update_acc_hist_size(ctx, rhf_state)
+        update_rhf_acc_hist_size(ctx, rhf_state)
         rhf_state.P_old = rhf_state.P.copy()
 
         # Update F_next with or without convergence acceleration
-        update_F_matrix(ctx, rhf_state)
+        update_rhf_F_matrix(ctx, rhf_state)
 
         # Compute next Density
-        update_density(ctx, ext_ctx, rhf_state)
+        update_rhf_density(ctx, ext_ctx, rhf_state)
 
         # Enforce real if theta=0
         if ctx.theta == 0.0:
@@ -85,7 +94,7 @@ def CS_RHF(ctx: CSRHFContext) -> CSRHFResults:
         rhf_state.use_conv_acc = conv_acc_criteria_met(ctx, ext_ctx, rhf_state)
 
     # Final update diagonalization
-    update_density(ctx, ext_ctx, rhf_state)
+    update_rhf_density(ctx, ext_ctx, rhf_state)
 
     rhf_state.F_next = rhf_state.F
 
@@ -109,138 +118,46 @@ def CS_RHF(ctx: CSRHFContext) -> CSRHFResults:
     )
 
 
-def update_RHF_energy(
-    ext_ctx: CSRHFConstants,
-    rhf_state: CSRHFState,
-) -> None:
-    rhf_state.E_RHF = E_0_comp(rhf_state.P, ext_ctx.H_core, rhf_state.F)
-    rhf_state.E_diff = rhf_state.E_RHF - rhf_state.E_prev
-    rhf_state.E_prev = rhf_state.E_RHF
+# -------------------------------------------------------------
+#  RHF Initialization Functions
+# -------------------------------------------------------------
 
 
-def allocate_extended_context(ctx: CSRHFContext) -> CSRHFConstants:
-
-    dim = len(ctx.S)
-    X = np.zeros((dim, dim), dtype=np.complex128)
-    det = np.zeros(dim, dtype=np.int32)
-    eri_scaled = np.zeros((dim, dim, dim, dim), dtype=np.complex128)
-    H_core = np.zeros((dim, dim), dtype=np.complex128)
-    core_mask = np.zeros((dim, dim), dtype=np.bool)
-    _eigensolver = ctx._eigensolver
-
-    return CSRHFConstants(
-        dim=dim,
-        X=X,
-        det=det,
-        eri_scaled=eri_scaled,
-        H_core=H_core,
-        core_mask=core_mask,
-        _eigensolver=_eigensolver,
-    )
-
-
-def allocate_rhf_state(ctx: CSRHFContext) -> CSRHFState:
-    iteration = 0
-    P = np.zeros((len(ctx.S), len(ctx.S)), dtype=np.complex128)
-    E_prev = np.complex128(0.0)
-    use_conv_acc = False
-    F_guess: List[NDArray[np.complex128]] = []
-    residuals: List[NDArray[np.complex128]] = []
-    F_next = np.zeros((len(ctx.S), len(ctx.S)), dtype=np.complex128)
-    error: complex = 1e10
-    converged: bool = False
-    C_munu = np.zeros((len(ctx.S), len(ctx.S)), dtype=np.complex128)
-    e_orb = np.zeros(len(ctx.S), dtype=np.complex128)
-    C_prime = np.zeros((len(ctx.S), len(ctx.S)), dtype=np.complex128)
-    F = np.zeros((len(ctx.S), len(ctx.S)), dtype=np.complex128)
-    r = np.zeros((len(ctx.S), len(ctx.S)), dtype=np.complex128)
-    E_RHF = np.complex128(0.0)
-    E_diff = np.complex128(0.0)
-    P_old = np.zeros((len(ctx.S), len(ctx.S)), dtype=np.complex128)
-
-    return CSRHFState(
-        iteration=iteration,
-        P=P,
-        E_prev=E_prev,
-        use_conv_acc=use_conv_acc,
-        F_guess=F_guess,
-        residuals=residuals,
-        F_next=F_next,
-        error=error,
-        converged=converged,
-        C_munu=C_munu,
-        e_orb=e_orb,
-        C_prime=C_prime,
-        F=F,
-        r=r,
-        E_RHF=E_RHF,
-        E_diff=E_diff,
-        P_old=P_old,
-    )
-
-
-def validate_context_input(ctx):
-    if not len(ctx.T) == len(ctx.V) == len(ctx.S):
-        raise ValueError(
-            f"Matrices T, V, S must have the same dimensions. Got N_S={len(ctx.S)}, N_T={len(ctx.T)}, N_V={len(ctx.V)}"
-        )
-
-    if ctx.n_electrons % 2 != 0:
-        raise ValueError("RHF can only be closed-shell systems")
-
-    if ctx.conv_type not in (None, "DIIS", "CROP"):
-        raise ValueError("Convergence assist must be either None, 'DIIS', or 'CROP'")
-
-    if ctx._eigensolver not in [
-        "eig",
-        "eigh",
-        "genh",
-    ]:
-        raise ValueError(
-            f"Eigensolver must be either 'eig', 'eigh' or 'genh'. Got {ctx._eigensolver}"
-        )
-
-
-def is_converged(
-    ctx: CSRHFContext,
-    rhf_state: CSRHFState,
-) -> bool:
+def initialize_rhf_extended_context(ctx: CSRHFContext, ext_ctx: CSRHFConstants) -> None:
     """
-    Check convergence based on residual norms.
+    Setup extended context with transformed matrices and scaled integrals.
 
     Parameters
     ----------
-    verbose : bool
-        If True, print status.
-    threshold : float
-        Convergence threshold.
-    iter_idx : int
-        Current iteration index.
-    r : NDArray[np.complex128]
-        Residual matrix.
+    ctx : CSRHFContext
+        Original context with integrals and parameters.
+    ext_ctx : CSRHFConstants
+        Initialized extended context to compute.
 
     Returns
     -------
-    converged : bool
-        True if converged, else False.
+    None
     """
-    converged: bool = False
 
-    if ctx._convergence_criteria == "max":
-        error_re: float = float(np.max(np.abs(rhf_state.r.real)))
-        error_im: float = float(np.max(np.abs(rhf_state.r.imag)))
-        if rhf_state.iteration > 1 and np.max([error_re, error_im]) < ctx.threshold:
-            converged = True
+    ext_ctx.dim = len(ctx.S)
+    ext_ctx.X = transformation_matrix(ctx.S.astype(np.complex128)).astype(np.complex128)
+    ext_ctx.det, _ = validate_determinant(ctx.n_electrons, ctx.occupation, ext_ctx.dim)
 
-    elif ctx._convergence_criteria == "norm":
-        error: float = np.linalg.norm(rhf_state.r)
-        if rhf_state.iteration > 1 and error < ctx.threshold:
-            converged = True
+    T_scaled, V_scaled, ext_ctx.eri_scaled = scale_integrals(
+        ctx.T, ctx.V, ctx.eri, ctx.theta
+    )
+    ext_ctx.H_core = T_scaled + V_scaled
+    ext_ctx.core_mask = np.abs(ext_ctx.H_core) > 1e-10
 
-    if converged and ctx.verbose:
-        print(f"Convergence achieved after {rhf_state.iteration} iterations.")
+    if ctx.theta != 0:
+        ext_ctx._eigensolver = "eig"
 
-    return converged
+        # Convergence acceleration setup
+    ext_ctx.acc_iteration_start, ext_ctx.acc_requested = initialize_conv_acc(
+        ctx.acc_hist_size, ctx.conv_type, ctx.acc_iteration_start
+    )
+
+    return
 
 
 def initialize_rhf_state(
@@ -277,7 +194,7 @@ def initialize_rhf_state(
     return
 
 
-def initialize_P_and_E(
+def initialize_rhf_P_and_E(
     ctx: CSRHFContext,
     rhf_state: CSRHFState,
 ) -> None:
@@ -296,102 +213,9 @@ def initialize_P_and_E(
     return
 
 
-def print_cycle_data(
-    _convergence_criteria: Literal["norm", "max"],
-    rhf_state: CSRHFState,
+def initialize_rhf_state_variable(
+    ext_ctx: CSRHFConstants, rhf_state: CSRHFState
 ) -> None:
-    """
-    Print SCF iteration data.
-
-    Parameters
-    ----------
-    iter_idx : int
-        Current iteration index.
-    r : NDArray[np.complex128]
-        Residual matrix.
-    E_RHF : np.complex128
-        Current RHF energy.
-    E_diff : np.complex128
-        Energy difference from previous iteration.
-
-    Returns
-    -------
-    None
-    """
-
-    if _convergence_criteria == "norm":
-        error = np.linalg.norm(rhf_state.r)
-        print(
-            f"  {rhf_state.iter_idx:5}     {rhf_state.E_RHF:24.6E}     {rhf_state.E_diff:24.6E}     {error:8.4E}"
-        )
-        return
-
-    elif _convergence_criteria == "max":
-        error_re, error_im = np.max(np.abs(rhf_state.r.real)), np.max(
-            np.abs(rhf_state.r.imag)
-        )
-        print(
-            f"{rhf_state.iter_idx:5}     {rhf_state.E_RHF:24.6E}     {rhf_state.E_diff:24.6E}     {error_re:8.4E}     {error_im:8.4E}j"
-        )
-        return
-
-
-def update_density(
-    ctx: CSRHFContext,
-    ext_ctx: CSRHFConstants,
-    rhf_state: CSRHFState,
-) -> None:
-    """
-    Update density matrix and related quantities. For specifics, see calculate_P_next.
-
-    Parameters
-    ----------
-    n_electrons : int
-        Total electron count.
-    X : NDArray[np.complex128]
-        Transformation matrix.
-    det : NDArray[np.int32]
-        Occupation determinant.
-    core_mask : NDArray[np.bool]
-        Mask to mitigate numerical noise.
-    F_next : NDArray[np.complex128]
-        Next Fock matrix.
-
-    Returns
-    -------
-    P : NDArray[np.complex128]
-        Updated density matrix.
-    e_orb : NDArray[np.complex128]
-        Updated orbital energies.
-    C_munu : NDArray[np.complex128]
-        Updated MO coefficients.
-    C_prime : NDArray[np.complex128]
-        Updated transformed eigenvectors.
-
-    Notes
-    -----
-    - This function applies a core mask to the density matrix to reduce numerical noise,
-    where it is understood that different angular momentum matrix elements must be 0.
-    """
-
-    (
-        rhf_state.P,
-        rhf_state.e_orb,
-        rhf_state.C_munu,
-        *_,
-        rhf_state.C_prime,
-    ) = calculate_P_next(rhf_state.F_next, ext_ctx.X, ctx.n_electrons, ext_ctx.det)
-
-    # P, e_orb, C_munu = calculate_P_next_2(
-    #     F_next, S, n_electrons, det,
-    # )
-
-    rhf_state.P = rhf_state.P * ext_ctx.core_mask
-    rhf_state.C_munu = sign_convention(rhf_state.C_munu)
-    return
-
-
-def initialize_state_variables(ext_ctx: CSRHFConstants, rhf_state: CSRHFState) -> None:
     rhf_state.use_conv_acc = False
     rhf_state.converged = False
     rhf_state.F_guess = []
@@ -405,44 +229,7 @@ def initialize_state_variables(ext_ctx: CSRHFConstants, rhf_state: CSRHFState) -
     return
 
 
-def setup_extended_context(ctx: CSRHFContext, ext_ctx: CSRHFConstants) -> None:
-    """
-    Setup extended context with transformed matrices and scaled integrals.
-
-    Parameters
-    ----------
-    ctx : CSRHFContext
-        Original context with integrals and parameters.
-    ext_ctx : CSRHFConstants
-        Initialized extended context to compute.
-
-    Returns
-    -------
-    None
-    """
-
-    ext_ctx.dim = len(ctx.S)
-    ext_ctx.X = transformation_matrix(ctx.S.astype(np.complex128)).astype(np.complex128)
-    ext_ctx.det, _ = validate_determinant(ctx.n_electrons, ctx.occupation, ext_ctx.dim)
-
-    T_scaled, V_scaled, ext_ctx.eri_scaled = scale_integrals(
-        ctx.T, ctx.V, ctx.eri, ctx.theta
-    )
-    ext_ctx.H_core = T_scaled + V_scaled
-    ext_ctx.core_mask = np.abs(ext_ctx.H_core) > 1e-10
-
-    if ctx.theta != 0:
-        ext_ctx._eigensolver = "eig"
-
-        # Convergence acceleration setup
-    ext_ctx.acc_iteration_start, ext_ctx.acc_requested = setup_conv_acc(
-        ctx.acc_hist_size, ctx.conv_type, ctx.acc_iteration_start
-    )
-
-    return
-
-
-def setup_conv_acc(
+def initialize_conv_acc(
     acc_hist_size: int,
     conv_type: Literal[None, "DIIS", "CROP"],
     acc_iteration_start: int,
@@ -520,6 +307,93 @@ def compute_unscaled_density(
     return P, unscaled_res.E_RHF
 
 
+# -------------------------------------------------------------
+#  RHF Helper Functions
+# -------------------------------------------------------------
+
+
+def is_converged(
+    ctx: CSRHFContext,
+    rhf_state: CSRHFState,
+) -> bool:
+    """
+    Check convergence based on residual norms.
+
+    Parameters
+    ----------
+    verbose : bool
+        If True, print status.
+    threshold : float
+        Convergence threshold.
+    iter_idx : int
+        Current iteration index.
+    r : NDArray[np.complex128]
+        Residual matrix.
+
+    Returns
+    -------
+    converged : bool
+        True if converged, else False.
+    """
+    converged: bool = False
+
+    if ctx._convergence_criteria == "max":
+        error_re: float = float(np.max(np.abs(rhf_state.r.real)))
+        error_im: float = float(np.max(np.abs(rhf_state.r.imag)))
+        if rhf_state.iteration > 1 and np.max([error_re, error_im]) < ctx.threshold:
+            converged = True
+
+    elif ctx._convergence_criteria == "norm":
+        error: float = np.linalg.norm(rhf_state.r)
+        if rhf_state.iteration > 1 and error < ctx.threshold:
+            converged = True
+
+    if converged and ctx.verbose:
+        print(f"Convergence achieved after {rhf_state.iteration} iterations.")
+
+    return converged
+
+
+def print_cycle_data(
+    _convergence_criteria: Literal["norm", "max"],
+    rhf_state: CSRHFState,
+) -> None:
+    """
+    Print SCF iteration data.
+
+    Parameters
+    ----------
+    iter_idx : int
+        Current iteration index.
+    r : NDArray[np.complex128]
+        Residual matrix.
+    E_RHF : np.complex128
+        Current RHF energy.
+    E_diff : np.complex128
+        Energy difference from previous iteration.
+
+    Returns
+    -------
+    None
+    """
+
+    if _convergence_criteria == "norm":
+        error = np.linalg.norm(rhf_state.r)
+        print(
+            f"  {rhf_state.iter_idx:5}     {rhf_state.E_RHF:24.6E}     {rhf_state.E_diff:24.6E}     {error:8.4E}"
+        )
+        return
+
+    elif _convergence_criteria == "max":
+        error_re, error_im = np.max(np.abs(rhf_state.r.real)), np.max(
+            np.abs(rhf_state.r.imag)
+        )
+        print(
+            f"{rhf_state.iter_idx:5}     {rhf_state.E_RHF:24.6E}     {rhf_state.E_diff:24.6E}     {error_re:8.4E}     {error_im:8.4E}j"
+        )
+        return
+
+
 def print_table_header():
     """
     Print SCF iteration table header.
@@ -548,7 +422,76 @@ def conv_acc_criteria_met(
     return use_conv_acc
 
 
-def update_acc_hist_size(cxt: CSRHFContext, rhf_state: CSRHFState) -> None:
+# -------------------------------------------------------------
+#  RHF Update Functions
+# -------------------------------------------------------------
+
+
+def update_rhf_energy(
+    ext_ctx: CSRHFConstants,
+    rhf_state: CSRHFState,
+) -> None:
+    rhf_state.E_RHF = E_0_comp(rhf_state.P, ext_ctx.H_core, rhf_state.F)
+    rhf_state.E_diff = rhf_state.E_RHF - rhf_state.E_prev
+    rhf_state.E_prev = rhf_state.E_RHF
+
+
+def update_rhf_density(
+    ctx: CSRHFContext,
+    ext_ctx: CSRHFConstants,
+    rhf_state: CSRHFState,
+) -> None:
+    """
+    Update density matrix and related quantities. For specifics, see calculate_P_next.
+
+    Parameters
+    ----------
+    n_electrons : int
+        Total electron count.
+    X : NDArray[np.complex128]
+        Transformation matrix.
+    det : NDArray[np.int32]
+        Occupation determinant.
+    core_mask : NDArray[np.bool]
+        Mask to mitigate numerical noise.
+    F_next : NDArray[np.complex128]
+        Next Fock matrix.
+
+    Returns
+    -------
+    P : NDArray[np.complex128]
+        Updated density matrix.
+    e_orb : NDArray[np.complex128]
+        Updated orbital energies.
+    C_munu : NDArray[np.complex128]
+        Updated MO coefficients.
+    C_prime : NDArray[np.complex128]
+        Updated transformed eigenvectors.
+
+    Notes
+    -----
+    - This function applies a core mask to the density matrix to reduce numerical noise,
+    where it is understood that different angular momentum matrix elements must be 0.
+    """
+
+    (
+        rhf_state.P,
+        rhf_state.e_orb,
+        rhf_state.C_munu,
+        *_,
+        rhf_state.C_prime,
+    ) = calculate_P_next(rhf_state.F_next, ext_ctx.X, ctx.n_electrons, ext_ctx.det)
+
+    # P, e_orb, C_munu = calculate_P_next_2(
+    #     F_next, S, n_electrons, det,
+    # )
+
+    rhf_state.P = rhf_state.P * ext_ctx.core_mask
+    rhf_state.C_munu = sign_convention(rhf_state.C_munu)
+    return
+
+
+def update_rhf_acc_hist_size(cxt: CSRHFContext, rhf_state: CSRHFState) -> None:
     rhf_state.F_guess.append(rhf_state.F)
     rhf_state.residuals.append(rhf_state.r)
 
@@ -559,7 +502,7 @@ def update_acc_hist_size(cxt: CSRHFContext, rhf_state: CSRHFState) -> None:
     return
 
 
-def update_F_matrix(
+def update_rhf_F_matrix(
     ctx: CSRHFContext,
     rhf_state: CSRHFState,
 ) -> None:
@@ -588,7 +531,7 @@ def update_F_matrix(
     return
 
 
-def update_F_and_r_comp(
+def update_rhf_F_and_r_comp(
     ctx: CSRHFContext,
     ext_ctx: CSRHFConstants,
     rhf_state: CSRHFState,
@@ -617,7 +560,12 @@ def update_F_and_r_comp(
     return
 
 
-def RHF_theta_traj(max_theta, n_points, cxt: CSRHFContext):
+# -------------------------------------------------------------
+#  RHF Trajectory & Plotting Functions
+# -------------------------------------------------------------
+
+
+def rhf_theta_traj(max_theta, n_points, cxt: CSRHFContext):
     """
     Sample energies along theta trajectory.
 
