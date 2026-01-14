@@ -2,6 +2,8 @@ import numpy as np
 from numpy.typing import NDArray
 from typing import Union, Tuple, Literal
 
+from py_mods.src.SCF.types import CSUHFContext
+
 
 def validate_determinant(
     n_electrons: int,
@@ -187,6 +189,21 @@ def validate_rhf_context_input(ctx):
     ]:
         raise ValueError(
             f"Eigensolver must be either 'eig', 'eigh' or 'genh'. Got {ctx._eigensolver}"
+        )
+
+
+def validate_uhf_context_input(ctx: CSUHFContext) -> None:
+    if not (len(ctx.T) == len(ctx.V) == len(ctx.S)):
+        raise ValueError(
+            f"Matrices T, V, S must have the same dimensions. Got N_S={len(ctx.S)}, N_T={len(ctx.T)}, N_V={len(ctx.V)}"
+        )
+
+    if ctx.conv_type not in (None, "DIIS", "CROP"):
+        raise ValueError("Convergence assist must be either None, 'DIIS', or 'CROP'")
+
+    if ((ctx.n_electrons - ctx.mult) % 2) == 1:
+        raise ValueError(
+            f"It is not possible to have {ctx.mult} unpaired electrons with {ctx.n_electrons} electrons."
         )
 
 

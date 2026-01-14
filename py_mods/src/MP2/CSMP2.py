@@ -3,12 +3,12 @@ from numpy.typing import NDArray
 from typing import Literal, Union
 from dataclasses import dataclass
 from py_mods.src.SCF.types import CSRHFResults
-from py_mods.src.SCF.CSUHF import CS_UHF_ResultsClass
+from py_mods.src.SCF.CSUHF import CSUHFResults
 
 
 @dataclass
 class CS_MP2_Results(object):
-    CS_MP2Context: Union[CSRHFResults, CS_UHF_ResultsClass]
+    CS_MP2Context: Union[CSRHFResults, CSUHFResults]
     E_MP2: np.complex128
     E_corr: np.complex128
     MP_type: Literal["RMP2", "UMP2"]
@@ -17,7 +17,7 @@ class CS_MP2_Results(object):
 
 
 def CS_MP2(
-    CS_MP2Context: Union[CSRHFResults, CS_UHF_ResultsClass],
+    CS_MP2Context: Union[CSRHFResults, CSUHFResults],
 ) -> CS_MP2_Results:
     """Compute the MP2 energy correction using complex scaled UHF or RHF reference.
 
@@ -33,7 +33,7 @@ def CS_MP2(
     """
     if isinstance(CS_MP2Context, CSRHFResults):
         mp2_result = CS_MP2_RHF(CS_MP2Context)
-    elif isinstance(CS_MP2Context, CS_UHF_ResultsClass):
+    elif isinstance(CS_MP2Context, CSUHFResults):
         mp2_result = CS_MP2_UHF(CS_MP2Context)
     else:
         raise TypeError(
@@ -121,7 +121,7 @@ def CS_MP2_RHF(CS_RHF_Context: CSRHFResults) -> CS_MP2_Results:
     return returnClass
 
 
-def CS_MP2_UHF(CS_UHF_Context: CS_UHF_ResultsClass) -> CS_MP2_Results:
+def CS_MP2_UHF(CS_UHF_Context: CSUHFResults) -> CS_MP2_Results:
     """
     Compute the MP2 energy correction using complex scaled UHF reference.
 

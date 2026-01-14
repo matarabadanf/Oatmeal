@@ -30,6 +30,7 @@ from py_mods.src.SCF.types import (
     CSRHFConstants,
     allocate_rhf_extended_context,
     allocate_rhf_state,
+    pack_rhf_results,
 )
 
 
@@ -99,24 +100,9 @@ def CS_RHF(ctx: CSRHFContext) -> CSRHFResults:
 
     rhf_state.F_next = rhf_state.F
 
-    return CSRHFResults(
-        context=ctx,
-        converged=rhf_state.converged,
-        E_RHF=rhf_state.E_RHF,
-        e_orb=rhf_state.e_orb,
-        n_elec=np.int32(ctx.n_electrons),
-        det=rhf_ext_ctx.det,
-        H_core=rhf_ext_ctx.H_core,
-        X=rhf_ext_ctx.X,
-        F_final=rhf_state.F_next,
-        C_prime=rhf_state.C_prime,
-        P_guess=rhf_state.P_old if iter_idx > 0 else rhf_state.P,
-        P=rhf_state.P,
-        C_munu=rhf_state.C_munu,
-        error=rhf_state.r,
-        iterations=iter_idx,
-        scaled_eris=rhf_ext_ctx.eri_scaled,
-    )
+    rhf_results = pack_rhf_results(ctx, rhf_ext_ctx, rhf_state)
+
+    return rhf_results
 
 
 # -------------------------------------------------------------
@@ -429,14 +415,8 @@ def update_rhf_density(
     where it is understood that different angular momentum matrix elements must be 0.
     """
 
-    (
-        rhf_state.P,
-        rhf_state.e_orb,
-        rhf_state.C_munu,
-        *_,
-        rhf_state.C_prime,
-    ) = calculate_P_next(
-        rhf_state.F_next, rhf_ext_ctx.X, ctx.n_electrons, rhf_ext_ctx.det
+    rhf_state.P, rhf_state.e_orb, rhf_state.C_munu, rhf_state.C_prime = (
+        calculate_P_next(rhf_state.F_next, rhf_ext_ctx.X, rhf_ext_ctx.det)
     )
 
     # P, e_orb, C_munu = calculate_P_next_2(

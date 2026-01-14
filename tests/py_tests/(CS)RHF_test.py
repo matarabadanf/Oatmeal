@@ -1,8 +1,8 @@
 import numpy as np
 import pytest
 from py_mods.src.SCF.CSRHF import CS_RHF, rhf_theta_traj
-from py_mods.src.SCF.types import CSRHFContext
-from py_mods.src.SCF.CSUHF import UHF_theta_traj, CS_UHF_ContextClass
+from py_mods.src.SCF.types import CSRHFContext, CSUHFContext
+from py_mods.src.SCF.CSUHF import UHF_theta_traj
 from py_mods.src.SCF._drafts.RHF import RHF
 from pathlib import Path
 
@@ -255,7 +255,7 @@ def test_qchem_21s() -> None:
         threshold=2e-10,
         conv_type="CROP",
     )
-    H2_context = CS_UHF_ContextClass(
+    H2_context = CSUHFContext(
         S_even_H2,
         T_even_H2,
         V_even_H2,

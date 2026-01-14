@@ -194,10 +194,7 @@ def guess_density_RHF(
 def calc_p_matrix_comp(
     l_matrix: NDArray[np.complex128],
     r_matrix: NDArray[np.complex128],
-    n_electrons: int,
-    determinant: Optional[NDArray[np.int32]] = None,
-    natural_occupation: bool = True,
-    mode: Literal["RHF", "UHF"] = "RHF",
+    determinant,
 ) -> NDArray[np.complex128]:
     """
     Calculate complex density matrix.
@@ -210,32 +207,15 @@ def calc_p_matrix_comp(
         Left MO coefficients.
     r_matrix : NDArray[np.complex128]
         Right MO coefficients.
-    n_electrons : int
-        Electron count.
     determinant : Optional[NDArray]
         Occupation determinant.
-    natural_occupation : bool
-        If True, use natural occupation.
 
     Returns
     -------
     NDArray[np.complex128]
         Density matrix.
     """
-    assert (
-        n_electrons == sum(determinant) if determinant is not None else True
-    ), "n_electrons must match determinant sum"
-
-    if determinant is None:
-        raise ValueError("Must provide determinant if natural_occupation is False")
-    det_arr = determinant
-
-    if mode == "UHF":
-        mask = (det_arr == 1).astype(np.complex128)
-        P = np.einsum("ma, a, an -> mn", r_matrix, mask, l_matrix)
-    else:
-        mask = (det_arr == 2).astype(np.complex128)
-        P = 2.0 * np.einsum("ma, a, an->mn", r_matrix, mask, l_matrix)
+    P = np.einsum("ma, a, an->mn", r_matrix, determinant, l_matrix)
 
     return P
 
@@ -403,13 +383,8 @@ def calc_diis_extrapolation(
 def calculate_P_next(
     F: NDArray[np.complex128],
     X: NDArray[np.complex128],
-    n_electrons: int,
     det: NDArray[np.int32],
-    mode: Literal["RHF", "UHF"] = "RHF",
 ) -> Tuple[
-    NDArray[np.complex128],
-    NDArray[np.complex128],
-    NDArray[np.complex128],
     NDArray[np.complex128],
     NDArray[np.complex128],
     NDArray[np.complex128],
@@ -468,10 +443,9 @@ def calculate_P_next(
     R_munu = X @ R_prime
 
     # Build new density matrix
-    P_LR = calc_p_matrix_comp(L_munu, R_munu, n_electrons, det, mode=mode)
-    P_RR = np.copy(P_LR)
+    P_munu = calc_p_matrix_comp(L_munu, R_munu, det)
 
-    return P_LR, e_values, C_munu, R_munu, L_munu, P_RR, C_prime
+    return P_munu, e_values, C_munu, C_prime
 
 
 def calculate_P_next_2(
@@ -515,7 +489,7 @@ def calculate_P_next_2(
     e_values, C_munu = scipy.linalg.eigh(F, S)
 
     # Build new density matrix
-    P_LR = calc_p_matrix_comp(C_munu.T, C_munu, n_electrons, det, mode=mode)
+    P_LR = calc_p_matrix_comp(C_munu.T, C_munu, det)
 
     return P_LR, e_values, C_munu
 

@@ -1,5 +1,6 @@
 import numpy as np
-from py_mods.src.SCF.CSUHF import CS_UHF, CSUHFContext
+from py_mods.src.SCF.CSUHF import CS_UHF
+from py_mods.src.SCF.types import CSUHFContext
 from pathlib import Path
 
 data_path = Path(__file__).parent / "data"
