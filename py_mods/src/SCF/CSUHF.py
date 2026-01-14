@@ -230,7 +230,7 @@ def compute_uhf_unscaled_density(
     ctx: CSUHFContext,
     ext_uhf_ctx: CSUHFConstants,
     uhf_state: CSUHFState,
-) -> Tuple[NDArray[np.complex128], float]:
+) -> None:
     if ctx.verbose:
         print("Converging unscaled UHF case:")
 
@@ -259,8 +259,11 @@ def compute_uhf_unscaled_density(
         print("Unscaled energy: ", unscaled_res.E_UHF)
         print("\n\n\nConverging scaled case from unscaled density as reference:")
 
-    P = unscaled_res.P_alpha
-    return P, unscaled_res.E_UHF
+    uhf_state.P_alpha = unscaled_res.P_alpha
+    uhf_state.P_beta = unscaled_res.P_beta
+    uhf_state.E_prev = unscaled_res.E_UHF
+
+    return
 
 
 def guess_density_UHF(
@@ -294,8 +297,8 @@ def guess_density_UHF(
         p_final = guess_density_RHF(ctx.p_guess, ext_uhf_ctx.dim, ctx.initial_orbitals)
         uhf_state.E_prev = np.complex128(0.0)
 
-    uhf_state.P_alpha = p_final / 2
-    uhf_state.P_beta = p_final / 2
+    uhf_state.P_alpha = np.copy(p_final) / 2
+    uhf_state.P_beta = np.copy(p_final) / 2
 
     return
 

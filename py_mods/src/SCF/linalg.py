@@ -108,24 +108,27 @@ def _diagonalize_gram(
     solver: Literal["eig", "eigh"],
 ) -> Tuple:
 
-    if (
-        np.allclose(F_prime.T, F_prime) and np.linalg.norm(F_prime.imag) < 1e-14
-    ) or solver == "eigh":
+    use_eigh = (
+        np.allclose(F_prime.T, F_prime)
+        and np.linalg.norm(F_prime.imag) < 1e-14
+        or solver == "eigh"
+    )
+
+    if use_eigh:
         e_values, C_prime = np.linalg.eigh(F_prime)
 
     else:
         e_values, C_prime = np.linalg.eig(F_prime)
 
-    e_values, C_prime = np.linalg.eig(F_prime)
-
-    # Sort by real part of eigenvalues (standard for SCF stability)
+    # Sort
     idx = e_values.argsort()
     e_values = e_values[idx]
     C_prime = C_prime[:, idx]
 
-    # degeneracies = count_degen(e_values)
-    # C_norm = orthonormalize_solutions(e_values, C_prime, degeneracies)
-    C_norm = orthonormalize_solutions2(e_values, C_prime)
+    if not use_eigh:
+        C_norm = orthonormalize_solutions2(e_values, C_prime)
+    else:
+        C_norm = C_prime
 
     C_norm_p = C_norm
 

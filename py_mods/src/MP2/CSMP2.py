@@ -284,7 +284,7 @@ def CS_MP2_UHF(CS_UHF_Context: CSUHFResults) -> CS_MP2_Results:
 
     E_corr = aa_mp2 + bb_mp2 + ab_mp2
 
-    E_MP2 = CS_UHF_Context.E_UHF - E_corr
+    E_MP2 = CS_UHF_Context.E_UHF + E_corr
 
     returnClass = CS_MP2_Results(CS_UHF_Context, E_MP2, E_corr, mp_type, None, None)
 
