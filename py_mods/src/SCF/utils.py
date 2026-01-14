@@ -1,6 +1,6 @@
 import numpy as np
 from numpy.typing import NDArray
-from typing import Union, Tuple
+from typing import Union, Tuple, Literal
 
 
 def validate_determinant(
@@ -188,6 +188,33 @@ def validate_rhf_context_input(ctx):
         raise ValueError(
             f"Eigensolver must be either 'eig', 'eigh' or 'genh'. Got {ctx._eigensolver}"
         )
+
+
+def initialize_conv_acc(
+    acc_hist_size: int,
+    conv_type: Literal[None, "DIIS", "CROP"],
+    acc_iteration_start: int,
+) -> Tuple[int, bool]:
+    """
+    Setup convergence acceleration parameters.
+
+    Parameters
+    ----------
+    """
+    if conv_type not in [None, "DIIS", "CROP"]:
+        print(
+            "Convergence assist must be either None, 'DIIS', or 'CROP'. Reverted to no convergence acceleration"
+        )
+        return int(1e10), False
+
+    acc_requested = conv_type is not None
+    acc_iteration_start = (
+        min(acc_iteration_start + 1, acc_hist_size)
+        if acc_hist_size >= acc_iteration_start
+        else max(acc_iteration_start + 1, acc_hist_size)
+    )
+
+    return (acc_iteration_start, acc_requested)
 
 
 if __name__ == "__main__":

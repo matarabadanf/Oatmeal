@@ -1,5 +1,5 @@
 import numpy as np
-from py_mods.src.SCF.CSUHF import CS_UHF, CS_UHF_ContextClass
+from py_mods.src.SCF.CSUHF import CS_UHF, CSUHFContext
 from pathlib import Path
 
 data_path = Path(__file__).parent / "data"
@@ -14,7 +14,7 @@ def test_B_huge() -> None:
 
     # test: SCF convergence for B in aug-cc-pvqz
 
-    context = CS_UHF_ContextClass(
+    context = CSUHFContext(
         S=S_aug_cc_pvqz_B,
         T=T_aug_cc_pvqz_B,
         V=V_aug_cc_pvqz_B,
@@ -43,7 +43,7 @@ def test_N() -> None:
 
     # test: SCF convergence for B in cc-pvqz
 
-    context = CS_UHF_ContextClass(
+    context = CSUHFContext(
         S=S_aug_cc_pvqz_N,
         T=T_aug_cc_pvqz_N,
         V=V_aug_cc_pvqz_N,
@@ -72,7 +72,7 @@ def test_Cl() -> None:
 
     # test: SCF convergence for B in cc-pvqz
 
-    context = CS_UHF_ContextClass(
+    context = CSUHFContext(
         S=S_aug_cc_pvqz_Cl,
         T=T_aug_cc_pvqz_Cl,
         V=V_aug_cc_pvqz_Cl,
@@ -142,7 +142,7 @@ def test_H2_dissociation():
         overlap = mol.intor("int1e_ovlp")
         eri = mol.intor("int2e")
 
-        context = CS_UHF_ContextClass(
+        context = CSUHFContext(
             overlap,
             kin,
             vnuc,

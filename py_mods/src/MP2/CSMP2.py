@@ -2,13 +2,13 @@ import numpy as np
 from numpy.typing import NDArray
 from typing import Literal, Union
 from dataclasses import dataclass
-from py_mods.src.SCF.types import CSRHFResults as CS_RHF_ResultsClass
+from py_mods.src.SCF.types import CSRHFResults
 from py_mods.src.SCF.CSUHF import CS_UHF_ResultsClass
 
 
 @dataclass
 class CS_MP2_Results(object):
-    CS_MP2Context: Union[CS_RHF_ResultsClass, CS_UHF_ResultsClass]
+    CS_MP2Context: Union[CSRHFResults, CS_UHF_ResultsClass]
     E_MP2: np.complex128
     E_corr: np.complex128
     MP_type: Literal["RMP2", "UMP2"]
@@ -17,13 +17,13 @@ class CS_MP2_Results(object):
 
 
 def CS_MP2(
-    CS_MP2Context: Union[CS_RHF_ResultsClass, CS_UHF_ResultsClass],
+    CS_MP2Context: Union[CSRHFResults, CS_UHF_ResultsClass],
 ) -> CS_MP2_Results:
     """Compute the MP2 energy correction using complex scaled UHF or RHF reference.
 
     Parameters
     ----------
-    CS_RHF_Context: Union[CS_RHF_ResultsClass, CS_UHF_ResultsClass]
+    CS_RHF_Context: Union[CSRHFResults, CS_UHF_ResultsClass]
         Dataclass containing converged CS-RHF results.
 
     Returns
@@ -31,24 +31,24 @@ def CS_MP2(
     returnClass: CS_MP2_Results
         Dataclass containing the MP2 energy correction.
     """
-    if isinstance(CS_MP2Context, CS_RHF_ResultsClass):
+    if isinstance(CS_MP2Context, CSRHFResults):
         mp2_result = CS_MP2_RHF(CS_MP2Context)
     elif isinstance(CS_MP2Context, CS_UHF_ResultsClass):
         mp2_result = CS_MP2_UHF(CS_MP2Context)
     else:
         raise TypeError(
-            f"CS_MP2Context must be either CS_RHF_ResultsClass or CS_UHF_ResultsClass. Type is {type(CS_MP2Context)}"
+            f"CS_MP2Context must be either CSRHFResults or CS_UHF_ResultsClass. Type is {type(CS_MP2Context)}"
         )
 
     return mp2_result
 
 
-def CS_MP2_RHF(CS_RHF_Context: CS_RHF_ResultsClass) -> CS_MP2_Results:
+def CS_MP2_RHF(CS_RHF_Context: CSRHFResults) -> CS_MP2_Results:
     """Compute the MP2 energy correction using complex scaled RHF reference.
 
     Parameters
     ----------
-    CS_RHF_Context: CS_RHF_ResultsClass
+    CS_RHF_Context: CSRHFResults
         Dataclass containing converged CS-RHF results.
 
     Returns
