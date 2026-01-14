@@ -219,10 +219,6 @@ def initialize_uhf_P_and_E(
     else:
         guess_density_UHF(ctx, ext_uhf_ctx, uhf_state)
 
-    if ctx.break_symm:
-        # note that breaking symmetry will only make sense when the guess is not zeros
-        uhf_state.P_beta[: ctx.n_electrons, : ctx.n_electrons] = 0
-
     return
 
 
@@ -297,8 +293,14 @@ def guess_density_UHF(
         p_final = guess_density_RHF(ctx.p_guess, ext_uhf_ctx.dim, ctx.initial_orbitals)
         uhf_state.E_prev = np.complex128(0.0)
 
-    uhf_state.P_alpha = np.copy(p_final) / 2
-    uhf_state.P_beta = np.copy(p_final) / 2
+    uhf_state.P_alpha = np.copy(p_final)
+    uhf_state.P_beta = np.copy(p_final)
+
+    if ctx.break_symm:
+        # note that breaking symmetry will only make sense when the guess is not zeros
+        dim = uhf_state.P_beta.shape[0]
+        half = dim // 2
+        uhf_state.P_beta[:half, :half] = 0.0
 
     return
 

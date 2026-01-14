@@ -138,27 +138,6 @@ def _diagonalize_gram(
     return R_prime, L_prime, e_values, C_prime
 
 
-# def count_degen(e_orb: NDArray[np.complex128]) -> Dict[complex, int]:
-#     """
-#     Count eigenvalue degeneracies.
-
-#     Parameters
-#     ----------
-#     e_orb : NDArray[np.complex128]
-#         Orbital energies.
-
-#     Returns
-#     -------
-#     Dict[complex, int]
-#         Degeneracy map.
-#     """
-#     counts: Dict[complex, int] = {}
-#     for item in e_orb:
-#         val = np.round(item, 5)
-#         counts[val] = counts.get(val, 0) + 1
-#     return counts
-
-
 def count_degen2(e_orb: NDArray[np.complex128]) -> Dict[complex, int]:
     """
     Count eigenvalue degeneracies.
@@ -175,7 +154,7 @@ def count_degen2(e_orb: NDArray[np.complex128]) -> Dict[complex, int]:
     """
     counts: Dict[complex, int] = {}
     for item in e_orb:
-        val = np.round(item, 5)
+        val = np.round(item, 10)
         counts[val] = counts.get(val, 0) + 1
 
     keys = np.array(list(counts.keys()))
