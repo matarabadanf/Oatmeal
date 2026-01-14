@@ -71,7 +71,7 @@ class CSRHFContext:
 
     # Internal
     _eigensolver: Literal["eig", "eigh"] = "eigh"
-    _convergence_criteria: Literal["norm", "max"] = "max"
+    _convergence_criteria: Literal["norm", "max"] = "norm"
 
 
 @dataclass
@@ -325,7 +325,7 @@ class CSUHFContext:
 
     # Internal
     _eigensolver: Literal["eig", "eigh"] = "eigh"
-    _convergence_criteria: Literal["norm", "max"] = "max"
+    _convergence_criteria: Literal["norm", "max"] = "norm"
 
 
 @dataclass

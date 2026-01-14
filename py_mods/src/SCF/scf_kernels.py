@@ -430,9 +430,8 @@ def calculate_P_next(
     diag_LFR = np.diag(np.diagonal(LFR))
 
     # try:
-    assert np.allclose(
-        LFR, diag_LFR, atol=1e-6
-    ), "Matrix product L' @ F' @ R' is not diagonal"
+    if not np.allclose(LFR, diag_LFR, atol=1e-6):
+        raise RuntimeError("Matrix product L' @ F' @ R' is not diagonal")
 
     # except AssertionError:
     #     plot_map(LFR-diag_LFR)

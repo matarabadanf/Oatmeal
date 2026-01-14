@@ -318,7 +318,7 @@ def print_cycle_data(
     if _convergence_criteria == "norm":
         error = np.linalg.norm(rhf_state.r)
         print(
-            f"  {rhf_state.iter_idx:5}     {rhf_state.E_RHF:24.6E}     {rhf_state.E_diff:24.6E}     {error:8.4E}"
+            f"  {rhf_state.iteration:5}     {rhf_state.E_RHF:24.6E}     {rhf_state.E_diff:24.6E}     {error:8.4E}"
         )
         return
 
@@ -327,7 +327,7 @@ def print_cycle_data(
             np.abs(rhf_state.r.imag)
         )
         print(
-            f"{rhf_state.iter_idx:5}     {rhf_state.E_RHF:24.6E}     {rhf_state.E_diff:24.6E}     {error_re:8.4E}     {error_im:8.4E}j"
+            f"{rhf_state.iteration:5}     {rhf_state.E_RHF:24.6E}     {rhf_state.E_diff:24.6E}     {error_re:8.4E}     {error_im:8.4E}j"
         )
         return
 

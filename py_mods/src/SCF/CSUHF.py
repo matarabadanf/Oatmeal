@@ -294,8 +294,8 @@ def guess_density_UHF(
         p_final = guess_density_RHF(ctx.p_guess, ext_uhf_ctx.dim, ctx.initial_orbitals)
         uhf_state.E_prev = np.complex128(0.0)
 
-    uhf_state.P_alpha = p_final
-    uhf_state.P_beta = p_final
+    uhf_state.P_alpha = p_final / 2
+    uhf_state.P_beta = p_final / 2
 
     return
 
