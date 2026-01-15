@@ -148,6 +148,8 @@ def initialize_rhf_extended_context(
     # eigensolver enforced
     if ctx.theta != 0:
         rhf_ext_ctx._eigensolver = "eig"
+    else:
+        rhf_ext_ctx._eigensolver = ctx._eigensolver
 
     # Convergence acceleration setup
     rhf_ext_ctx.acc_iteration_start, rhf_ext_ctx.acc_requested = initialize_conv_acc(
@@ -416,7 +418,9 @@ def update_rhf_density(
     """
 
     rhf_state.P, rhf_state.e_orb, rhf_state.C_munu, rhf_state.C_prime = (
-        calculate_P_next(rhf_state.F_next, rhf_ext_ctx.X, rhf_ext_ctx.det)
+        calculate_P_next(
+            rhf_state.F_next, rhf_ext_ctx.X, rhf_ext_ctx.det, rhf_ext_ctx._eigensolver
+        )
     )
 
     # P, e_orb, C_munu = calculate_P_next_2(

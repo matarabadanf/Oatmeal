@@ -2,6 +2,9 @@ import numpy as np
 from numpy.typing import NDArray
 from typing import Literal, Union, Tuple, Dict
 from scipy.linalg import block_diag
+import warnings
+
+warnings.simplefilter("once", RuntimeWarning)
 
 
 def transformation_matrix(
@@ -55,6 +58,7 @@ def transformation_matrix(
 
 def diagonalize_biorthogonal(
     F_prime: NDArray[np.complex128],
+    solver: Literal["eig", "eigh"],
 ) -> Tuple[
     NDArray[np.complex128],
     NDArray[np.complex128],
@@ -84,7 +88,7 @@ def diagonalize_biorthogonal(
         Diagonal matrix (L @ F @ R).
     """
 
-    R_prime, _, e_values, C_prime = _diagonalize_gram(F_prime, None)
+    R_prime, _, e_values, C_prime = _diagonalize_gram(F_prime, solver)
 
     # e_values, R_prime = np.linalg.eigh(F_prime)
 
@@ -108,14 +112,23 @@ def _diagonalize_gram(
     solver: Literal["eig", "eigh"],
 ) -> Tuple:
 
-    use_eigh = (
-        np.allclose(F_prime.T, F_prime)
-        and np.linalg.norm(F_prime.imag) < 1e-14
-        or solver == "eigh"
+    suitable_for_eigh = (
+        np.allclose(F_prime.T, F_prime) and np.linalg.norm(F_prime.imag) < 1e-14
     )
 
-    if use_eigh:
-        e_values, C_prime = np.linalg.eigh(F_prime)
+    if suitable_for_eigh:
+        if solver == "eig":
+            warnings.warn(
+                "WARNING: THIS MATRIX IS SUITED TO BE DIAGONALIZED USING EIGH. HOWEVER THE USE OF EIG WAS REQUESTED. THIS CAN AFFECT NUMERICAL STABILITY AND RESULTS",
+                RuntimeWarning,
+            )
+            e_values, C_prime = np.linalg.eig(F_prime)
+
+        elif solver == "eigh":
+            e_values, C_prime = np.linalg.eigh(F_prime)
+
+        else:
+            raise ValueError(f"Solver must be 'eig' or 'eigh' (inputed {solver})")
 
     else:
         e_values, C_prime = np.linalg.eig(F_prime)
@@ -125,7 +138,7 @@ def _diagonalize_gram(
     e_values = e_values[idx]
     C_prime = C_prime[:, idx]
 
-    if not use_eigh:
+    if not suitable_for_eigh or solver != "eigh":
         C_norm = orthonormalize_solutions2(e_values, C_prime)
     else:
         C_norm = C_prime
@@ -154,7 +167,7 @@ def count_degen2(e_orb: NDArray[np.complex128]) -> Dict[complex, int]:
     """
     counts: Dict[complex, int] = {}
     for item in e_orb:
-        val = np.round(item, 10)
+        val = np.round(item, 5)
         counts[val] = counts.get(val, 0) + 1
 
     keys = np.array(list(counts.keys()))

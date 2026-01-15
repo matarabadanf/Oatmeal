@@ -3,6 +3,7 @@ from numpy.typing import NDArray
 from typing import Tuple
 from py_mods.src.SCF.CSRHF import CS_RHF
 from py_mods.src.SCF.types import CSRHFContext
+import copy
 
 from py_mods.src.SCF.scf_kernels import (
     E_0_unrestricted_comp,
@@ -37,6 +38,52 @@ from py_mods.src.SCF.types import (
 
 
 def CS_UHF(ctx: CSUHFContext) -> CSUHFResults:
+    """
+    Perform a Complex Scaled RHF calculation.
+
+    Takes overlap, kinetic, nuclear attraction and two-electron integrals,
+    applies complex scaling by angle `theta` and runs an UHF loop
+    using biorthogonal diagonalization.
+
+    Parameters
+    ----------
+    context : CS_UHF_Context
+        Context object containing all parameters for the calculation.
+
+    Returns
+    -------
+    CS_UHF_Results
+        Results object. For complete description of parameters see definition.
+
+    Notes
+    ------
+    - The system bust be a closed shell: n_electrons must be even. This is asserted.
+    - Integrals must be passed and have the same dimensions. This is asserted.
+
+
+    - Implementation was done based on "Modern Quantum Chemistry" by Szabo and Ostlund.
+    - DIIS implementation was based on [Pulay](https://doi.org/10.1002/jcc.540030413).
+    - CROP implementation was based on [Ettenhuber, Jorgensen](https://doi.org/10.1021/ct501114q).
+
+    ^* CROP algorithm does not compute the new trial as t_opt + w_opt, as it breaks convergence here.
+    """
+    if ctx.theta == 0:
+        return _csuhf_kernel(ctx)
+
+    else:
+        scaled_context = copy.deepcopy(ctx)
+
+        # perform unscaled calculation first
+        ctx.theta = 0
+        unscaled_rhf = _csuhf_kernel(ctx)
+
+        # use results for scaled calculation
+        scaled_context.p_guess = "INPORB"
+        scaled_context.initial_orbitals = [unscaled_rhf.P_alpha, unscaled_rhf.P_beta]
+        return _csuhf_kernel(scaled_context)
+
+
+def _csuhf_kernel(ctx: CSUHFContext) -> CSUHFResults:
     """
     Perform a Complex Scaled RHF calculation.
 
@@ -104,8 +151,8 @@ def CS_UHF(ctx: CSUHFContext) -> CSUHFResults:
 
         # Save in memory guesses and residuals keeping size of Convergence Algorithm space
         update_uhf_acc_hist_size(ctx, uhf_state)
-        uhf_state.P_old_alpha = uhf_state.P_alpha.copy()
-        uhf_state.P_old_beta = uhf_state.P_beta.copy()
+        uhf_state.P_old_alpha = uhf_state.P_alpha
+        uhf_state.P_old_beta = uhf_state.P_beta
 
         # Choose F for P_{n+1}
         update_uhf_F_matrix(ctx, uhf_state)
@@ -186,6 +233,8 @@ def initialize_uhf_extended_context(
     # eigensolver enforced
     if ctx.theta != 0:
         uhf_ext_ctx._eigensolver = "eig"
+    else:
+        uhf_ext_ctx._eigensolver = ctx._eigensolver
 
     # Convergence acceleration setup
     uhf_ext_ctx.acc_iteration_start, uhf_ext_ctx.acc_requested = initialize_conv_acc(
@@ -212,12 +261,7 @@ def initialize_uhf_P_and_E(
     -------
     None
     """
-
-    if ctx.theta != 0.0:
-        compute_uhf_unscaled_density(ctx, ext_uhf_ctx, uhf_state)
-
-    else:
-        guess_density_UHF(ctx, ext_uhf_ctx, uhf_state)
+    guess_density_UHF(ctx, ext_uhf_ctx, uhf_state)
 
     return
 
@@ -289,18 +333,43 @@ def guess_density_UHF(
             p_final = guess_scf.P
             uhf_state.E_prev = guess_scf.E_RHF
 
-    else:
-        p_final = guess_density_RHF(ctx.p_guess, ext_uhf_ctx.dim, ctx.initial_orbitals)
-        uhf_state.E_prev = np.complex128(0.0)
+            uhf_state.P_alpha = np.copy(p_final)
+            uhf_state.P_beta = np.copy(p_final)
 
-    uhf_state.P_alpha = np.copy(p_final)
-    uhf_state.P_beta = np.copy(p_final)
+    elif ctx.p_guess == "INPORB":
+        assert (
+            ctx.initial_orbitals is not None
+        ), "Initial orbitals must be provided when p_guess is 'INPORB'"
+        assert (
+            len(ctx.initial_orbitals) == 2
+        ), "Initial orbitals must be a list of two density matrices [P_alpha, P_beta]"
+        assert (
+            ctx.initial_orbitals[0].shape
+            == ctx.initial_orbitals[1].shape
+            == (
+                ext_uhf_ctx.dim,
+                ext_uhf_ctx.dim,
+            )
+        ), "Initial alpha density matrix has incorrect dimensions."
+        uhf_state.p_alpha = ctx.initial_orbitals[0]
+        uhf_state.p_beta = ctx.initial_orbitals[1]
+
+    else:
+        uhf_state.P_alpha = uhf_state.P_beta = guess_density_RHF(
+            ctx.p_guess, ext_uhf_ctx.dim, None
+        )
 
     if ctx.break_symm:
         # note that breaking symmetry will only make sense when the guess is not zeros
         dim = uhf_state.P_beta.shape[0]
         half = dim // 2
-        uhf_state.P_beta[:half, :half] = 0.0
+
+        if np.allclose(uhf_state.P_beta, uhf_state.P_alpha):
+            uhf_state.P_beta[:half, :half] += uhf_state.P_alpha[half:, half:]
+            uhf_state.P_alpha[half:, half:] += uhf_state.P_beta[:half, :half]
+
+            uhf_state.P_alpha /= 4
+            uhf_state.P_beta /= 4
 
     return
 
@@ -418,6 +487,7 @@ def update_uhf_density(
             uhf_state.F_next_alpha,
             uhf_ext_ctx.X,
             uhf_ext_ctx.det[0],
+            uhf_ext_ctx._eigensolver,
         )
     )
     uhf_state.P_beta, uhf_state.e_orb_beta, uhf_state.C_munu_beta, *_ = (
@@ -425,6 +495,7 @@ def update_uhf_density(
             uhf_state.F_next_beta,
             uhf_ext_ctx.X,
             uhf_ext_ctx.det[1],
+            uhf_ext_ctx._eigensolver,
         )
     )
 

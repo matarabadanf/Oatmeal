@@ -188,7 +188,9 @@ def guess_density_RHF(
         return np.ones((dim, dim), dtype=np.complex128)
 
     else:
-        raise ValueError("Invalid method. Choose 'core', 'ones' or 'IMPORB'.")
+        raise ValueError(
+            f"Invalid method. Choose 'core', 'ones' or 'IMPORB' (inputed {p_guess})."
+        )
 
 
 def calc_p_matrix_comp(
@@ -384,6 +386,7 @@ def calculate_P_next(
     F: NDArray[np.complex128],
     X: NDArray[np.complex128],
     det: NDArray[np.int32],
+    solver: Literal["eig", "eigh"],
 ) -> Tuple[
     NDArray[np.complex128],
     NDArray[np.complex128],
@@ -423,7 +426,7 @@ def calculate_P_next(
 
     F_prime /= mat_norm  # divide by the norm to avoid numerical instability
 
-    e_values, C_prime, L_prime, R_prime, LFR = diagonalize_biorthogonal(F_prime)
+    e_values, C_prime, L_prime, R_prime, LFR = diagonalize_biorthogonal(F_prime, solver)
 
     e_values *= mat_norm
 
