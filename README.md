@@ -67,8 +67,4 @@ pytest . -c all.ini
 
 
 ## References
-- Basis sets ([Basis set exchange](https://www.basissetexchange.org/)).
-- [PySCF](https://doi.org/10.1063/5.0006074).
-- DIIS ([Pulay](https://doi.org/10.1002/jcc.540030413)).
-- CROP ([Ettenhuber, Jorgensen](https://doi.org/10.1021/ct501114q)).
-
+For a complete list of references see [References](docs/References.md)
