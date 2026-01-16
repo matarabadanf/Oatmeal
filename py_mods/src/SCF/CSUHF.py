@@ -212,7 +212,9 @@ def initialize_uhf_extended_context(
     None
     """
     uhf_ext_ctx.dim = len(ctx.S)
-    uhf_ext_ctx.X = np.array(transformation_matrix(ctx.S), dtype=np.complex128)
+    uhf_ext_ctx.X = np.array(
+        transformation_matrix(ctx.S.astype(np.complex128)), dtype=np.complex128
+    )
 
     # validate occupation
     uhf_ext_ctx.det[0], uhf_ext_ctx.det[1], _ = validate_unrestricted_determinant(
@@ -275,7 +277,7 @@ def compute_uhf_unscaled_density(
         print("Converging unscaled UHF case:")
 
     unscaled_ctx = CSUHFContext(
-        S=ctx.S,
+        S=ctx.S.astype(np.complex128),
         T=ctx.T,
         V=ctx.V,
         eri=ctx.eri,
@@ -351,8 +353,8 @@ def guess_density_UHF(
                 ext_uhf_ctx.dim,
             )
         ), "Initial alpha density matrix has incorrect dimensions."
-        uhf_state.p_alpha = ctx.initial_orbitals[0]
-        uhf_state.p_beta = ctx.initial_orbitals[1]
+        uhf_state.P_alpha = ctx.initial_orbitals[0]
+        uhf_state.P_beta = ctx.initial_orbitals[1]
 
     else:
         uhf_state.P_alpha = uhf_state.P_beta = guess_density_RHF(
@@ -411,7 +413,7 @@ def conv_acc_criteria_met(
 
 
 def is_converged_uhf(
-    ctx: CSRHFContext,
+    ctx: CSUHFContext,
     uhf_state: CSUHFState,
 ) -> bool:
     """
@@ -436,10 +438,10 @@ def is_converged_uhf(
     converged: bool = False
 
     if ctx._convergence_criteria == "max":
-        error_re_alpha: float = float(np.max(np.abs(uhf_state.r_alpha.real)))
-        error_im_alpha: float = float(np.max(np.abs(uhf_state.r_alpha.imag)))
-        error_re_beta: float = float(np.max(np.abs(uhf_state.r_beta.real)))
-        error_im_beta: float = float(np.max(np.abs(uhf_state.r_beta.imag)))
+        error_re_alpha = float(np.max(np.abs(uhf_state.r_alpha.real)))
+        error_im_alpha = float(np.max(np.abs(uhf_state.r_alpha.imag)))
+        error_re_beta = float(np.max(np.abs(uhf_state.r_beta.real)))
+        error_im_beta = float(np.max(np.abs(uhf_state.r_beta.imag)))
 
         error_alpha = max(error_re_alpha, error_im_alpha)
         error_beta = max(error_re_beta, error_im_beta)
@@ -451,10 +453,10 @@ def is_converged_uhf(
             converged = True
 
     elif ctx._convergence_criteria == "norm":
-        error_alpha: float = np.linalg.norm(uhf_state.r_alpha)
-        error_beta: float = np.linalg.norm(uhf_state.r_beta)
+        error_alpha = float(np.linalg.norm(uhf_state.r_alpha))
+        error_beta = float(np.linalg.norm(uhf_state.r_beta))
 
-        error: float = max(error_alpha, error_beta)
+        error = max(error_alpha, error_beta)
 
         if uhf_state.iteration > 1 and error < ctx.threshold:
             converged = True
@@ -588,7 +590,7 @@ def update_uhf_F_and_r_comp(
         calculate_unrestricted_F_and_r_comp(
             uhf_state.P_alpha,
             uhf_state.P_beta,
-            ctx.S,
+            ctx.S.astype(np.complex128),
             uhf_ext_ctx.H_core,
             uhf_ext_ctx.eri_scaled,
         )
@@ -611,11 +613,15 @@ def perform_spin_diagostics(
     ctx: CSUHFContext, uhf_state: CSUHFState
 ) -> UHFSpinDiagnostics:
     S_diagnostics: UHFSpinDiagnostics = calculate_s2_expectation(
-        uhf_state.P_alpha, uhf_state.P_beta, ctx.S, ctx.verbose
+        uhf_state.P_alpha, uhf_state.P_beta, ctx.S.astype(np.complex128), ctx.verbose
     )
 
-    uhf_state.final_alpha_elec = np.trace(uhf_state.P_alpha.real @ ctx.S)
-    uhf_state.final_beta_elec = np.trace(uhf_state.P_beta.real @ ctx.S)
+    uhf_state.final_alpha_elec = np.trace(
+        uhf_state.P_alpha.real @ ctx.S.astype(np.complex128)
+    )
+    uhf_state.final_beta_elec = np.trace(
+        uhf_state.P_beta.real @ ctx.S.astype(np.complex128)
+    )
 
     if (
         abs(uhf_state.final_alpha_elec + uhf_state.final_beta_elec - ctx.n_electrons)

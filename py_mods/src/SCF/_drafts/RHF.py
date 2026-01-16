@@ -1,6 +1,6 @@
 import numpy as np
 from numpy.typing import NDArray
-from typing import Literal, Tuple
+from typing import List, Literal, Tuple, Union
 from py_mods.src.SCF.scf_kernels import (
     calc_g_matrix,
     calc_p_matrix,
@@ -270,8 +270,9 @@ def residual(
 
 
 def conv_guess(
-    residuals: NDArray[np.float64], F_guesses: NDArray[np.float64]
-) -> NDArray[np.float64]:
+    residuals: List[NDArray[np.complex128]],
+    F_guesses: List[NDArray[np.complex128]],
+) -> Tuple[NDArray[np.complex128], NDArray[np.complex128]]:
     """
     Calculate the Convergence Algorithm extrapolated Fock matrix.
 
@@ -304,10 +305,10 @@ def conv_guess(
     # solve the system of equations
     c = np.linalg.solve(B_matrix, solution)
 
-    F_conv = sum([c[i] * F_guesses[i] for i in range(len(c) - 1)])
-    r_conv = sum([c[i] * residuals[i] for i in range(len(c) - 1)])
+    F_conv = np.array(sum([c[i] * F_guesses[i] for i in range(len(c) - 1)]))
+    r_conv = np.array(sum([c[i] * residuals[i] for i in range(len(c) - 1)]))
 
-    return F_conv, r_conv
+    return (F_conv, r_conv)
 
 
 if __name__ == "__main__":

@@ -116,9 +116,9 @@ def V_NN(
 
 
 def scale_integrals(
-    T: NDArray[np.complex128],
-    V: NDArray[np.complex128],
-    eri: NDArray[np.complex128],
+    T: Union[NDArray[np.complex128], NDArray[np.float64]],
+    V: Union[NDArray[np.complex128], NDArray[np.float64]],
+    eri: Union[NDArray[np.complex128], NDArray[np.float64]],
     theta: float,
 ) -> Tuple[NDArray[np.complex128], NDArray[np.complex128], NDArray[np.complex128]]:
     """
@@ -151,7 +151,7 @@ def scale_integrals(
 
 
 def guess_density_RHF(
-    p_guess: Literal["core", "ones", "IMPORB"],
+    p_guess: Literal["core", "ones", "INPORB"],
     dim: int,
     INPORB: Union[NDArray[np.complex128], NDArray[np.float64], None],
 ) -> NDArray[np.complex128]:
@@ -162,7 +162,7 @@ def guess_density_RHF(
     ----------
     dim : int
         Basis dimension.
-    method : {'core', 'ones', 'IMPORB'}
+    method : {'core', 'ones', 'INPORB'}
         Guess method.
     INPORB : {NDArray[np.complex128], NDArray[np.float64], None}
         Imported guess orbitals.
@@ -175,9 +175,10 @@ def guess_density_RHF(
     if p_guess == "INPORB":
         assert INPORB is not None, "Empty INPORB alpha for guess"
 
-        assert (
-            isinstance(INPORB, np.array) and INPORB.shape == X.shape
-        ), f"Wrong type ({type(INPORB)}) or dimensions ({INPORB.shape}) of import guess orbitals, expexted {type(X)} and {X.shape}"
+        assert isinstance(INPORB, np.ndarray) and INPORB.shape == (
+            dim,
+            dim,
+        ), f"Wrong type ({type(INPORB)}) or dimensions ({INPORB.shape}) of import guess orbitals. Dimension expected is and {(dim, dim)}"
 
         return np.copy(INPORB.astype(np.complex128))
 
@@ -189,13 +190,13 @@ def guess_density_RHF(
 
     else:
         raise ValueError(
-            f"Invalid method. Choose 'core', 'ones' or 'IMPORB' (inputed {p_guess})."
+            f"Invalid method. Choose 'core', 'ones' or 'INPORB' (inputed {p_guess})."
         )
 
 
 def calc_p_matrix_comp(
-    l_matrix: NDArray[np.complex128],
-    r_matrix: NDArray[np.complex128],
+    l_matrix: Union[NDArray[np.complex128], np.ndarray],
+    r_matrix: Union[NDArray[np.complex128], np.ndarray],
     determinant,
 ) -> NDArray[np.complex128]:
     """
@@ -460,10 +461,6 @@ def calculate_P_next_2(
     NDArray[np.complex128],
     NDArray[np.complex128],
     NDArray[np.complex128],
-    NDArray[np.complex128],
-    NDArray[np.complex128],
-    NDArray[np.complex128],
-    NDArray[np.complex128],
 ]:
     """
     Calculate the next density matrix P_{n+1} given Fock matrix F_n and transformation matrix X.
@@ -488,18 +485,21 @@ def calculate_P_next_2(
     ------
     Diagonalization algorithm used is np.linalg.eigh due to the matrix being symmetric.
     """
-    e_values, C_munu = scipy.linalg.eigh(F, S)
+    e_values_r, C_munu_r = scipy.linalg.eigh(F, S)
+
+    e_values: NDArray[np.complex128] = e_values_r.astype(np.complex128)
+    C_munu: NDArray[np.complex128] = C_munu_r.astype(np.complex128)
 
     # Build new density matrix
     P_LR = calc_p_matrix_comp(C_munu.T, C_munu, det)
 
-    return P_LR, e_values, C_munu
+    return (P_LR, e_values, C_munu)
 
 
 # --- UHF helper functions ---
 def calculate_unrestricted_F_and_r_comp(
     P_alpha: NDArray[np.complex128],
-    P_beta,
+    P_beta: NDArray[np.complex128],
     S: NDArray[np.complex128],
     H_core: NDArray[np.complex128],
     eri: NDArray[np.complex128],

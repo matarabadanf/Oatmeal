@@ -33,7 +33,7 @@ class CSRHFContext:
         Maximum SCF iterations.
     threshold : float
         Convergence threshold.
-    p_guess : {'core', 'ones', 'IMPORB'}
+    p_guess : {'core', 'ones', 'INPORB'}
         Initial density guess type.
     guess_max_iter : int or None
         Iterations for preliminary RHF guess (if applicable).
@@ -61,7 +61,7 @@ class CSRHFContext:
     occupation: Union[int, NDArray[np.int32], None] = None
     max_iter: int = 100
     threshold: float = 1e-12
-    p_guess: Literal["core", "ones", "IMPORB"] = "core"
+    p_guess: Literal["core", "ones", "INPORB"] = "core"
     guess_max_iter: Union[int, None] = None
     initial_orbitals: Union[NDArray[np.float64], NDArray[np.complex128], None] = None
     verbose: bool = False
@@ -156,7 +156,7 @@ class CSRHFResults:
     P_guess: NDArray[np.complex128]
     P: NDArray[np.complex128]
     C_munu: NDArray[np.complex128]
-    error: float
+    error: Union[float, complex]
     iterations: int
     scaled_eris: NDArray[np.complex128]
 
@@ -241,7 +241,7 @@ def pack_rhf_results(
         P_guess=rhf_state.P_old if rhf_state.iteration > 0 else rhf_state.P,
         P=rhf_state.P,
         C_munu=rhf_state.C_munu,
-        error=rhf_state.r,
+        error=rhf_state.error,
         iterations=rhf_state.iteration,
         scaled_eris=rhf_ext_ctx.eri_scaled,
     )
@@ -278,7 +278,7 @@ class CSUHFContext:
         Maximum SCF iterations.
     threshold : float, optional
         Convergence threshold for density matrix difference.
-    p_guess : Literal['core', 'ones', 'RHF', 'IMPORB'], optional
+    p_guess : Literal['core', 'ones', 'RHF', 'INPORB'], optional
         Type of initial guess for density matrix.
     guess_max_iter : int or None, optional
         If p_guess is 'RHF', number of iterations to run the preliminary RHF calculation.
@@ -314,9 +314,9 @@ class CSUHFContext:
     occupation: Union[int, Tuple[NDArray[np.int32], NDArray[np.int32]], None] = None
     max_iter: int = 100
     threshold: float = 1e-12
-    p_guess: Literal["core", "ones", "RHF", "IMPORB"] = "core"
+    p_guess: Literal["core", "ones", "RHF", "INPORB"] = "core"
     guess_max_iter: Union[int, None] = None
-    initial_orbitals: Union[NDArray[np.float64], NDArray[np.complex128], None] = None
+    initial_orbitals: Union[List[NDArray[np.complex128]], None] = None
     break_symm: bool = False
     verbose: bool = False
     conv_type: Literal[None, "DIIS", "CROP"] = "DIIS"

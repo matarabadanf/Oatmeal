@@ -142,6 +142,7 @@ def initialize_rhf_extended_context(
     T_scaled, V_scaled, rhf_ext_ctx.eri_scaled = scale_integrals(
         ctx.T, ctx.V, ctx.eri, ctx.theta
     )
+
     rhf_ext_ctx.H_core = T_scaled + V_scaled
     rhf_ext_ctx.core_mask = np.abs(rhf_ext_ctx.H_core) > 1e-10
 
@@ -284,7 +285,7 @@ def is_converged(
             converged = True
 
     elif ctx._convergence_criteria == "norm":
-        error: float = np.linalg.norm(rhf_state.r)
+        error = np.linalg.norm(rhf_state.r)
         if rhf_state.iteration > 1 and error < ctx.threshold:
             converged = True
 
@@ -352,7 +353,7 @@ def print_table_header():
 def conv_acc_criteria_met(
     ctx: CSRHFContext,
     rhf_ext_ctx: CSRHFConstants,
-    rhf_state: CSRHFState = None,
+    rhf_state: CSRHFState,
 ) -> bool:
     use_conv_acc = False
     if (
@@ -476,7 +477,7 @@ def update_rhf_F_and_r_comp(
     ctx: CSRHFContext,
     rhf_ext_ctx: CSRHFConstants,
     rhf_state: CSRHFState,
-) -> Tuple[NDArray[np.complex128], NDArray[np.complex128]]:
+) -> None:
     """
     Calculate Fock matrix & Residual.
 
@@ -499,7 +500,10 @@ def update_rhf_F_and_r_comp(
     rhf_state.F = rhf_ext_ctx.H_core + calc_g_matrix_comp(
         rhf_state.P, rhf_ext_ctx.eri_scaled
     )
-    rhf_state.r = calc_residual_commutator(rhf_state.F, rhf_state.P, ctx.S)
+    rhf_state.r = calc_residual_commutator(
+        rhf_state.F, rhf_state.P, ctx.S.astype(np.complex128)
+    )
+
     return
 
 

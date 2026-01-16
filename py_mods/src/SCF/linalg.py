@@ -1,6 +1,6 @@
 import numpy as np
 from numpy.typing import NDArray
-from typing import Literal, Union, Tuple, Dict
+from typing import Any, Literal, Union, Tuple, Dict
 from scipy.linalg import block_diag
 import warnings
 
@@ -8,7 +8,7 @@ warnings.simplefilter("once", RuntimeWarning)
 
 
 def transformation_matrix(
-    S_munu: NDArray[np.complex128],
+    S_munu: Union[NDArray[np.complex128], NDArray[np.float64]],
     method: Literal["canonical", "symmetric"] = "symmetric",
     verbose: bool = False,
 ) -> NDArray[np.float64]:
@@ -151,7 +151,9 @@ def _diagonalize_gram(
     return R_prime, L_prime, e_values, C_prime
 
 
-def count_degen2(e_orb: NDArray[np.complex128]) -> Dict[complex, int]:
+def count_degen2(
+    e_orb: NDArray[np.complex128],
+) -> Tuple[NDArray[np.complex128], NDArray[np.int16]]:
     """
     Count eigenvalue degeneracies.
 
@@ -167,13 +169,13 @@ def count_degen2(e_orb: NDArray[np.complex128]) -> Dict[complex, int]:
     """
     counts: Dict[complex, int] = {}
     for item in e_orb:
-        val = np.round(item, 5)
+        val: np.complex128 = np.complex128(np.round(item, 5))
         counts[val] = counts.get(val, 0) + 1
 
-    keys = np.array(list(counts.keys()))
-    degs = np.array(list(counts.values()))
+    keys = np.array(list(counts.keys()), dtype=np.complex128)
+    degs = np.array(list(counts.values()), dtype=np.int16)
 
-    return keys, degs
+    return (keys, degs)
 
 
 def c_projector(
@@ -334,20 +336,22 @@ def canonicalize(
     C_munu: NDArray[np.complex128],
     F: NDArray[np.complex128],
     n_occ: int,
-) -> NDArray[np.complex128]:
+) -> Tuple[NDArray[np.complex128], NDArray[np.complex128]]:
     F_mo = np.einsum("mu, uv, vn -> mn", C_munu.conj().T, F, C_munu)
 
     F_vv = F_mo[n_occ:, n_occ:]
 
     eps_virt, U_virt = np.linalg.eigh(F_vv)
 
+    eps_virt = eps_virt.astype(np.complex128)
+
     U_full = block_diag(np.eye(n_occ), U_virt)
 
     C_new = C_munu @ U_full
-    eps_occ = np.diag(F_mo)[:n_occ]
+    eps_occ = np.diag(F_mo)[:n_occ].astype(np.complex128)
     epsilon_new = np.concatenate([eps_occ, eps_virt])
 
-    return C_new, epsilon_new
+    return (C_new, epsilon_new)
 
 
 def sign_convention(matrix):
