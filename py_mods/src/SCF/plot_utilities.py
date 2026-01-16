@@ -122,17 +122,18 @@ def plot_mo_analysis(C1, E1, C2, E2, titles=None):
         )
 
         ax_e.set_xlabel("Molecular Orbitals (MO)")
-        ax_e.set_yticks([])  
-        ax_e.set_ylabel("E") 
+        ax_e.set_yticks([])
+        ax_e.set_ylabel("E")
 
         fig.colorbar(im_e, ax=ax_e, label="Energy")
 
     return fig
 
+
 def _plot_3_maps_real(matrices, plot_range=None, titles=None):
     """
     Plots 3 matrices side-by-side.
-    
+
     Parameters
     ----------
     matrices: list of 3 NDArray[np.float64]
@@ -148,10 +149,10 @@ def _plot_3_maps_real(matrices, plot_range=None, titles=None):
         titles = ["Matrix 1", "Matrix 2", "Matrix 3"]
 
     for ax, matrix, title in zip(axes, matrices, titles):
-        
+
         im = ax.imshow(matrix, cmap="viridis", interpolation="nearest")
         fig.colorbar(im, ax=ax, label="Value", fraction=0.046, pad=0.04)
-        
+
         ax.set_title(title)
 
         if plot_range is not None:
@@ -159,3 +160,7 @@ def _plot_3_maps_real(matrices, plot_range=None, titles=None):
             ax.set_ylim(plot_range[1])
 
     return fig
+
+
+if __name__ == "__main__":
+    pass
