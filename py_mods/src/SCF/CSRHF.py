@@ -1,4 +1,5 @@
 import numpy as np
+import copy
 from numpy.typing import NDArray
 from typing import Literal, Tuple
 import matplotlib.pyplot as plt
@@ -34,7 +35,7 @@ from py_mods.src.SCF.types import (
 )
 
 
-def CS_RHF(ctx: CSRHFContext) -> CSRHFResults:
+def _csrhf_kernel(ctx: CSRHFContext) -> CSRHFResults:
     """
     Perform Complex Scaled RHF calculation.
 
@@ -103,6 +104,24 @@ def CS_RHF(ctx: CSRHFContext) -> CSRHFResults:
     rhf_results = pack_rhf_results(ctx, rhf_ext_ctx, rhf_state)
 
     return rhf_results
+
+
+def CS_RHF(ctx: CSRHFContext) -> CSRHFResults:
+
+    if ctx.theta == 0:
+        return _csrhf_kernel(ctx)
+
+    else:
+        scaled_context = copy.deepcopy(ctx)
+
+        # perform unscaled calculation first
+        ctx.theta = 0
+        unscaled_rhf = _csrhf_kernel(ctx)
+
+        # use results for scaled calculation
+        scaled_context.p_guess = "INPORB"
+        scaled_context.initial_orbitals = unscaled_rhf.P
+        return _csrhf_kernel(scaled_context)
 
 
 # -------------------------------------------------------------
