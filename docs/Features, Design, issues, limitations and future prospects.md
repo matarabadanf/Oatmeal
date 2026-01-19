@@ -3,7 +3,7 @@
 This document aims to provide a brief overview of features, design decisions made during development, known limitations, and possible future improvements.
 
 ## Features
-The current implementation's features are briefly listed below. For specific results see [Results](../docs/Results.md), for examples see [Examples](../docs/Examples.md), and the `notebooks` folder contains explanatory notebooks demonstrating the code and reproducing results.
+The current implementation's features are briefly listed below. For specific results see [Results](../docs/Results.md), for examples see [Tutorial](../docs/Tutorial.md), and the `notebooks` folder contains explanatory notebooks demonstrating the code and reproducing results.
 
 As of 17 January 2026, the implementation includes:
 - **(CS)RHF and (CS)UHF:** Complex-scaled restricted and unrestricted Hartree–Fock calculations.

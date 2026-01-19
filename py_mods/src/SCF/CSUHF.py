@@ -362,7 +362,7 @@ def guess_density_UHF(
         )
 
     if ctx.break_symm is not None:
-        if isinstance(bool, ctx.break_symm) and ctx.break_symm:
+        if ctx.break_symm == True:
             ctx.break_symm = "arbitrary"
 
         if ctx.break_symm == "arbitrary":

@@ -11,7 +11,7 @@ from numpy.typing import NDArray
 @dataclass
 class CSRHFContext:
     """
-    Context for CS_RHF calculations.
+    Context for (CS)RHF calculation.
 
     Attributes
     ----------
@@ -24,29 +24,32 @@ class CSRHFContext:
     eri : NDArray[np.float64]
         Electron repulsion integrals.
     n_electrons : int
-        Total electron count (must be even).
-    theta : float
-        Complex-scaling angle (radians).
-    occupation : int or NDArray[np.int32] or None
-        Occupation vector. If -1/None, build default.
-    max_iter : int
-        Maximum SCF iterations.
-    threshold : float
-        Convergence threshold.
-    p_guess : {'core', 'ones', 'INPORB'}
-        Initial density guess type.
-    guess_max_iter : int or None
-        Iterations for preliminary RHF guess (if applicable).
-    initial_orbitals : NDArray or None
-        Imported orbitals for guess.
-    verbose : bool
-        If True, print progress.
-    conv_type : {None, 'DIIS', 'CROP'}
-        Convergence algorithm.
-    acc_hist_size : int
-        History size for convergence acceleration.
-    acc_iteration_start : int
-        Iteration to start acceleration.
+        Total electron count (must be an even number).
+    theta : float, optional
+        Complex-scaling angle in radians. Default is 0.0.
+    occupation : int, NDArray[np.int32] or None, optional
+        Occupation vector. If an integer, it specifies the number of doubly occupied
+        orbitals. If an array, it explicitly defines the occupation numbers.
+        If None, a default occupation is built based on `n_electrons`. Default is None.
+    max_iter : int, optional
+        Maximum number of SCF iterations. Default is 100.
+    threshold : float, optional
+        Convergence threshold. Default is 1e-12.
+    p_guess : {'core', 'ones', 'INPORB'}, optional
+        Initial density guess type. Default is 'core'.
+    guess_max_iter : int or None, optional
+        Maximum iterations for a preliminary RHF guess (if applicable). Default is None.
+    initial_orbitals : NDArray[np.float64], NDArray[np.complex128] or None, optional
+        Imported orbitals for the initial guess. Required if `p_guess` is 'INPORB'.
+        Can be real or complex. Default is None.
+    verbose : bool, optional
+        If True, print progress information to stdout. Default is False.
+    conv_type : {None, 'DIIS', 'CROP'}, optional
+        Convergence acceleration algorithm. Default is 'DIIS'.
+    acc_hist_size : int, optional
+        History size for the convergence acceleration subspace. Default is 10.
+    acc_iteration_start : int, optional
+        Iteration number to start applying convergence acceleration. Default is 12.
     """
 
     # Required
@@ -76,6 +79,31 @@ class CSRHFContext:
 
 @dataclass
 class CSRHFConstants:
+    """
+    Constants and scaled/calculated matrices for (CS)RHF.
+
+    Attributes
+    ----------
+    dim : int
+        Dimension of the basis set (number of MO basis functions).
+    X : NDArray[np.complex128]
+        Orthogonalization matrix (S^{-1/2} for canonical orthogonalization).
+    det : NDArray[np.int32]
+        Occupation vector.
+    eri_scaled : NDArray[np.complex128]
+        Complex-scaled eris in the atomic orbital basis.
+    H_core : NDArray[np.complex128]
+        Complex-scaled core Hamiltonian matrix (T + V).
+    core_mask : NDArray[np.bool]
+        Boolean mask of Hcore interactions.
+    _eigensolver : {'eig', 'eigh'}
+        Solver to use for diagonalization.
+    acc_iteration_start : int, optional
+        Iteration number at which to begin convergence acceleration. Default is 10.
+    acc_requested : bool, optional
+        Boolean indicating if convergence acceleration (DIIS/CROP) is requested. Default is False.
+    """
+
     dim: int
     X: NDArray[np.complex128]
     det: NDArray[np.int32]
@@ -83,12 +111,53 @@ class CSRHFConstants:
     H_core: NDArray[np.complex128]
     core_mask: NDArray[np.bool]
     _eigensolver: Literal["eig", "eigh"]
-    acc_iteration_start: int = 0
+    acc_iteration_start: int = 10
     acc_requested: bool = False
 
 
 @dataclass
 class CSRHFState:
+    """
+    State struct for (CS)RHF procedure.
+
+    Attributes
+    ----------
+    iteration : int
+        Current SCF iteration number.
+    P : NDArray[np.complex128]
+        Current density matrix.
+    E_prev : np.complex128
+        Energy from previous iteration.
+    use_conv_acc : bool
+        Bool indicating if convergence acceleration is used.
+    F_guess : List[NDArray[np.complex128]]
+        DIIS/CROP history of F matrices.
+    residuals : List[NDArray[np.complex128]]
+        DIIS/CROP history of error vectors.
+    F_next : NDArray[np.complex128]
+        Extrapolated F matrix.
+    error : complex
+        Current error.
+    converged : bool
+        True if converged with threshold.
+    C_munu : NDArray[np.complex128]
+        MO coefficients in the atomic orbital basis.
+    C_prime : NDArray[np.complex128]
+        MO coefficients in the orthogonalized basis.
+    e_orb : NDArray[np.complex128]
+        Current orbital energies.
+    F : NDArray[np.complex128]
+        Current Fock matrix.
+    r : NDArray[np.complex128]
+        Current residual/error vector.
+    E_RHF : np.complex128
+        Current total RHF energy.
+    E_diff : np.complex128
+        Change in energy from the previous iteration.
+    P_old : NDArray[np.complex128]
+        Density matrix from the previous iteration.
+    """
+
     iteration: int
     P: NDArray[np.complex128]
     E_prev: np.complex128
@@ -111,36 +180,42 @@ class CSRHFState:
 @dataclass
 class CSRHFResults:
     """
-    Results for CS_RHF calculations.
+    Struct containing the results of a (CS)RHF calculation.
 
     Attributes
     ----------
     context : CSRHFContext
         Input context.
     converged : bool
-        Convergence status.
-    E_RHF : complex
-        Final RHF energy.
+        True if the SCF converged.
+    E_RHF : np.complex128
+        Complex-Scaled RHF energy.
     e_orb : NDArray[np.complex128]
         Orbital energies.
-    n_elec : float
-        Calculated electron count.
+    n_elec : np.int32
+        Final number of electrons.
+    det : NDArray[np.int32]
+        Occupation vector.
+    H_core : NDArray[np.complex128]
+        (CS)H_core.
     X : NDArray[np.complex128]
-        Transformation matrix.
+        Orthogonalization transformation matrix.
     F_final : NDArray[np.complex128]
-        Final Fock matrix.
+        The Fock matrix of the final iteration.
     C_prime : NDArray[np.complex128]
-        Transformed eigenvectors.
+        Molecular orbital coefficients in the orthogonalized basis.
     P_guess : NDArray[np.complex128]
-        Initial density guess.
+        Initial density matrix.
     P : NDArray[np.complex128]
-        Final LR density matrix.
+        Final density matrix.
     C_munu : NDArray[np.complex128]
         Final MO coefficients.
-    error : float
-        Final residual norm.
+    error : float or complex
+        Final error.
     iterations : int
-        Total iterations performed.
+        Number of iterations.
+    scaled_eris : NDArray[np.complex128]
+        Scaled eris.
     """
 
     context: CSRHFContext
@@ -162,7 +237,19 @@ class CSRHFResults:
 
 
 def allocate_rhf_extended_context(ctx: CSRHFContext) -> CSRHFConstants:
+    """
+    Allocate extended context for (CS)RHF calculations.
 
+    Parameters
+    ----------
+    ctx : CSRHFContext
+        Input context with system parameters.
+
+    Returns
+    -------
+    CSRHFConstants
+        Allocated extended context with preallocated matrices.
+    """
     dim = len(ctx.S)
     X = np.zeros((dim, dim), dtype=np.complex128)
     det = np.zeros(dim, dtype=np.int32)
@@ -183,6 +270,19 @@ def allocate_rhf_extended_context(ctx: CSRHFContext) -> CSRHFConstants:
 
 
 def allocate_rhf_state(ctx: CSRHFContext) -> CSRHFState:
+    """
+    Allocate state for CSRHF calculations.
+
+    Parameters
+    ----------
+    ctx : CSRHFContext
+        Input context with system parameters.
+
+    Returns
+    -------
+    CSRHFState
+        Allocated state with preallocated matrices and initial values.
+    """
     iteration = 0
     P = np.zeros((len(ctx.S), len(ctx.S)), dtype=np.complex128)
     E_prev = np.complex128(0.0)
@@ -227,6 +327,23 @@ def pack_rhf_results(
     rhf_ext_ctx: CSRHFConstants,
     rhf_state: CSRHFState,
 ) -> CSRHFResults:
+    """
+    Pack results from (CS)RHF calculation into a results dataclass.
+
+    Parameters
+    ----------
+    ctx : CSRHFContext
+        Input context used for the calculation.
+    rhf_ext_ctx : CSRHFConstants
+        Extended context with preallocated matrices.
+    rhf_state : CSRHFState
+        Final state after SCF iterations.
+
+    Returns
+    -------
+    CSRHFResults
+        Packed results from the CSRHF calculation.
+    """
     return CSRHFResults(
         context=ctx,
         converged=rhf_state.converged,
@@ -255,50 +372,46 @@ def pack_rhf_results(
 @dataclass
 class CSUHFContext:
     """
-    Context class for CS_UHF calculations.
+    Context for (CS)UHF calculations.
 
     Attributes
     ----------
-    S : NDArray[np.float64], shape (n, n)
+    S : NDArray[np.float64]
         Overlap matrix.
-    T : NDArray[np.float64], shape (n, n)
+    T : NDArray[np.float64]
         Kinetic energy matrix.
-    V : NDArray[np.float64], shape (n, n)
+    V : NDArray[np.float64]
         Nuclear attraction matrix.
-    eri : NDArray[np.float64], shape (n, n, n, n)
+    eri : NDArray[np.float64]
         Electron repulsion integrals.
     n_electrons : int
-        Total number of electrons (must be even for closed-shell RHF).
-    theta : float
-        Complex-scaling angle (radians).
-    occupation : int or NDArray[np.int32] or None
-        If -1 (or None) build a default RHF occupation vector (2,2,...,0).
-        If an ndarray is provided it must sum to n_electrons.
+        Total electron count.
+    mult : int, optional
+        Spin multiplicity (2S + 1). Default is -1 (calculate from n_electrons).
+    theta : float, optional
+        Complex-scaling angle in radians. Default is 0.0.
+    occupation : Union[int, Tuple[NDArray[np.int32], NDArray[np.int32]], None], optional
+        Occupation vector. If int/None, built defaults. If Tuple, explicit (alpha, beta) vectors.
     max_iter : int, optional
-        Maximum SCF iterations.
+        Maximum SCF iterations. Default is 100.
     threshold : float, optional
-        Convergence threshold for density matrix difference.
+        Convergence threshold. Default is 1e-12.
     p_guess : Literal['core', 'ones', 'RHF', 'INPORB'], optional
-        Type of initial guess for density matrix.
+        Initial density guess type. Default is 'core'.
     guess_max_iter : int or None, optional
-        If p_guess is 'RHF', number of iterations to run the preliminary RHF calculation.
-    initial_orbitals : NDArray[np.float64] or None, optional
-        If p_guess is 'initial_orbitals', the initial guess orbitals.
-    break_symm : bool, optional
-        If True, breaks the symmetry of the initial guess density matrix.
+        Max iterations for preliminary RHF guess.
+    initial_orbitals : List[NDArray[np.complex128]] or None, optional
+        List of [alpha, beta] orbitals for 'INPORB' guess.
+    break_symm : Literal[None, True, 'arbitrary', 'random', 'perturbation'], optional
+        Method to break initial guess symmetry.
     verbose : bool, optional
-        If True print iteration progress.
+        If True, print progress.
     conv_type : Literal[None, 'DIIS', 'CROP'], optional
-        Type of Convergence Algorithm to use. If None, no algorithm is used.
+        Convergence algorithm. Default is 'DIIS'.
     acc_hist_size : int, optional
-        Number of previous Fock matrices and residuals to store for Convergence Algorithm.
+        History size for convergence acceleration. Default is 10.
     acc_iteration_start : int, optional
-        Iteration number to start Convergence Algorithm.
-
-    Notes
-    -----
-    - Symmety is broken by zeroing the beta density matrix in the occupied space.
-    - Breaking symmetry only makes sense when the guess is not zeros.
+        Iteration to start acceleration. Default is 12.
     """
 
     # Required
@@ -332,6 +445,35 @@ class CSUHFContext:
 
 @dataclass
 class CSUHFConstants:
+    """
+    Constants and scaled/calculated matrices for (CS)UHF.
+
+    Attributes
+    ----------
+    dim : int
+        Dimension of the basis set.
+    X : NDArray[np.complex128]
+        Orthogonalization matrix (S^{-1/2}).
+    det : NDArray[np.int32]
+        Occupation vector for (alpha, beta).
+    alpha_elec : int
+        Number of alpha electrons.
+    beta_elec : int
+        Number of beta electrons.
+    eri_scaled : NDArray[np.complex128]
+        Complex-scaled eris.
+    H_core : NDArray[np.complex128]
+        Complex-scaled core Hamiltonian (T + V).
+    core_mask : NDArray[np.bool]
+        Boolean mask of Hcore interactions.
+    _eigensolver : {'eig', 'eigh'}
+        Solver for diagonalization.
+    acc_iteration_start : int, optional
+        Iteration to start acceleration. Default is 0.
+    acc_requested : bool, optional
+        If True, convergence acceleration is requested. Default is False.
+    """
+
     dim: int
     X: NDArray[np.complex128]
     det: NDArray[np.int32]  # of size (Dim, 2)
@@ -348,6 +490,79 @@ class CSUHFConstants:
 
 @dataclass
 class CSUHFState:
+    """
+    State struct for CSUHF procedure.
+
+    Attributes
+    ----------
+    iteration : int
+        Current SCF iteration number.
+    use_conv_acc : bool
+        If convergence acceleration is active.
+    converged : bool
+        True if converged with threshold.
+    E_UHF : np.complex128
+        Current total UHF energy.
+    e_orb_alpha : NDArray[np.complex128]
+        Alpha orbital energies.
+    e_orb_beta : NDArray[np.complex128]
+        Beta orbital energies.
+    C_munu_alpha : NDArray[np.complex128]
+        Alpha MO coefficients (AO basis).
+    C_munu_beta : NDArray[np.complex128]
+        Beta MO coefficients (AO basis).
+    C_prime_alpha : NDArray[np.complex128]
+        Alpha MO coefficients (Orthogonal basis).
+    C_prime_beta : NDArray[np.complex128]
+        Beta MO coefficients (Orthogonal basis).
+    final_alpha_elec : int
+        Calculated alpha electron count.
+    final_beta_elec : int
+        Calculated beta electron count.
+    F_guess_alpha : List[NDArray[np.complex128]]
+        Alpha Fock history (DIIS/CROP).
+    F_guess_beta : List[NDArray[np.complex128]]
+        Beta Fock history (DIIS/CROP).
+    residuals_alpha : List[NDArray[np.complex128]]
+        Alpha error vector history.
+    residuals_beta : List[NDArray[np.complex128]]
+        Beta error vector history.
+    P_old_alpha : NDArray[np.complex128]
+        Alpha density from previous iteration.
+    P_old_beta : NDArray[np.complex128]
+        Beta density from previous iteration.
+    r_alpha : NDArray[np.complex128]
+        Alpha residual vector.
+    r_beta : NDArray[np.complex128]
+        Beta residual vector.
+    error_alpha : complex
+        Alpha component error.
+    error_beta : complex
+        Beta component error.
+    error : complex
+        Total error metric.
+    E_diff : np.complex128
+        Change in energy from previous iteration.
+    E_prev : np.complex128
+        Energy from previous iteration.
+    F_alpha : NDArray[np.complex128]
+        Current Alpha Fock matrix.
+    F_beta : NDArray[np.complex128]
+        Current Beta Fock matrix.
+    F_next_alpha : NDArray[np.complex128]
+        Extrapolated Alpha Fock matrix.
+    F_next_beta : NDArray[np.complex128]
+        Extrapolated Beta Fock matrix.
+    P_alpha : NDArray[np.complex128]
+        Current Alpha density matrix.
+    P_beta : NDArray[np.complex128]
+        Current Beta density matrix.
+    P_total : NDArray[np.complex128]
+        Total density (P_alpha + P_beta).
+    P_diff : NDArray[np.complex128]
+        Spin density (P_alpha - P_beta).
+    """
+
     # control
     iteration: int
     use_conv_acc: bool
@@ -401,6 +616,23 @@ class CSUHFState:
 
 @dataclass
 class UHFSpinDiagnostics(object):
+    """
+    Struct for spin analysis.
+
+    Attributes
+    ----------
+    N_alpha : int
+        Number of alpha electrons.
+    N_beta : int
+        Number of beta electrons.
+    s2 : float
+        Expectation value <S^2>.
+    S_z : float
+        Expectation value <S_z>.
+    spin_contamination : float
+        Difference between calculated and exact <S^2>.
+    """
+
     N_alpha: int
     N_beta: int
     s2: float
@@ -411,42 +643,56 @@ class UHFSpinDiagnostics(object):
 @dataclass
 class CSUHFResults(object):
     """
-    Results class for CS_UHF calculations.
+    Results for CS_UHF calculations.
 
     Attributes
     ----------
     context : CSUHFContext
-        Context object used for the calculation.
+        Input context.
     converged : bool
-        Wether SCF calculation converged.
-    E_UHF : float
+        Convergence status.
+    E_UHF : np.complex128
         Final UHF energy.
-    e_alph : NDArray[np.complex128], shape (n,)
+    e_alpha : NDArray[np.complex128]
         Alpha orbital energies.
-    e_beta : NDArray[np.complex128], shape (n,)
+    e_beta : NDArray[np.complex128]
         Beta orbital energies.
-    X : NDArray[np.complex128], shape (n, n)
+    n_alpha : float
+        Alpha electron count.
+    n_beta : float
+        Beta electron count.
+    det : Tuple[NDArray[np.int32], NDArray[np.int32]]
+        Occupation vectors (alpha, beta).
+    X : NDArray[np.complex128]
         Transformation matrix.
-    P_guess_alpha: NDArray[np.complex128], shape (n, n)
-        Initial alpha density matrix guess.
-    P_guess_beta: NDArray[np.complex128], shape (n, n)
-        Initial beta density matrix guess.
-    P_alph : NDArray[np.complex128], shape (n, n)
-        Alpha density matrix.
-    P_beta : NDArray[np.complex128], shape (n, n)
-        Beta density matrix.
-    P_total : NDArray[np.complex128], shape (n, n)
+    F_final_alph : NDArray[np.complex128]
+        Final Alpha Fock matrix.
+    F_final_beta : NDArray[np.complex128]
+        Final Beta Fock matrix.
+    P_guess_alpha : NDArray[np.complex128]
+        Initial alpha density guess.
+    P_guess_beta : NDArray[np.complex128]
+        Initial beta density guess.
+    P_alpha : NDArray[np.complex128]
+        Final alpha density matrix.
+    P_beta : NDArray[np.complex128]
+        Final beta density matrix.
+    P_total : NDArray[np.complex128]
         Total density matrix.
-    P_diff : NDArray[np.complex128], shape (n, n)
-        Spin density matrix (P_alpha - P_beta).
-    L_alpha : NDArray[np.complex128], shape (n, n)
-        Left eigenvector matrix for alpha spin.
-    C_alpha : NDArray[np.complex128], shape (n, n)
-        Right eigenvector matrix for alpha spin.
-    L_beta : NDArray[np.complex128], shape (n, n)
-        Left eigenvector matrix for beta spin.
-    C_beta : NDArray[np.complex128], shape (n, n)
-        Right eigenvector matrix for beta spin.
+    P_diff : NDArray[np.complex128]
+        Spin density matrix.
+    C_alpha : NDArray[np.complex128]
+        Alpha MO coefficients.
+    C_beta : NDArray[np.complex128]
+        Beta MO coefficients.
+    S_diagnostics : UHFSpinDiagnostics
+        Spin diagnostic struct.
+    error : float
+        Final error.
+    iterations : int
+        Total iterations performed.
+    scaled_eris : NDArray[np.complex128]
+        Scaled eris.
     """
 
     context: CSUHFContext
@@ -475,6 +721,19 @@ class CSUHFResults(object):
 
 
 def allocate_uhf_extended_context(ctx: CSUHFContext) -> CSUHFConstants:
+    """
+    Allocate extended context for CSUHF calculations.
+
+    Parameters
+    ----------
+    ctx : CSUHFContext
+        Input context with system parameters.
+
+    Returns
+    -------
+    CSUHFConstants
+        Allocated extended context with preallocated matrices.
+    """
     dim = len(ctx.S)
     X = np.zeros((dim, dim), dtype=np.complex128)
     det = np.zeros((2, dim), dtype=np.int32)
@@ -497,6 +756,19 @@ def allocate_uhf_extended_context(ctx: CSUHFContext) -> CSUHFConstants:
 
 
 def allocate_uhf_state(ctx: CSUHFContext) -> CSUHFState:
+    """
+    Allocate state for CSUHF calculations.
+
+    Parameters
+    ----------
+    ctx : CSUHFContext
+        Input context with system parameters.
+
+    Returns
+    -------
+    CSUHFState
+        Allocated state with preallocated matrices and initial values.
+    """
     iteration = 0
     P_alpha = np.zeros((len(ctx.S), len(ctx.S)), dtype=np.complex128)
     P_beta = np.zeros((len(ctx.S), len(ctx.S)), dtype=np.complex128)
@@ -576,6 +848,29 @@ def pack_uhf_results(
     P_guess_beta: NDArray[np.complex128],
     S_diagnostics: UHFSpinDiagnostics,
 ) -> CSUHFResults:
+    """
+    Pack results from CSUHF calculation into a results dataclass.
+
+    Parameters
+    ----------
+    ctx : CSUHFContext
+        Input context used for the calculation.
+    uhf_ext_ctx : CSUHFConstants
+        Extended context with preallocated matrices.
+    uhf_state : CSUHFState
+        Final state after SCF iterations.
+    P_guess_alpha : NDArray[np.complex128]
+        Initial alpha density guess.
+    P_guess_beta : NDArray[np.complex128]
+        Initial beta density guess.
+    S_diagnostics : UHFSpinDiagnostics
+        Spin diagnostic struct.
+
+    Returns
+    -------
+    CSUHFResults
+        Packed results from the CSUHF calculation.
+    """
     return CSUHFResults(
         context=ctx,
         converged=uhf_state.converged,
