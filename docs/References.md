@@ -18,4 +18,4 @@
 - [Basis set exchange](https://www.basissetexchange.org/).
 - [PySCF](https://doi.org/10.1063/5.0006074).
 - [Qchem](https://doi.org/10.1080/00268976.2014.952696).
-
+- [Dirac](https://doi.org/10.1063/5.0004844).
