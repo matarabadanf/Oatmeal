@@ -390,5 +390,7 @@ UHF examples are provided in the following [Notebook](../notebooks/CS-SCF%20resu
 
 For examples of results obtained with this code, see [Results](../docs/Results.md) and for more use cases check the **Notebooks directory**.
 
+To see some other examples, check the `tests` directory.
+
 # References
 For a complete list of references, see [References](../docs/References.md).
