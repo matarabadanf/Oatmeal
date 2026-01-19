@@ -128,7 +128,7 @@ def E(
             basis_1, i - 1, basis_2, j, 1, dim
         )
     if t == 0 and j > 0:
-        return X_pb * E(basis_1, i, basis_2, j - 1, 0, dim) + E(
+        return X_pb * E(basis_1, i, basis_2, j - 1, 0, dim) + (1.0 / (2.0 * p)) * E(
             basis_1, i, basis_2, j - 1, 1, dim
         )
 
