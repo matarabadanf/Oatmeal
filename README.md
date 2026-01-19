@@ -67,4 +67,4 @@ pytest . -c all.ini
 
 
 ## References
-For a complete list of references see [References](docs/References.md)
+For a complete list of references see [References](docs/References.md).

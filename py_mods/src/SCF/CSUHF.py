@@ -361,17 +361,33 @@ def guess_density_UHF(
             ctx.p_guess, ext_uhf_ctx.dim, None
         )
 
-    if ctx.break_symm:
-        # note that breaking symmetry will only make sense when the guess is not zeros
-        dim = uhf_state.P_beta.shape[0]
-        half = dim // 2
+    if ctx.break_symm is not None:
+        if isinstance(bool, ctx.break_symm) and ctx.break_symm:
+            ctx.break_symm = "arbitrary"
 
-        if np.allclose(uhf_state.P_beta, uhf_state.P_alpha):
-            uhf_state.P_beta[:half, :half] += uhf_state.P_alpha[half:, half:]
-            uhf_state.P_alpha[half:, half:] += uhf_state.P_beta[:half, :half]
+        if ctx.break_symm == "arbitrary":
+            # note that breaking symmetry will only make sense when the guess is not zeros
+            dim = uhf_state.P_beta.shape[0]
+            half = dim // 2
 
-            uhf_state.P_alpha /= 4
-            uhf_state.P_beta /= 4
+            if np.allclose(uhf_state.P_beta, uhf_state.P_alpha):
+                uhf_state.P_beta[:half, :half] += uhf_state.P_alpha[half:, half:]
+                uhf_state.P_alpha[half:, half:] += uhf_state.P_beta[:half, :half]
+
+                uhf_state.P_alpha /= 4
+                uhf_state.P_beta /= 4
+
+        elif ctx.break_symm == "random":
+            raise NotImplementedError("Random symmetry breaking not implemented yet.")
+
+        elif ctx.break_symm == "perturbation":
+            raise NotImplementedError(
+                "Perturbation symmetry breaking not implemented yet."
+            )
+        else:
+            raise ValueError(
+                "Invalid value for break_symm. Accepted values are None, 'arbitrary' (or True), 'random', 'perturbation'."
+            )
 
     return
 

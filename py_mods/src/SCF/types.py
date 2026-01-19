@@ -317,7 +317,9 @@ class CSUHFContext:
     p_guess: Literal["core", "ones", "RHF", "INPORB"] = "core"
     guess_max_iter: Union[int, None] = None
     initial_orbitals: Union[List[NDArray[np.complex128]], None] = None
-    break_symm: bool = False
+    break_symm: Literal[None, True, "arbitrary", "random", "perturbation"] = (
+        None  # type of symmetry breaking. If True is given, 'arbitrary' will be used
+    )
     verbose: bool = False
     conv_type: Literal[None, "DIIS", "CROP"] = "DIIS"
     acc_hist_size: int = 10
