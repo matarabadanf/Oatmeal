@@ -7,7 +7,7 @@ from py_mods.src.SCF.CSUHF import CSUHFResults
 
 
 @dataclass
-class CS_MP2_Results(object):
+class CSMP2Results(object):
     CS_MP2Context: Union[CSRHFResults, CSUHFResults]
     E_MP2: np.complex128
     E_corr: np.complex128
@@ -18,7 +18,7 @@ class CS_MP2_Results(object):
 
 def CS_MP2(
     CS_MP2Context: Union[CSRHFResults, CSUHFResults],
-) -> CS_MP2_Results:
+) -> CSMP2Results:
     """Compute the MP2 energy correction using complex scaled UHF or RHF reference.
 
     Parameters
@@ -28,7 +28,7 @@ def CS_MP2(
 
     Returns
     -------
-    returnClass: CS_MP2_Results
+    returnClass: CSMP2Results
         Dataclass containing the MP2 energy correction.
     """
     if isinstance(CS_MP2Context, CSRHFResults):
@@ -43,7 +43,7 @@ def CS_MP2(
     return mp2_result
 
 
-def CS_MP2_RHF(CS_RHF_Context: CSRHFResults) -> CS_MP2_Results:
+def CS_MP2_RHF(CS_RHF_Context: CSRHFResults) -> CSMP2Results:
     """Compute the MP2 energy correction using complex scaled RHF reference.
 
     Parameters
@@ -53,7 +53,7 @@ def CS_MP2_RHF(CS_RHF_Context: CSRHFResults) -> CS_MP2_Results:
 
     Returns
     -------
-    returnClass: CS_MP2_Results
+    returnClass: CSMP2Results
         Dataclass containing the MP2 energy correction.
     """
     mp_type = "RMP2"
@@ -114,14 +114,14 @@ def CS_MP2_RHF(CS_RHF_Context: CSRHFResults) -> CS_MP2_Results:
 
     E_MP2 = E_corr + CS_RHF_Context.E_RHF
 
-    returnClass = CS_MP2_Results(
+    returnClass = CSMP2Results(
         CS_RHF_Context, E_MP2, E_corr, mp_type, contribution, eris_mo_chem
     )
 
     return returnClass
 
 
-def CS_MP2_UHF(CS_UHF_Context: CSUHFResults) -> CS_MP2_Results:
+def CS_MP2_UHF(CS_UHF_Context: CSUHFResults) -> CSMP2Results:
     """
     Compute the MP2 energy correction using complex scaled UHF reference.
 
@@ -132,7 +132,7 @@ def CS_MP2_UHF(CS_UHF_Context: CSUHFResults) -> CS_MP2_Results:
 
     Returns
     -------
-    returnClass: CS_MP2_Results
+    returnClass: CSMP2Results
         Dataclass containing the MP2 energy correction.
     """
 
@@ -286,7 +286,7 @@ def CS_MP2_UHF(CS_UHF_Context: CSUHFResults) -> CS_MP2_Results:
 
     E_MP2 = CS_UHF_Context.E_UHF + E_corr
 
-    returnClass = CS_MP2_Results(CS_UHF_Context, E_MP2, E_corr, mp_type, None, None)
+    returnClass = CSMP2Results(CS_UHF_Context, E_MP2, E_corr, mp_type, None, None)
 
     return returnClass
 
