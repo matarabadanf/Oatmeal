@@ -10,7 +10,6 @@ def h_ab_Z(
     projection_1: Tuple[int, int, int],
     basis_2: Primitive,
     projection_2: Tuple[int, int, int],
-    n_atoms: int,
     charge_atom: Union[int, float],
     coord_atom: NDArray[np.float64],
     k_hyper: int = 80,
@@ -47,12 +46,13 @@ def h_ab_Z(
     Implements the electron-nuclear attraction integral using Hermite Gaussian
     functions following the McMurchie-Davidson scheme.
     """
+    coord_atom = np.array(coord_atom).reshape(-1)
 
     a = basis_1.exp
     b = basis_2.exp
 
-    r_A = basis_1.R
-    r_B = basis_2.R
+    r_A = basis_1.R.reshape(-1)
+    r_B = basis_2.R.reshape(-1)
 
     i, k, m = projection_1
     j, l, n = projection_2
@@ -71,13 +71,14 @@ def h_ab_Z(
     R_tuv_n_array = R_tuv_n(p, r_PC, t_max, u_max, v_max, k_hyper)
     charge = charge_atom
 
-    for t in range(t_max):
-        for u in range(u_max):
-            for v in range(v_max):
+    for t in range(t_max + 1):
+        for u in range(u_max + 1):
+            for v in range(v_max + 1):
 
                 coefficient = E_ab(
                     basis_1, projection_1, basis_2, projection_2, t, u, v
                 )
+
                 hermite_integral = R_tuv_n_array[t, u, v, 0]
 
                 # print(f"{t}, {u}, {v}, {0}: {coefficient} {charge} {hermite_integral}")
@@ -85,7 +86,7 @@ def h_ab_Z(
 
                 h_ab_total += coefficient * charge * hermite_integral
 
-    return (-1) ** (t_max + u_max + v_max) * 2 * np.pi / p * h_ab_total
+    return -(2 * np.pi / p) * charge_atom * h_ab_total
 
 
 def V_3D(
@@ -99,6 +100,7 @@ def V_3D(
     coord_atom,
     k_hyper: int = 80,
 ):
+
     V_unnorm = h_ab_Z(
         basis_1, projection_1, basis_2, projection_2, charge_atom, coord_atom, k_hyper
     )

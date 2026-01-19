@@ -15,10 +15,21 @@ class Primitive:
         Center coordinates (3D vector)
     exp : float
         Gaussian exponent
-    angular_momentum : int
-        Angular momentum quantum number
-    norm : float
-        Normalization constant
+    total_L : int
+        Total angular momentum quantum number
+    l_projections : NDArray[np.int32]
+        Array of angular momentum projections (n_projections x 3)
+    normalization_constants : NDArray[np.float64]
+        Normalization constants for each projection
+    charge : float
+        Charge associated with the primitive
+
+    Notes
+    -----
+    - The l_projections array contains all valid (l_x, l_y, l_z) combinations
+      such that l_x + l_y + l_z = total_L.
+    - The normalization_constants array contains the normalization factors
+      corresponding to each angular momentum projection.
     """
 
     R: NDArray[np.float64]
@@ -26,6 +37,7 @@ class Primitive:
     total_L: int
     l_projections: NDArray[np.int32]  # of dimensions (n_projections, 3)
     normalization_constants: NDArray[np.float64]
+    charge: float = 1
 
 
 def create_primitive(R: NDArray[np.float64], exp: float, total_L: int) -> Primitive:
@@ -98,6 +110,77 @@ def self_overlap(Prim: Primitive) -> NDArray[np.float64]:
         )
 
     return overlaps
+
+
+def normalize_primitive(Prim: Primitive) -> None:
+    """
+    Normalize the primitive basis function in place by updating its normalization constants.
+
+    Parameters
+    ----------
+    Prim : Primitive
+        The primitive basis function to be normalized. Its normalization_constants attribute
+        will be updated in place.
+    """
+    for i, projection in enumerate(Prim.l_projections):
+        N = 1 / np.sqrt(
+            S_3D(
+                Prim,
+                projection,
+                Prim.normalization_constants[i],
+                Prim,
+                projection,
+                Prim.normalization_constants[i],
+            )
+        )
+        Prim.normalization_constants[i] = N
+
+
+def create_normalized_primitive(
+    R: NDArray[np.float64], exp: float, total_L: int, charge: float = 1
+) -> Primitive:
+    """
+    Factory function to create a Primitive object with computed angular momentum projections
+    and normalization constants.
+
+    Parameters
+
+    ----------
+    R : NDArray[np.float64]
+        Center coordinates (3D vector)
+    exp : float
+        Gaussian exponent
+    total_L : int
+        Total angular momentum quantum number
+
+    Returns
+    -------
+    Primitive
+        Primitive object
+    """
+    # Generate all angular momentum projections for total_L
+    l_projections = []
+    for l_x in range(total_L + 1):
+        for l_y in range(total_L - l_x + 1):
+            l_z = total_L - l_x - l_y
+            l_projections.append([l_x, l_y, l_z])
+    l_projections = np.array(l_projections, dtype=np.int32)
+
+    # Compute normalization constants for each projection
+    normalization_constants = np.zeros(len(l_projections)) + 1
+
+    prim = Primitive(
+        R=R,
+        exp=exp,
+        total_L=total_L,
+        l_projections=l_projections,
+        normalization_constants=normalization_constants,
+        charge=charge,
+    )
+
+    normalize_primitive(prim)
+
+    return prim
 
 
 def S_3D(

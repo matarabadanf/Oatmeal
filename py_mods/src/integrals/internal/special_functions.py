@@ -57,15 +57,17 @@ def M(a: float, b: float, x: float, k: int) -> float:
     float
         The value of the M(a, b, x) series computed with k terms.
     """
-    m = 0.0
-    for i in range(0, k):
-        a_k = pochhammer(a, i)
-        b_k = pochhammer(b, i)
-        k_factorial = scipy.special.gamma(i + 1)
-        # print(f"series {i}: {a_k} {b_k} {k_factorial},  {a_k / (b_k * k_factorial)} ")
-        m += a_k / (b_k * k_factorial) * x**i
+    term = 1.0
+    m_sum = 1.0
 
-    return float(m)
+    for n in range(1, k):
+        numerator = (a + n - 1) * x
+        denominator = (b + n - 1) * n
+
+        term *= numerator / denominator
+        m_sum += term
+
+    return float(m_sum)
 
 
 def boys_hypergeom(n: int, x: float, k: int):

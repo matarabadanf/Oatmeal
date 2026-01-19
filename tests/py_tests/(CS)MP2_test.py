@@ -77,7 +77,7 @@ def test_UMP2():
 
     assert (
         UHF_res.E_UHF.real - e_elec < 1e-14
-    ), "Difference in convergence of SCF with reference"
+    ), f"Difference in convergence of SCF with reference. Expected {e_elec}, got {UHF_res.E_UHF.real}"
 
     mymp = mp.UMP2(mf).run()
     mp_results = CS_MP2(UHF_res)
