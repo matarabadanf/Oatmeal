@@ -4,12 +4,13 @@ from py_mods.src.integrals.internal.ST_utils import S_1D, kinetic_energy_integra
 
 # --- Normalization and projection utilities ---
 
-def N_const(basis: Primitive, projection = None) -> float: # TODO: the issue is here
+
+def N_const(basis: Primitive, projection=None) -> float:  # TODO: the issue is here
     """
     Calculate normalization constant of a Primitive.
 
     Takes the value of a single projection directly as the normalization
-    constant is equal in any projection for a certain total l. 
+    constant is equal in any projection for a certain total l.
 
     Parameters
     ------
@@ -32,60 +33,8 @@ def N_const(basis: Primitive, projection = None) -> float: # TODO: the issue is 
 
     return N_A
 
-def project(l: int) -> list[list[int]]:
-    """
-    Return projections with total angular momentum l.
 
-
-    Parameters
-    ------
-    l : int
-        total angular momentum.
-
-    Returns
-    ------
-    projections : list[list[int]]
-        all possible projections with total angular momentum l.
-    """
-    if l == 0:
-        return [[0,0,0]]
-    elif l == 1:
-        return [[1,0,0], [0,1,0], [0,0,1]]
-    elif l == 2:
-        return [[2,0,0], [0,2,0], [0,0,2], [1,1,0], [0,1,1], [1,0,1]]
-    elif l == 3:
-        return [[3,0,0], [0,3,0], [0,0,3], [2,1,0], [0,2,1], [1,0,2], [2,0,1], [1,2,0], [0,1,2], [1,1,1]]
-    else:
-        return []
-
-
-def project_dim(l: int) -> int:
-    """
-    Return number of projections with total angular momentum l.
-
-    Parameters
-    ------
-    l : int
-        total angular momentum.
-
-    Returns
-    ------
-    projections : int
-        Number of projections for total angular momentum l.
-    """
-    if l == 0:
-        return 1
-    elif l == 1:
-        return 3
-    elif l == 2:
-        return 6
-    elif l == 3:
-        return 10
-    else:
-        return -1
-
-
-def orthogonal(i:int, j:int) -> bool:
+def orthogonal(i: int, j: int) -> bool:
     """
     Check if two angular momenta are the same.
 
@@ -108,11 +57,16 @@ def orthogonal(i:int, j:int) -> bool:
 
 
 # --- Overlap 3D with primitives ---
-def S_3D_components(basis_1: Primitive, projection_1: np.ndarray, basis_2: Primitive, projection_2: np.ndarray) -> np.ndarray:
+def S_3D_components(
+    basis_1: Primitive,
+    projection_1: np.ndarray,
+    basis_2: Primitive,
+    projection_2: np.ndarray,
+) -> np.ndarray:
     """
     Compute the three Cartesian components of the 3D overlap between two primitive functions.
 
-    To ensure orthogonality if the scalar product is 0 (they dont share a 
+    To ensure orthogonality if the scalar product is 0 (they dont share a
     component in the same projection) and the individual l is nonzero, the
     function returns [0,0,0].
 
@@ -137,11 +91,11 @@ def S_3D_components(basis_1: Primitive, projection_1: np.ndarray, basis_2: Primi
         If the projection vectors are orthogonal and both l1 and l2 are nonzero,
         returns numpy.array([0, 0, 0]).
 
-    Notes 
+    Notes
     -------
-        - We will do it this way for now, since we have to test for d functions. 
-        It is true that the calculation of the three 1d overlaps might be redundant, 
-        but it must be checked out. 
+        - We will do it this way for now, since we have to test for d functions.
+        It is true that the calculation of the three 1d overlaps might be redundant,
+        but it must be checked out.
     """
     # If there is overlap calculate it
     R_a = basis_1.R
@@ -153,9 +107,12 @@ def S_3D_components(basis_1: Primitive, projection_1: np.ndarray, basis_2: Primi
     overlap_components = np.zeros(3)
 
     for comp, _ in enumerate(overlap_components):
-        overlap_components[comp] = S_1D(R_a[comp], R_b[comp], alpha, beta, projection_1[comp], projection_2[comp])
+        overlap_components[comp] = S_1D(
+            R_a[comp], R_b[comp], alpha, beta, projection_1[comp], projection_2[comp]
+        )
 
     return overlap_components
+
 
 def S_3D(basis_1: Primitive, projection_1, basis_2: Primitive, projection_2) -> float:
     """
@@ -179,19 +136,25 @@ def S_3D(basis_1: Primitive, projection_1, basis_2: Primitive, projection_2) -> 
     ------
         float: The product of the three overlap components (S_ab, S_cd, S_ef).
     """
-    S_ab, S_cd, S_ef =  S_3D_components(basis_1, projection_1, basis_2, projection_2)
+    S_ab, S_cd, S_ef = S_3D_components(basis_1, projection_1, basis_2, projection_2)
 
     return S_ab * S_cd * S_ef
 
 
 # --- Kinetic 3D with primitives ---
 
-def T_3D(basis_1: Primitive, projection_1: np.ndarray, basis_2: Primitive, projection_2: np.ndarray) -> float:
+
+def T_3D(
+    basis_1: Primitive,
+    projection_1: np.ndarray,
+    basis_2: Primitive,
+    projection_2: np.ndarray,
+) -> float:
     """
     Calculate the product of the three kinetic energy integral components.
 
     Computes the kinetic energy integrals between two primitive functions
-    for each Cartesian component and calculates the total kinetic energy with: 
+    for each Cartesian component and calculates the total kinetic energy with:
 
     T_{ab} = T_{ij} S_{kl} S_{mn} + S_{ij} T_{kl} S_{mn} + S_{ij} S_{kl} T_{mn}
 
@@ -213,7 +176,7 @@ def T_3D(basis_1: Primitive, projection_1: np.ndarray, basis_2: Primitive, proje
     -------
     total_kinetic : float
         The product of the three kinetic energy components (T_ab, T_cd, T_ef).
-    
+
     Notes
     ------
         - Calls  S_3D_components.
@@ -223,7 +186,7 @@ def T_3D(basis_1: Primitive, projection_1: np.ndarray, basis_2: Primitive, proje
     R_b = basis_2.R
 
     alpha = basis_1.exp
-    beta  = basis_2.exp
+    beta = basis_2.exp
 
     a, c, e = projection_1
     b, d, f = projection_2
@@ -236,15 +199,10 @@ def T_3D(basis_1: Primitive, projection_1: np.ndarray, basis_2: Primitive, proje
     T_cd = kinetic_energy_integrals(R_a[1], R_b[1], alpha, beta, c, d)
     T_ef = kinetic_energy_integrals(R_a[2], R_b[2], alpha, beta, e, f)
 
-    total_kinetic = (T_ab * S_cd * S_ef) + (S_ab * T_cd  * S_ef) +  (S_ab * S_cd * T_ef)
+    total_kinetic = (T_ab * S_cd * S_ef) + (S_ab * T_cd * S_ef) + (S_ab * S_cd * T_ef)
 
-    return total_kinetic 
+    return total_kinetic
 
 
-def calculate_primitive_dimension(basis_list: list[Primitive]):
-
-    return [project_dim(basis.angular_momentum) for basis in basis_list]
-
-if __name__ == '__main__':
-    pass 
-
+if __name__ == "__main__":
+    pass

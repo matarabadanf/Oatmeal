@@ -4,6 +4,7 @@ from typing import Tuple, Union
 from py_mods.src.integrals.primitive import Primitive
 from py_mods.src.integrals.internal.hermite_utils import R_tuv_n, E_ab
 
+
 def h_ab_Z(
     basis_1: Primitive,
     projection_1: Tuple[int, int, int],
@@ -12,7 +13,7 @@ def h_ab_Z(
     n_atoms: int,
     charge_atom: Union[int, float],
     coord_atom: NDArray[np.float64],
-    k_hyper: int = 80
+    k_hyper: int = 80,
 ) -> float:
     """
     Calculate electron-nuclear attraction integral between two Gaussian basis functions.
@@ -60,8 +61,8 @@ def h_ab_Z(
     u_max = k + l + 1
     v_max = m + n + 1
 
-    p = a+b
-    r_P = (a * r_A + b * r_B)/p
+    p = a + b
+    r_P = (a * r_A + b * r_B) / p
 
     h_ab_total = 0
 
@@ -74,7 +75,9 @@ def h_ab_Z(
         for u in range(u_max):
             for v in range(v_max):
 
-                coefficient = E_ab(basis_1, projection_1, basis_2, projection_2, t, u, v)
+                coefficient = E_ab(
+                    basis_1, projection_1, basis_2, projection_2, t, u, v
+                )
                 hermite_integral = R_tuv_n_array[t, u, v, 0]
 
                 # print(f"{t}, {u}, {v}, {0}: {coefficient} {charge} {hermite_integral}")
@@ -82,7 +85,26 @@ def h_ab_Z(
 
                 h_ab_total += coefficient * charge * hermite_integral
 
-    return (-1)**(t_max+u_max+v_max)*2 * np.pi / p * h_ab_total
+    return (-1) ** (t_max + u_max + v_max) * 2 * np.pi / p * h_ab_total
+
+
+def V_3D(
+    basis_1,
+    projection_1,
+    N_a,
+    basis_2,
+    projection_2,
+    N_b,
+    charge_atom,
+    coord_atom,
+    k_hyper: int = 80,
+):
+    V_unnorm = h_ab_Z(
+        basis_1, projection_1, basis_2, projection_2, charge_atom, coord_atom, k_hyper
+    )
+
+    return N_a * N_b * V_unnorm
+
 
 def g_abcd(
     basis_1: Primitive,
@@ -93,7 +115,7 @@ def g_abcd(
     p3: Tuple[int, int, int],
     basis_4: Primitive,
     p4: Tuple[int, int, int],
-    k_hyper: int = 80
+    k_hyper: int = 80,
 ) -> float:
     """
     Calculate two-electron repulsion integral between four Gaussian basis functions.
@@ -143,18 +165,19 @@ def g_abcd(
     nu_max = kk + ll + 1
     phi_max = mm + nn + 1
 
+    p = a + b
+    r_P = (a * r_A + b * r_B) / p
 
-    p = a+b
-    r_P = (a * r_A + b * r_B)/p
-
-    q = c+d
-    r_Q = (c * r_C + d * r_D)/q
+    q = c + d
+    r_Q = (c * r_C + d * r_D) / q
 
     r_PQ = r_P - r_Q
 
-    alpha = p*q/(p+q)
+    alpha = p * q / (p + q)
 
-    Hermite_integral = R_tuv_n(alpha, r_PQ, t_max + tau_max, u_max + nu_max, v_max + phi_max, k_hyper)
+    Hermite_integral = R_tuv_n(
+        alpha, r_PQ, t_max + tau_max, u_max + nu_max, v_max + phi_max, k_hyper
+    )
 
     g_abcd = 0
 
@@ -169,4 +192,4 @@ def g_abcd(
                             integral = Hermite_integral[t + tau, u + nu, v + phi, 0]
                             g_abcd += coefficient_1 * coefficient_2 * integral
 
-    return 2*np.power(np.pi,2.5)/(p*q*np.sqrt(p+q))* g_abcd
+    return 2 * np.power(np.pi, 2.5) / (p * q * np.sqrt(p + q)) * g_abcd
