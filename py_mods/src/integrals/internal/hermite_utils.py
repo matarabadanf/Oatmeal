@@ -128,10 +128,10 @@ def E(
             + j * E(Ax, a, i, Bx, b, j - 1, t - 1, dim)
         ) / (2.0 * p * t)
     if t == 0 and i > 0:
-        return X_pa * E(Ax, a, i - 1, Bx, b, j, 0, dim) + (1.0 / (2.0 * p)) * E(
+        return X_pa * E(Ax, a, i - 1, Bx, b, j, 0, dim) + E(
             Ax, a, i - 1, Bx, b, j, 1, dim
         )
     if t == 0 and j > 0:
-        return X_pb * E(Ax, a, i, Bx, b, j - 1, 0, dim) + (1.0 / (2.0 * p)) * E(
+        return X_pb * E(Ax, a, i, Bx, b, j - 1, 0, dim) + E(
             Ax, a, i, Bx, b, j - 1, 1, dim
         )

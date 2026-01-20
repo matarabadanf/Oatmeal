@@ -70,7 +70,7 @@ def M(a: float, b: float, x: float, k: int) -> float:
     return float(m_sum)
 
 
-def boys_hypergeom(n: int, x: float, k: int):
+def boys_hypergeom(n: int, x: float, k: int = 80):
     """
     Definition of the Boys function from the confluent Hypergeometric function.
 

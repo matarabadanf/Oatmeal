@@ -65,13 +65,11 @@ def create_primitive(R: NDArray[np.float64], exp: float, total_L: int) -> Primit
     """
     # Generate all angular momentum projections for total_L
     l_projections = []
-    for l_x in range(total_L + 1):
-        for l_y in range(total_L - l_x + 1):
+    for l_x in range(total_L, -1, -1):
+        for l_y in range(total_L - l_x, -1, -1):
             l_z = total_L - l_x - l_y
             l_projections.append([l_x, l_y, l_z])
-    l_projections = np.array(l_projections, dtype=np.int32)
 
-    # Compute normalization constants for each projection
     normalization_constants = np.zeros(len(l_projections)) + 1
 
     prim = Primitive(
@@ -163,10 +161,11 @@ def create_normalized_primitive(
     """
     # Generate all angular momentum projections for total_L
     l_projections = []
-    for l_x in range(total_L + 1):
-        for l_y in range(total_L - l_x + 1):
+    for l_x in range(total_L, -1, -1):
+        for l_y in range(total_L - l_x, -1, -1):
             l_z = total_L - l_x - l_y
             l_projections.append([l_x, l_y, l_z])
+
     l_projections = np.array(l_projections, dtype=np.int32)
 
     # Compute normalization constants for each projection
@@ -574,7 +573,9 @@ def g_abcd(
                             coefficient_1 = E_ab(basis_1, p1, basis_2, p2, t, u, v)
                             coefficient_2 = E_ab(basis_3, p3, basis_4, p4, tau, nu, phi)
                             integral = Hermite_integral[t + tau, u + nu, v + phi, 0]
-                            g_abcd += coefficient_1 * coefficient_2 * integral
+
+                            sign = (-1.0) ** (tau + nu + phi)
+                            g_abcd += coefficient_1 * coefficient_2 * integral * sign
 
     return 2 * np.power(np.pi, 2.5) / (p * q * np.sqrt(p + q)) * g_abcd
 
