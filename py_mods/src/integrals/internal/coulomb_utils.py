@@ -1,8 +1,8 @@
 import numpy as np
 from numpy.typing import NDArray
 from typing import Tuple, Union
-from py_mods.src.integrals.primitive import Primitive
-from py_mods.src.integrals.internal.hermite_utils import R_tuv_n, E_ab
+from py_mods.src.integrals.primitive import Primitive, E_ab
+from py_mods.src.integrals.internal.hermite_utils import R_tuv_n
 
 
 def h_ab_Z(
@@ -195,3 +195,42 @@ def g_abcd(
                             g_abcd += coefficient_1 * coefficient_2 * integral
 
     return 2 * np.power(np.pi, 2.5) / (p * q * np.sqrt(p + q)) * g_abcd
+
+
+def eri(
+    basis_1: Primitive,
+    p1: Tuple[int, int, int],
+    N_a: float,
+    basis_2: Primitive,
+    p2: Tuple[int, int, int],
+    N_b: float,
+    basis_3: Primitive,
+    p3: Tuple[int, int, int],
+    N_c: float,
+    basis_4: Primitive,
+    p4: Tuple[int, int, int],
+    N_d: float,
+    k_hyper: int = 80,
+) -> float:
+
+    return (
+        N_a
+        * N_b
+        * N_c
+        * N_d
+        * g_abcd(
+            basis_1,
+            p1,
+            basis_2,
+            p2,
+            basis_3,
+            p3,
+            basis_4,
+            p4,
+            k_hyper,
+        )
+    )
+
+
+if __name__ == "__main__":
+    pass

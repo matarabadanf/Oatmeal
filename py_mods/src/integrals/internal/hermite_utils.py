@@ -1,8 +1,6 @@
 import numpy as np
 from numpy.typing import NDArray
-from typing import Tuple
 from py_mods.src.integrals.internal.special_functions import boys_hypergeom
-from py_mods.src.integrals.primitive import Primitive
 
 
 def R_tuv_n(
@@ -37,7 +35,7 @@ def R_tuv_n(
         Array of R(t,u,v,n) integrals with shape (t_max+1, u_max+1, v_max+1, n_max)
         where n_max = t_max + u_max + v_max
     """
-    R_2 = R_pc[0] ** 2 + R_pc[1] ** 2 + R_pc[2] ** 2
+    R_2: float = R_pc[0] ** 2 + R_pc[1] ** 2 + R_pc[2] ** 2
     X_pc, Y_pc, Z_pc = R_pc
 
     n_max = t_max + u_max + v_max + 1
@@ -75,7 +73,14 @@ def R_tuv_n(
 
 
 def E(
-    basis_1: Primitive, i: int, basis_2: Primitive, j: int, t: int, dim: int
+    Ax: NDArray[np.float64],
+    a: float,
+    i: int,
+    Bx: NDArray[np.float64],
+    b: float,
+    j: int,
+    t: int,
+    dim: int,
 ) -> float:
     """
     Calculate Hermite expansion coefficients for Gaussian overlap.
@@ -100,12 +105,11 @@ def E(
     float
         Hermite expansion coefficient E_{ij}^t
     """
-    Ax = basis_1.R[dim]
-    Bx = basis_2.R[dim]
-    a = basis_1.exp
-    b = basis_2.exp
+    A_coord = Ax[dim]
+    B_coord = Bx[dim]
 
-    X_ab = Bx - Ax
+    X_ab = B_coord - A_coord
+
     p = a + b
     mu = (a * b) / p
     X_pa = b / p * X_ab
@@ -120,58 +124,14 @@ def E(
     # Recursive cases
     if t > 0:
         return (
-            i * E(basis_1, i - 1, basis_2, j, t - 1, dim)
-            + j * E(basis_1, i, basis_2, j - 1, t - 1, dim)
+            i * E(Ax, a, i - 1, Bx, b, j, t - 1, dim)
+            + j * E(Ax, a, i, Bx, b, j - 1, t - 1, dim)
         ) / (2.0 * p * t)
     if t == 0 and i > 0:
-        return X_pa * E(basis_1, i - 1, basis_2, j, 0, dim) + (1.0 / (2.0 * p)) * E(
-            basis_1, i - 1, basis_2, j, 1, dim
+        return X_pa * E(Ax, a, i - 1, Bx, b, j, 0, dim) + (1.0 / (2.0 * p)) * E(
+            Ax, a, i - 1, Bx, b, j, 1, dim
         )
     if t == 0 and j > 0:
-        return X_pb * E(basis_1, i, basis_2, j - 1, 0, dim) + (1.0 / (2.0 * p)) * E(
-            basis_1, i, basis_2, j - 1, 1, dim
+        return X_pb * E(Ax, a, i, Bx, b, j - 1, 0, dim) + (1.0 / (2.0 * p)) * E(
+            Ax, a, i, Bx, b, j - 1, 1, dim
         )
-
-
-def E_ab(
-    basis_1: Primitive,
-    projection_1: Tuple[int, int, int],
-    basis_2: Primitive,
-    projection_2: Tuple[int, int, int],
-    t: int,
-    u: int,
-    v: int,
-) -> float:
-    """
-    Calculate product of Hermite coefficients for 3D Gaussian overlap.
-
-    Parameters
-    ----------
-    basis_1 : Primitive
-        First Gaussian primitive
-    projection_1 : Tuple[int, int, int]
-        Angular momentum indices (i,k,m) for basis_1
-    basis_2 : Primitive
-        Second Gaussian primitive
-    projection_2 : Tuple[int, int, int]
-        Angular momentum indices (j,l,n) for basis_2
-    t : int
-        x-component expansion order
-    u : int
-        y-component expansion order
-    v : int
-        z-component expansion order
-
-    Returns
-    -------
-    float
-        Product E_x * E_y * E_z of Hermite expansion coefficients
-    """
-    i, k, m = projection_1
-    j, l, n = projection_2
-
-    E_1 = E(basis_1, i, basis_2, j, t, 0)
-    E_2 = E(basis_1, k, basis_2, l, u, 1)
-    E_3 = E(basis_1, m, basis_2, n, v, 2)
-
-    return E_1 * E_2 * E_3
