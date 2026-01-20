@@ -1,11 +1,11 @@
-from py_mods.src.integrals.primitive import S_3D, T_3D, V_3D, eri
-from py_mods.src.integrals.primitive import Primitive, create_normalized_primitive
+from py_mods.src.integrals.GTO import S_3D, T_3D, V_3D, eri
+from py_mods.src.integrals.GTO import GTO, create_normalized_GTO
 import numpy as np
 
 
 def test_1s1s():
-    He_1s = create_normalized_primitive(np.array([0, 0, 0]), 0.4, 0)
-    H_1s = create_normalized_primitive(np.array([1, 0, 0]), 0.5, 0)
+    He_1s = create_normalized_GTO(np.array([0, 0, 0]), 0.4, 0)
+    H_1s = create_normalized_GTO(np.array([1, 0, 0]), 0.5, 0)
 
     S_1s1s = S_3D(
         He_1s,
@@ -95,8 +95,8 @@ def test_1s1s():
 
 
 def test_2p2p():
-    He_2p = create_normalized_primitive(np.array([0, 0, 0]), 0.4, 1)
-    H_2p = create_normalized_primitive(np.array([1, 0, 0]), 0.5, 1)
+    He_2p = create_normalized_GTO(np.array([0, 0, 0]), 0.4, 1)
+    H_2p = create_normalized_GTO(np.array([1, 0, 0]), 0.5, 1)
 
     S_2p2p_ref = np.array(
         [

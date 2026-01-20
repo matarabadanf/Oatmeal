@@ -8,7 +8,7 @@ from py_mods.src.integrals.internal.ST_utils import S_1D
 
 
 @dataclass
-class Primitive:
+class GTO:
     """
     Gaussian primitive basis function.
 
@@ -43,9 +43,9 @@ class Primitive:
     charge: float = 1
 
 
-def create_primitive(R: NDArray[np.float64], exp: float, total_L: int) -> Primitive:
+def create_GTO(R: NDArray[np.float64], exp: float, total_L: int) -> GTO:
     """
-    Factory function to create a Primitive object with computed angular momentum projections
+    Factory function to create a GTO object with computed angular momentum projections
     and normalization constants.
 
     Parameters
@@ -60,19 +60,15 @@ def create_primitive(R: NDArray[np.float64], exp: float, total_L: int) -> Primit
 
     Returns
     -------
-    Primitive
-        Primitive object
+    GTO
+        GTO object
     """
     # Generate all angular momentum projections for total_L
-    l_projections = []
-    for l_x in range(total_L, -1, -1):
-        for l_y in range(total_L - l_x, -1, -1):
-            l_z = total_L - l_x - l_y
-            l_projections.append([l_x, l_y, l_z])
+    l_projections = generate_angular_momentum_projections(total_L)
 
     normalization_constants = np.zeros(len(l_projections)) + 1
 
-    prim = Primitive(
+    prim = GTO(
         R=R,
         exp=exp,
         total_L=total_L,
@@ -85,14 +81,23 @@ def create_primitive(R: NDArray[np.float64], exp: float, total_L: int) -> Primit
     return prim
 
 
-def self_overlap(Prim: Primitive) -> NDArray[np.float64]:
+def generate_angular_momentum_projections(total_L):
+    l_projections = []
+    for l_x in range(total_L, -1, -1):
+        for l_y in range(total_L - l_x, -1, -1):
+            l_z = total_L - l_x - l_y
+            l_projections.append([l_x, l_y, l_z])
+    return np.array(l_projections, dtype=np.int16)
+
+
+def self_overlap(Prim: GTO) -> NDArray[np.float64]:
     """
-    Compute the self-overlap of a Primitive function.
+    Compute the self-overlap of a GTO function.
 
     Parameters
     ----------
-    Prim : Primitive
-        Primitive function
+    Prim : GTO
+        GTO function
 
     Returns
     -------
@@ -113,13 +118,13 @@ def self_overlap(Prim: Primitive) -> NDArray[np.float64]:
     return overlaps
 
 
-def normalize_primitive(Prim: Primitive) -> None:
+def normalize_GTO(Prim: GTO) -> None:
     """
     Normalize the primitive basis function in place by updating its normalization constants.
 
     Parameters
     ----------
-    Prim : Primitive
+    Prim : GTO
         The primitive basis function to be normalized. Its normalization_constants attribute
         will be updated in place.
     """
@@ -137,11 +142,11 @@ def normalize_primitive(Prim: Primitive) -> None:
         Prim.normalization_constants[i] = N
 
 
-def create_normalized_primitive(
+def create_normalized_GTO(
     R: NDArray[np.float64], exp: float, total_L: int, charge: float = 1
-) -> Primitive:
+) -> GTO:
     """
-    Factory function to create a Primitive object with computed angular momentum projections
+    Factory function to create a GTO object with computed angular momentum projections
     and normalization constants.
 
     Parameters
@@ -156,8 +161,8 @@ def create_normalized_primitive(
 
     Returns
     -------
-    Primitive
-        Primitive object
+    GTO
+        GTO object
     """
     # Generate all angular momentum projections for total_L
     l_projections = []
@@ -171,7 +176,7 @@ def create_normalized_primitive(
     # Compute normalization constants for each projection
     normalization_constants = np.zeros(len(l_projections)) + 1
 
-    prim = Primitive(
+    prim = GTO(
         R=R,
         exp=exp,
         total_L=total_L,
@@ -180,16 +185,16 @@ def create_normalized_primitive(
         charge=charge,
     )
 
-    normalize_primitive(prim)
+    normalize_GTO(prim)
 
     return prim
 
 
 # --- Hermite coefficients product for 3D overlap ---
 def E_ab(
-    basis_1: Primitive,
+    basis_1: GTO,
     projection_1: Tuple[int, int, int],
-    basis_2: Primitive,
+    basis_2: GTO,
     projection_2: Tuple[int, int, int],
     t: int,
     u: int,
@@ -200,11 +205,11 @@ def E_ab(
 
     Parameters
     ----------
-    basis_1 : Primitive
+    basis_1 : GTO
         First Gaussian primitive
     projection_1 : Tuple[int, int, int]
         Angular momentum indices (i,k,m) for basis_1
-    basis_2 : Primitive
+    basis_2 : GTO
         Second Gaussian primitive
     projection_2 : Tuple[int, int, int]
         Angular momentum indices (j,l,n) for basis_2
@@ -234,10 +239,10 @@ def E_ab(
 
 
 def S_3D(
-    basis_1: Primitive,
+    basis_1: GTO,
     projection_1,
     N_A: float,
-    basis_2: Primitive,
+    basis_2: GTO,
     projection_2,
     N_B: float,
 ) -> float:
@@ -246,14 +251,14 @@ def S_3D(
 
     Parameters
     ------
-    basis_1 : Primitive
+    basis_1 : GTO
         First primitive; must provide attributes:
           - R : array-like of length 3, center coordinates (R_x, R_y, R_z)
           - exp : float, Gaussian exponent (alpha)
           - angular_momentum : int, total angular momentum (l)
     projection_1 : numpy.ndarray
         Length-3 integer array with projection quantum numbers for basis_1 (m_x, m_y, m_z)
-    basis_2 : Primitive
+    basis_2 : GTO
         Second primitive; same requirements as basis_1
     projection_2 : numpy.ndarray
         Length-3 integer array with projection quantum numbers for basis_2
@@ -269,9 +274,9 @@ def S_3D(
 
 # --- Overlap 3D with primitives ---
 def S_3D_components(
-    basis_1: Primitive,
+    basis_1: GTO,
     projection_1: np.ndarray,
-    basis_2: Primitive,
+    basis_2: GTO,
     projection_2: np.ndarray,
 ) -> np.ndarray:
     """
@@ -283,14 +288,14 @@ def S_3D_components(
 
     Parameters
     ----------
-    basis_1 : Primitive
+    basis_1 : GTO
         First primitive; must provide attributes:
           - R : array-like of length 3, center coordinates (R_x, R_y, R_z)
           - exp : float, Gaussian exponent (alpha)
           - angular_momentum : int, total angular momentum (l)
     projection_1 : numpy.ndarray
         Length-3 integer array with projection quantum numbers for basis_1 (m_x, m_y, m_z)
-    basis_2 : Primitive
+    basis_2 : GTO
         Second primitive; same requirements as basis_1
     projection_2 : numpy.ndarray
         Length-3 integer array with projection quantum numbers for basis_2
@@ -358,9 +363,9 @@ def T_3D(prim_1, proj_1, N_a, prim_2, proj_2, N_b):
 
 # --- Overlap 3D with primitives ---
 def S_3D_components(
-    basis_1: Primitive,
+    basis_1: GTO,
     projection_1: np.ndarray,
-    basis_2: Primitive,
+    basis_2: GTO,
     projection_2: np.ndarray,
 ) -> np.ndarray:
     """
@@ -372,14 +377,14 @@ def S_3D_components(
 
     Parameters
     ----------
-    basis_1 : Primitive
+    basis_1 : GTO
         First primitive; must provide attributes:
           - R : array-like of length 3, center coordinates (R_x, R_y, R_z)
           - exp : float, Gaussian exponent (alpha)
           - angular_momentum : int, total angular momentum (l)
     projection_1 : numpy.ndarray
         Length-3 integer array with projection quantum numbers for basis_1 (m_x, m_y, m_z)
-    basis_2 : Primitive
+    basis_2 : GTO
         Second primitive; same requirements as basis_1
     projection_2 : numpy.ndarray
         Length-3 integer array with projection quantum numbers for basis_2
@@ -470,10 +475,10 @@ def h_ab_Z(
 
 
 def V_3D(
-    basis_1: Primitive,
+    basis_1: GTO,
     projection_1: Tuple[int, int, int],
     N_a: float,
-    basis_2: Primitive,
+    basis_2: GTO,
     projection_2: Tuple[int, int, int],
     N_b: float,
     charge_atom: float,
@@ -490,13 +495,13 @@ def V_3D(
 
 ##--- Two-electron repulsion integral between four Gaussian basis functions ---
 def g_abcd(
-    basis_1: Primitive,
+    basis_1: GTO,
     p1: Tuple[int, int, int],
-    basis_2: Primitive,
+    basis_2: GTO,
     p2: Tuple[int, int, int],
-    basis_3: Primitive,
+    basis_3: GTO,
     p3: Tuple[int, int, int],
-    basis_4: Primitive,
+    basis_4: GTO,
     p4: Tuple[int, int, int],
     k_hyper: int = 80,
 ) -> float:
@@ -505,7 +510,7 @@ def g_abcd(
 
     Parameters
     ----------
-    basis_1, basis_2, basis_3, basis_4 : Primitive
+    basis_1, basis_2, basis_3, basis_4 : GTO
         Gaussian primitive basis functions
     p1, p2, p3, p4 : Tuple[int, int, int]
         Angular momentum indices (i,k,m) for each basis function
@@ -581,16 +586,16 @@ def g_abcd(
 
 
 def eri(
-    basis_1: Primitive,
+    basis_1: GTO,
     p1: Tuple[int, int, int],
     N_a: float,
-    basis_2: Primitive,
+    basis_2: GTO,
     p2: Tuple[int, int, int],
     N_b: float,
-    basis_3: Primitive,
+    basis_3: GTO,
     p3: Tuple[int, int, int],
     N_c: float,
-    basis_4: Primitive,
+    basis_4: GTO,
     p4: Tuple[int, int, int],
     N_d: float,
     k_hyper: int = 80,

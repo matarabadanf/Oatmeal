@@ -1,7 +1,7 @@
 import numpy as np
 from numpy.typing import NDArray
 from typing import Tuple, Union
-from py_mods.src.integrals.primitive import Primitive, E_ab
+from py_mods.src.integrals.GTO import Primitive, E_ab
 from py_mods.src.integrals.internal.hermite_utils import R_tuv_n
 
 
