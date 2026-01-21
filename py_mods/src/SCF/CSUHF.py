@@ -371,8 +371,8 @@ def guess_density_UHF(
             half = dim // 2
 
             if np.allclose(uhf_state.P_beta, uhf_state.P_alpha):
-                uhf_state.P_beta[:half, :half] += uhf_state.P_alpha[half:, half:]
-                uhf_state.P_alpha[half:, half:] += uhf_state.P_beta[:half, :half]
+                uhf_state.P_beta[:half, :half] += 0.1
+                uhf_state.P_alpha[half:, half:] -= 0.1
 
                 uhf_state.P_alpha /= 4
                 uhf_state.P_beta /= 4

@@ -234,6 +234,7 @@ class CSRHFResults:
     error: Union[float, complex]
     iterations: int
     scaled_eris: NDArray[np.complex128]
+    homo_index: int
 
 
 def allocate_rhf_extended_context(ctx: CSRHFContext) -> CSRHFConstants:
@@ -361,6 +362,7 @@ def pack_rhf_results(
         error=rhf_state.error,
         iterations=rhf_state.iteration,
         scaled_eris=rhf_ext_ctx.eri_scaled,
+        homo_index=int(np.int32(ctx.n_electrons) / 2),
     )
 
 
@@ -718,6 +720,7 @@ class CSUHFResults(object):
     error: float
     iterations: int
     scaled_eris: NDArray[np.complex128]
+    homo_index: int
 
 
 def allocate_uhf_extended_context(ctx: CSUHFContext) -> CSUHFConstants:
@@ -878,7 +881,7 @@ def pack_uhf_results(
         e_alpha=uhf_state.e_orb_alpha,
         e_beta=uhf_state.e_orb_beta,
         n_alpha=uhf_state.final_alpha_elec,
-        n_beta=uhf_state.final_alpha_elec,
+        n_beta=uhf_state.final_beta_elec,
         det=(uhf_ext_ctx.det[0], uhf_ext_ctx.det[1]),
         X=uhf_ext_ctx.X,
         F_final_alph=uhf_state.F_next_alpha,
@@ -895,6 +898,9 @@ def pack_uhf_results(
         error=max(uhf_state.error_alpha, uhf_state.error_beta),
         iterations=uhf_state.iteration,
         scaled_eris=uhf_ext_ctx.eri_scaled,
+        homo_index=int(
+            max(uhf_state.final_alpha_elec.real, uhf_state.final_beta_elec.real)
+        ),
     )
 
 
