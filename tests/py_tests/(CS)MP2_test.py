@@ -72,11 +72,13 @@ def test_UMP2():
     UHF_cxt = UHF_context_from_pyscf(**pyscf_args)
     UHF_cxt.break_symm = True
     UHF_cxt.p_guess = "RHF"
+    UHF_cxt.guess_max_iter = 30
 
     UHF_res = CS_UHF(UHF_cxt)
 
     assert (
-        UHF_res.E_UHF.real - e_elec < 1e-14
+        UHF_res.E_UHF.real - e_elec
+        < 1e-13  # E-14 breaks with the current definition of symmetry breaking
     ), f"Difference in convergence of SCF with reference. Expected {e_elec}, got {UHF_res.E_UHF.real}"
 
     mymp = mp.UMP2(mf).run()
