@@ -11,8 +11,9 @@ def RHF_context_from_pyscf(
     basis="cc-pvdz",
     verbose=0,
     parseable_basis: Union[None, str] = None,
+    cart=False,
 ):
-    mol = gto.M(atom=atom, spin=spin, charge=charge, basis=basis)
+    mol = gto.M(atom=atom, spin=spin, charge=charge, basis=basis, cart=cart)
     n_elec = sum(mol.nelec)
 
     if parseable_basis is not None:
@@ -34,9 +35,26 @@ def RHF_context_from_pyscf(
     return return_class
 
 
-def UHF_context_from_pyscf(atom="He 0 0 0", spin=0, charge=0, basis="cc-pvdz"):
-    mol = gto.M(atom=atom, spin=spin, charge=charge, basis=basis)
+def UHF_context_from_pyscf(
+    atom="He 0 0 0",
+    spin=0,
+    charge=0,
+    basis="cc-pvdz",
+    verbose=0,
+    parseable_basis: Union[None, str] = None,
+    cart=False,
+):
+    mol = gto.M(atom=atom, spin=spin, charge=charge, basis=basis, cart=cart)
     n_elec = sum(mol.nelec)
+
+    if parseable_basis is not None:
+        try:
+            mol.basis = gto.basis.parse(parseable_basis)
+            mol.build()
+        except BasisNotFoundError:
+            print("Invalid custom basis string. Reverting to default cc-pvdz")
+            mol = gto.M(atom=atom, spin=spin, charge=charge, basis=basis)
+            mol.build()
 
     kin = mol.intor("int1e_kin")
     vnuc = mol.intor("int1e_nuc")
