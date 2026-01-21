@@ -141,7 +141,7 @@ def S_GTO_mat(cont_1: CGTOClass, cont_2: CGTOClass):
     S_mat = np.zeros((cont_1.l_dim, cont_2.l_dim))
 
     for p1 in range(cont_1.l_dim):
-        for p2 in range(cont_1.l_dim):
+        for p2 in range(cont_2.l_dim):
             S_mat[p1, p2] = S_GTO_proj(cont_1, p1, cont_2, p2)
 
     return S_mat * cont_1.N_a * cont_2.N_a
@@ -218,7 +218,7 @@ def T_GTO_mat(cont_1: CGTOClass, cont_2: CGTOClass):
     T_mat = np.zeros((cont_1.l_dim, cont_2.l_dim))
 
     for p1 in range(cont_1.l_dim):
-        for p2 in range(cont_1.l_dim):
+        for p2 in range(cont_2.l_dim):
             T_mat[p1, p2] = T_GTO_proj(cont_1, p1, cont_2, p2)
 
     return T_mat * cont_1.N_a * cont_2.N_a
@@ -304,7 +304,7 @@ def V_GTO_mat(
     S_mat = np.zeros((cont_1.l_dim, cont_2.l_dim))
 
     for p1 in range(cont_1.l_dim):
-        for p2 in range(cont_1.l_dim):
+        for p2 in range(cont_2.l_dim):
             S_mat[p1, p2] = V_GTO_proj(cont_1, p1, cont_2, p2, atom_pos, atom_charges)
 
     return S_mat * cont_1.N_a * cont_2.N_a
@@ -406,7 +406,7 @@ def Eri_GTO_tensor(
     eri_mat = np.zeros((cont_1.l_dim, cont_2.l_dim, cont_3.l_dim, cont_4.l_dim))
 
     for p1 in range(cont_1.l_dim):
-        for p2 in range(cont_1.l_dim):
+        for p2 in range(cont_2.l_dim):
             for p3 in range(cont_3.l_dim):
                 for p4 in range(cont_4.l_dim):
                     eri_mat[p1, p2, p3, p4] = eri_GTO_proj(
