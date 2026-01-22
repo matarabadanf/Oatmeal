@@ -5,12 +5,13 @@ This document aims to provide a brief overview of features, design decisions mad
 ## Features
 The current implementation's features are briefly listed below. For specific results see [Results](../docs/Results.md), for examples see [Tutorial](../docs/Tutorial.md), and the `notebooks` directory contains explanatory notebooks demonstrating the code and reproducing results. To see some other examples, check the `tests` directory.
 
-As of 17 January 2026, the implementation includes:
+As of 22 January 2026, the implementation includes:
 - **(CS)RHF and (CS)UHF:** Complex-scaled restricted and unrestricted Hartree–Fock calculations.
 - **Convergence acceleration:** DIIS and CROP algorithms.
 - **(CS)RMP2 and (CS)UMP2:** Complex-scaled and standard second-order Møller–Plesset (MP2) perturbation theory.
 - **PySCF interface:** Integrals and basis sets are obtained via PySCF. A small interface converts PySCF integrals to internal classes for the calculations.
 - **Excited-state convergence:** A simple occupation-mask approach builds the density to target certain excited determinants.
+- **Integral evaluation:** A simple integral evaluation engine. 
 
 ## Design
 This section describes the main design decisions taken during the development of this project, as well as the reasoning behind them. Most decisions were based on standard SCF/MP2 literature, but some design choices were made to overcome specific limitations.

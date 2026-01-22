@@ -1,18 +1,18 @@
 import numpy as np
 from numpy.typing import NDArray
 from typing import Tuple, Union
-from py_mods.src.integrals.primitive import Primitive
-from py_mods.src.integrals.internal.hermite_utils import R_tuv_n, E_ab
+from py_mods.src.integrals.GTO import Primitive, E_ab
+from py_mods.src.integrals.internal.hermite_utils import R_tuv_n
+
 
 def h_ab_Z(
     basis_1: Primitive,
     projection_1: Tuple[int, int, int],
     basis_2: Primitive,
     projection_2: Tuple[int, int, int],
-    n_atoms: int,
     charge_atom: Union[int, float],
     coord_atom: NDArray[np.float64],
-    k_hyper: int = 80
+    k_hyper: int = 80,
 ) -> float:
     """
     Calculate electron-nuclear attraction integral between two Gaussian basis functions.
@@ -46,12 +46,13 @@ def h_ab_Z(
     Implements the electron-nuclear attraction integral using Hermite Gaussian
     functions following the McMurchie-Davidson scheme.
     """
+    coord_atom = np.array(coord_atom).reshape(-1)
 
     a = basis_1.exp
     b = basis_2.exp
 
-    r_A = basis_1.R
-    r_B = basis_2.R
+    r_A = basis_1.R.reshape(-1)
+    r_B = basis_2.R.reshape(-1)
 
     i, k, m = projection_1
     j, l, n = projection_2
@@ -60,8 +61,8 @@ def h_ab_Z(
     u_max = k + l + 1
     v_max = m + n + 1
 
-    p = a+b
-    r_P = (a * r_A + b * r_B)/p
+    p = a + b
+    r_P = (a * r_A + b * r_B) / p
 
     h_ab_total = 0
 
@@ -70,11 +71,14 @@ def h_ab_Z(
     R_tuv_n_array = R_tuv_n(p, r_PC, t_max, u_max, v_max, k_hyper)
     charge = charge_atom
 
-    for t in range(t_max):
-        for u in range(u_max):
-            for v in range(v_max):
+    for t in range(t_max + 1):
+        for u in range(u_max + 1):
+            for v in range(v_max + 1):
 
-                coefficient = E_ab(basis_1, projection_1, basis_2, projection_2, t, u, v)
+                coefficient = E_ab(
+                    basis_1, projection_1, basis_2, projection_2, t, u, v
+                )
+
                 hermite_integral = R_tuv_n_array[t, u, v, 0]
 
                 # print(f"{t}, {u}, {v}, {0}: {coefficient} {charge} {hermite_integral}")
@@ -82,7 +86,27 @@ def h_ab_Z(
 
                 h_ab_total += coefficient * charge * hermite_integral
 
-    return (-1)**(t_max+u_max+v_max)*2 * np.pi / p * h_ab_total
+    return -(2 * np.pi / p) * charge_atom * h_ab_total
+
+
+def V_3D(
+    basis_1,
+    projection_1,
+    N_a,
+    basis_2,
+    projection_2,
+    N_b,
+    charge_atom,
+    coord_atom,
+    k_hyper: int = 80,
+):
+
+    V_unnorm = h_ab_Z(
+        basis_1, projection_1, basis_2, projection_2, charge_atom, coord_atom, k_hyper
+    )
+
+    return N_a * N_b * V_unnorm
+
 
 def g_abcd(
     basis_1: Primitive,
@@ -93,7 +117,7 @@ def g_abcd(
     p3: Tuple[int, int, int],
     basis_4: Primitive,
     p4: Tuple[int, int, int],
-    k_hyper: int = 80
+    k_hyper: int = 80,
 ) -> float:
     """
     Calculate two-electron repulsion integral between four Gaussian basis functions.
@@ -143,18 +167,19 @@ def g_abcd(
     nu_max = kk + ll + 1
     phi_max = mm + nn + 1
 
+    p = a + b
+    r_P = (a * r_A + b * r_B) / p
 
-    p = a+b
-    r_P = (a * r_A + b * r_B)/p
-
-    q = c+d
-    r_Q = (c * r_C + d * r_D)/q
+    q = c + d
+    r_Q = (c * r_C + d * r_D) / q
 
     r_PQ = r_P - r_Q
 
-    alpha = p*q/(p+q)
+    alpha = p * q / (p + q)
 
-    Hermite_integral = R_tuv_n(alpha, r_PQ, t_max + tau_max, u_max + nu_max, v_max + phi_max, k_hyper)
+    Hermite_integral = R_tuv_n(
+        alpha, r_PQ, t_max + tau_max, u_max + nu_max, v_max + phi_max, k_hyper
+    )
 
     g_abcd = 0
 
@@ -169,4 +194,43 @@ def g_abcd(
                             integral = Hermite_integral[t + tau, u + nu, v + phi, 0]
                             g_abcd += coefficient_1 * coefficient_2 * integral
 
-    return 2*np.power(np.pi,2.5)/(p*q*np.sqrt(p+q))* g_abcd
+    return 2 * np.power(np.pi, 2.5) / (p * q * np.sqrt(p + q)) * g_abcd
+
+
+def eri(
+    basis_1: Primitive,
+    p1: Tuple[int, int, int],
+    N_a: float,
+    basis_2: Primitive,
+    p2: Tuple[int, int, int],
+    N_b: float,
+    basis_3: Primitive,
+    p3: Tuple[int, int, int],
+    N_c: float,
+    basis_4: Primitive,
+    p4: Tuple[int, int, int],
+    N_d: float,
+    k_hyper: int = 80,
+) -> float:
+
+    return (
+        N_a
+        * N_b
+        * N_c
+        * N_d
+        * g_abcd(
+            basis_1,
+            p1,
+            basis_2,
+            p2,
+            basis_3,
+            p3,
+            basis_4,
+            p4,
+            k_hyper,
+        )
+    )
+
+
+if __name__ == "__main__":
+    pass

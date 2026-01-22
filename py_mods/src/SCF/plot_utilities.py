@@ -1,8 +1,8 @@
-from re import I
 import matplotlib.pyplot as plt
 from numpy.typing import NDArray
-from typing import Literal, Tuple, Union
+from typing import Literal, Tuple, Union, List
 import numpy as np
+from py_mods.src.SCF.types import CSUHFResults
 
 
 # --- Plot Utilities ---
@@ -160,6 +160,108 @@ def _plot_3_maps_real(matrices, plot_range=None, titles=None):
             ax.set_ylim(plot_range[1])
 
     return fig
+
+
+def _plot_UHF_MO_energies(
+    e_alpha: NDArray[np.complex128],
+    e_beta: NDArray[np.complex128],
+    homo_index: int,
+    n_alpha: int,
+    n_beta: int,
+    units: str = "Hartree",
+    ylim: Union[None, List] = None,
+):
+    lumo_index = homo_index + 1
+    ylim_str = ""
+
+    pos_alpha = 1
+    pos_beta = 1.5
+    line_width = 0.4
+
+    occ_alpha_eners = e_alpha[:n_alpha]
+    occ_beta_eners = e_beta[:n_beta]
+
+    x_alpha_occ = np.zeros_like(occ_alpha_eners) + pos_alpha
+    x_beta_occ = np.zeros_like(occ_beta_eners) + pos_beta
+
+    plt.scatter(x_alpha_occ, occ_alpha_eners, marker="^")
+    plt.scatter(x_beta_occ, occ_beta_eners, marker="v")
+
+    for e in e_alpha:
+        plt.hlines(
+            y=e,
+            xmin=pos_alpha - line_width / 2,
+            xmax=pos_alpha + line_width / 2,
+            colors="blue",
+            linewidth=2,
+        )
+
+    for e in e_beta:
+        plt.hlines(
+            y=e,
+            xmin=pos_beta - line_width / 2,
+            xmax=pos_beta + line_width / 2,
+            colors="red",
+            linewidth=2,
+        )
+
+    plt.ylabel(f"Energy {units}")
+    plt.xticks([pos_alpha, pos_beta], ["Alpha", "Beta"])
+
+    plt.tick_params(axis="x", length=0)
+
+    if ylim is not None:
+        ylim_str = f"({str(ylim).replace("'", '').replace('"', '')})"
+
+        if len(ylim) != 2:
+            raise ValueError("ylim must be a list of two elements: [ymin, ymax]")
+
+        if isinstance(ylim[0], str):
+            if ylim[0] == "core":
+                ylim_index = 0
+
+            elif "HOMO" in ylim[0]:
+                ylim_index = eval(ylim[0].replace("HOMO", f"{homo_index}"))
+
+            elif "LUMO" in ylim[0]:
+                ylim_index = eval(ylim[0].replace("LUMO", f"{lumo_index}"))
+
+            ylim[0] = min(e_alpha[ylim_index], e_beta[ylim_index])
+            ylim[0] += ylim[0] * 0.1
+
+        if isinstance(ylim[1], str):
+            if "HOMO" in ylim[1]:
+                ylim_index = eval(ylim[1].replace("HOMO", f"{homo_index}"))
+
+            elif "LUMO" in ylim[1]:
+                ylim_index = eval(ylim[1].replace("LUMO", f"{lumo_index}"))
+
+            ylim[1] = min(e_alpha[ylim_index], e_beta[ylim_index])
+            ylim[1] += ylim[1] * 0.1
+
+        ylim_dist = abs(ylim[1] - ylim[0])
+
+        plt.ylim(ylim)
+
+    plt.title(f"MO energies {ylim_str}")
+
+    plt.grid(axis="y", linestyle="--", alpha=0.3)
+    plt.show()
+
+
+def plot_UHF_MO_energies(
+    unf_results: CSUHFResults, units: str = "Hartree", ylim: Union[None, List] = None
+):
+
+    _plot_UHF_MO_energies(
+        unf_results.e_alpha,
+        unf_results.e_alpha,
+        unf_results.homo_index,
+        int(unf_results.n_alpha.real),
+        int(unf_results.n_beta.real),
+        units=units,
+        ylim=ylim,
+    )
 
 
 if __name__ == "__main__":
