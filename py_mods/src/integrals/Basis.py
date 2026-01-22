@@ -12,7 +12,11 @@ import numpy as np
 
 
 @dataclass
+<<<<<<< HEAD
 class BasisSet:
+=======
+class BasisSetClass:
+>>>>>>> 4f58fba (BSE api.)
     CGTOs: List[CGTOClass]
     n_CGTOs: int
     matrix_indices: NDArray[np.int16]
@@ -21,7 +25,33 @@ class BasisSet:
     q_atoms: NDArray[np.float64]
 
 
+<<<<<<< HEAD
 def construct_basis_from_lists(cgto_list, r_atom_list, q_atom_list) -> BasisSet:
+=======
+def construct_basis_from_lists(
+    cgto_list: list[CGTOClass],
+    r_atom_list: NDArray[np.float64],
+    q_atom_list: NDArray[np.float64],
+) -> BasisSetClass:
+    """
+    Constructs a BasisSetClass object from lists of CGTOs and atomic positions/charges.
+
+    Parameters
+    ----------
+    cgto_list : list[CGTOClass]
+        List of CGTOClass objects representing the basis functions.
+    r_atom_list : NDArray[np.float64]
+        Array of atomic positions (shape: (N_atoms, 3)).
+    q_atom_list : NDArray[np.float64]
+        Array of atomic charges (shape: (N_atoms,)).
+
+    Returns
+    -------
+    BasisSetClass
+        An instance of BasisSetClass containing the provided CGTOs and atomic data.
+    """
+
+>>>>>>> 4f58fba (BSE api.)
     if len(r_atom_list) != len(q_atom_list):
         raise ValueError("Length of r_atom_list and q_atom_list must be the same.")
 
@@ -29,7 +59,11 @@ def construct_basis_from_lists(cgto_list, r_atom_list, q_atom_list) -> BasisSet:
     cgto_indices = [sum(projections[:i]) for i in range(len(cgto_list))]
     cgto_indices.append(projections[-1] + cgto_indices[-1])
 
+<<<<<<< HEAD
     basis_set = BasisSet(
+=======
+    basis_set = BasisSetClass(
+>>>>>>> 4f58fba (BSE api.)
         CGTOs=cgto_list,
         n_CGTOs=len(cgto_list),
         matrix_indices=cgto_indices,
@@ -41,7 +75,24 @@ def construct_basis_from_lists(cgto_list, r_atom_list, q_atom_list) -> BasisSet:
     return basis_set
 
 
+<<<<<<< HEAD
 def S_basis_set(basis_set: BasisSet) -> NDArray[np.float64]:
+=======
+def S_basis_set(basis_set: BasisSetClass) -> NDArray[np.float64]:
+    """
+    Calculate overlap matrix of a given basis set.
+
+    Parameters
+    ----------
+    basis_set : BasisSetClass
+        Basis set.
+
+    Returns
+    -------
+    NDArray[np.float64]
+        Overlap matrix.
+    """
+>>>>>>> 4f58fba (BSE api.)
     n_CGTOs = basis_set.n_CGTOs
     S_mat = np.zeros((basis_set.matrix_indices[-1], basis_set.matrix_indices[-1]))
 
@@ -60,7 +111,24 @@ def S_basis_set(basis_set: BasisSet) -> NDArray[np.float64]:
     return S_mat
 
 
+<<<<<<< HEAD
 def V_basis_set(basis_set: BasisSet) -> NDArray[np.float64]:
+=======
+def V_basis_set(basis_set: BasisSetClass) -> NDArray[np.float64]:
+    """
+    Calculate potential matrix of a given basis set.
+
+    Parameters
+    ----------
+    basis_set : BasisSetClass
+        Basis set.
+
+    Returns
+    -------
+    NDArray[np.float64]
+        Potential matrix.
+    """
+>>>>>>> 4f58fba (BSE api.)
     n_CGTOs = basis_set.n_CGTOs
     S_mat = np.zeros((basis_set.matrix_indices[-1], basis_set.matrix_indices[-1]))
 
@@ -82,7 +150,24 @@ def V_basis_set(basis_set: BasisSet) -> NDArray[np.float64]:
     return S_mat
 
 
+<<<<<<< HEAD
 def T_basis_set(basis_set: BasisSet) -> NDArray[np.float64]:
+=======
+def T_basis_set(basis_set: BasisSetClass) -> NDArray[np.float64]:
+    """
+    Calculate kinetic matrix of a given basis set.
+
+    Parameters
+    ----------
+    basis_set : BasisSetClass
+        Basis set.
+
+    Returns
+    -------
+    NDArray[np.float64]
+        Kinetic matrix.
+    """
+>>>>>>> 4f58fba (BSE api.)
     n_CGTOs = basis_set.n_CGTOs
     S_mat = np.zeros((basis_set.matrix_indices[-1], basis_set.matrix_indices[-1]))
 
@@ -101,6 +186,7 @@ def T_basis_set(basis_set: BasisSet) -> NDArray[np.float64]:
     return S_mat
 
 
+<<<<<<< HEAD
 def eri_basis_set(basis_set: BasisSet) -> NDArray[np.float64]:
     n_CGTOs = basis_set.n_CGTOs
     dim = basis_set.matrix_indices[-1]
@@ -196,6 +282,22 @@ def T_basis_set(basis_set: BasisSet) -> NDArray[np.float64]:
 
 
 def eri_basis_set(basis_set: BasisSet) -> NDArray[np.float64]:
+=======
+def eri_basis_set(basis_set: BasisSetClass) -> NDArray[np.float64]:
+    """
+    Calculate electron repulsion integral (ERI) tensor of a given basis set.
+
+    Parameters
+    ----------
+    basis_set : BasisSetClass
+        Basis set.
+
+    Returns
+    -------
+    NDArray[np.float64]
+        ERI tensor.
+    """
+>>>>>>> 4f58fba (BSE api.)
     n_CGTOs = basis_set.n_CGTOs
     dim = basis_set.matrix_indices[-1]
     eri_tensor = np.zeros((dim, dim, dim, dim))
