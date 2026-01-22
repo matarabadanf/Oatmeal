@@ -14,6 +14,8 @@ Currently the implemented features are:
     - Complex scaled Restricted MP2.
     - Complex scaled Unrestricted MP2.  
 
+- Simple OS/MD integral evaluation for generalized $l$ CGTOs. 
+
 ## Installation
 Instal as a module to be able to import it. Clone, then:
 ```shell
@@ -27,6 +29,7 @@ pip install -e . -r requirements.txt
 Oatmeal/
 |- py_mods/
 |    ─ src/
+|        - integrals/
 |        - SCF/                
 |            ─ RHF.py         
 |            - CSRHF.py
