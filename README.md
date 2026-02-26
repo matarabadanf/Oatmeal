@@ -14,7 +14,9 @@ Currently the implemented features are:
     - Complex scaled Restricted MP2.
     - Complex scaled Unrestricted MP2.  
 
-- Simple OS/MD integral evaluation for generalized $l$ CGTOs. 
+- Simple OS/MD integral evaluation for generalized $l$ CGTOs.
+
+For a complete list of Features, Tutorials, and the results of some calculations see the [documentation](docs/). 
 
 ## Installation
 Instal as a module to be able to import it. Clone, then:
