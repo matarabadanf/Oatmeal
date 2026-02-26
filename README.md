@@ -50,7 +50,7 @@ Oatmeal/
 ```
 
 ## Usage 
-The current implementation depends on the integrals to be calculated elsewhere. In particular, PySCF's integrals were used. A custom code to perform integral evaluation was coded, but is currently abysmally slow in comparison to PySCF. Still an example of an "dependency-less" SCF calculation can be seen [here](notebooks/Integral\evaluation/5_My_first_SCF.ipynb).
+The current implementation depends on the integrals to be calculated elsewhere. In particular, PySCF's integrals were used. A custom code to perform integral evaluation was coded, but is currently abysmally slow in comparison to PySCF. Still an example of an "dependency-less" SCF calculation can be seen [here](notebooks/Integral%20evaluation/5_My_first_SCF.ipynb).
 
 For usage examples see see the [Jupyter notebooks](notebooks/). 
 
