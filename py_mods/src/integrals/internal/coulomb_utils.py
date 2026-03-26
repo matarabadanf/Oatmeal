@@ -1,14 +1,14 @@
 import numpy as np
 from numpy.typing import NDArray
 from typing import Tuple, Union
-from py_mods.src.integrals.GTO import Primitive, E_ab
+from py_mods.src.integrals.GTO import GTO, E_ab
 from py_mods.src.integrals.internal.hermite_utils import R_tuv_n
 
 
 def h_ab_Z(
-    basis_1: Primitive,
+    basis_1: GTO,
     projection_1: Tuple[int, int, int],
-    basis_2: Primitive,
+    basis_2: GTO,
     projection_2: Tuple[int, int, int],
     charge_atom: Union[int, float],
     coord_atom: NDArray[np.float64],
@@ -19,11 +19,11 @@ def h_ab_Z(
 
     Parameters
     ----------
-    basis_1 : Primitive
+    basis_1 : GTO
         First Gaussian primitive basis function
     projection_1 : Tuple[int, int, int]
         Angular momentum indices (i,k,m) for basis_1
-    basis_2 : Primitive
+    basis_2 : GTO
         Second Gaussian primitive basis function
     projection_2 : Tuple[int, int, int]
         Angular momentum indices (j,l,n) for basis_2
@@ -109,13 +109,13 @@ def V_3D(
 
 
 def g_abcd(
-    basis_1: Primitive,
+    basis_1: GTO,
     p1: Tuple[int, int, int],
-    basis_2: Primitive,
+    basis_2: GTO,
     p2: Tuple[int, int, int],
-    basis_3: Primitive,
+    basis_3: GTO,
     p3: Tuple[int, int, int],
-    basis_4: Primitive,
+    basis_4: GTO,
     p4: Tuple[int, int, int],
     k_hyper: int = 80,
 ) -> float:
@@ -124,7 +124,7 @@ def g_abcd(
 
     Parameters
     ----------
-    basis_1, basis_2, basis_3, basis_4 : Primitive
+    basis_1, basis_2, basis_3, basis_4 : GTO
         Gaussian primitive basis functions
     p1, p2, p3, p4 : Tuple[int, int, int]
         Angular momentum indices (i,k,m) for each basis function
@@ -198,16 +198,16 @@ def g_abcd(
 
 
 def eri(
-    basis_1: Primitive,
+    basis_1: GTO,
     p1: Tuple[int, int, int],
     N_a: float,
-    basis_2: Primitive,
+    basis_2: GTO,
     p2: Tuple[int, int, int],
     N_b: float,
-    basis_3: Primitive,
+    basis_3: GTO,
     p3: Tuple[int, int, int],
     N_c: float,
-    basis_4: Primitive,
+    basis_4: GTO,
     p4: Tuple[int, int, int],
     N_d: float,
     k_hyper: int = 80,

@@ -51,6 +51,8 @@ def construct_basis_from_lists(
     cgto_indices = [sum(projections[:i]) for i in range(len(cgto_list))]
     cgto_indices.append(projections[-1] + cgto_indices[-1])
 
+    cgto_indices = np.array(cgto_indices, dtype=np.int16)
+
     basis_set = BasisSetClass(
         CGTOs=cgto_list,
         n_CGTOs=len(cgto_list),

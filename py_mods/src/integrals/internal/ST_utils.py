@@ -122,9 +122,7 @@ def S_1D(Ax: float, Bx: float, a: float, b: float, i: int, j: int) -> float:
     # if i*j == 0 and i != j:
     #     return 0
 
-    result = float(
-        obara_saika_bottom_up(Ax, Bx, a, b, i, j)[i][j]
-    )  # TODO: something fishy here
+    result = float(obara_saika_bottom_up(Ax, Bx, a, b, i, j)[i][j])
 
     return result
 

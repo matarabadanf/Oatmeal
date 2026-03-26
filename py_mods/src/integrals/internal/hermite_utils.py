@@ -135,3 +135,5 @@ def E(
         return X_pb * E(Ax, a, i, Bx, b, j - 1, 0, dim) + E(
             Ax, a, i, Bx, b, j - 1, 1, dim
         )
+    else:
+        return 0.0
