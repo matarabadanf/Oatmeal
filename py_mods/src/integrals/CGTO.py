@@ -55,6 +55,7 @@ def create_CGTOClass(
     exps: NDArray[np.float64],
     d_i: NDArray[np.float64],
     total_L: int,
+    unnormalized: bool = False,
 ) -> CGTOClass:
     """
     Factory function to create a GTOClass
@@ -90,7 +91,10 @@ def create_CGTOClass(
         primitives=primitives,
     )
 
-    N_a = calculate_normalization_constant(unnormalized_cgto)
+    if unnormalized:
+        N_a = 1.0
+    else:
+        N_a = calculate_normalization_constant(unnormalized_cgto)
 
     unnormalized_cgto.N_a = N_a
 
@@ -414,6 +418,8 @@ def Eri_GTO_tensor(
                     )
 
     eri_tensor = eri_mat * cont_1.N_a * cont_2.N_a * cont_3.N_a * cont_4.N_a
+
+    # print(f'Normalization constants are: {cont_1.N_a}, {cont_2.N_a}, {cont_3.N_a}, {cont_4.N_a}')
 
     return eri_tensor
 

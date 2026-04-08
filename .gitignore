@@ -68,7 +68,7 @@ Oatmeal.egg-info
 # make and cmake
 *build
 
-*eri*
+*eri_*
 *trans.dat
 tests/py_tests/data/*.dat
 *.npy
@@ -86,3 +86,4 @@ notebooks/dirac-matrix-elements/*.tgz*
 notebooks/dirac-matrix-elements/*.inp*
 notebooks/dirac-matrix-elements/*.xyz*
 notebooks/dirac-matrix-elements/*.out*
+notebooks/inter*/*
