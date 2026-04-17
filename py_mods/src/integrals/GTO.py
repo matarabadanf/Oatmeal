@@ -39,6 +39,7 @@ class GTO:
     exp: float
     total_L: int
     l_projections: NDArray[np.int32]  # of dimensions (n_projections, 3)
+    l_dim: int
     normalization_constants: NDArray[np.float64]
     charge: float = 1
 
@@ -74,6 +75,7 @@ def create_GTO(R: NDArray[np.float64], exp: float, total_L: int) -> GTO:
         total_L=total_L,
         l_projections=l_projections,
         normalization_constants=normalization_constants,
+        l_dim=len(l_projections)
     )
 
     prim.normalization_constants = 1 / np.sqrt(self_overlap(Prim=prim))
@@ -183,6 +185,7 @@ def create_normalized_GTO(
         l_projections=l_projections,
         normalization_constants=normalization_constants,
         charge=charge,
+        l_dim=len(l_projections)
     )
 
     normalize_GTO(prim)
