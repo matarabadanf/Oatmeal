@@ -1,10 +1,11 @@
 import numpy as np
 from numpy.typing import NDArray
 from dataclasses import dataclass
-from typing import Tuple
+from typing import Tuple, List
 from py_mods.src.integrals.internal.ST_utils import kinetic_energy_integrals
 from py_mods.src.integrals.internal.hermite_utils import R_tuv_n, E
 from py_mods.src.integrals.internal.ST_utils import S_1D
+from scipy.special import factorial2
 
 
 @dataclass
@@ -39,6 +40,7 @@ class GTO:
     exp: float
     total_L: int
     l_projections: NDArray[np.int32]  # of dimensions (n_projections, 3)
+    l_dim: int
     normalization_constants: NDArray[np.float64]
     charge: float = 1
 
@@ -74,6 +76,7 @@ def create_GTO(R: NDArray[np.float64], exp: float, total_L: int) -> GTO:
         total_L=total_L,
         l_projections=l_projections,
         normalization_constants=normalization_constants,
+        l_dim=len(l_projections),
     )
 
     prim.normalization_constants = 1 / np.sqrt(self_overlap(Prim=prim))
@@ -118,7 +121,7 @@ def self_overlap(Prim: GTO) -> NDArray[np.float64]:
     return overlaps
 
 
-def normalize_GTO(Prim: GTO) -> None:
+def normalize_GTO(Prim: GTO, hermit_normalize=False) -> None:
     """
     Normalize the primitive basis function in place by updating its normalization constants.
 
@@ -140,10 +143,16 @@ def normalize_GTO(Prim: GTO) -> None:
             )
         )
         Prim.normalization_constants[i] = N
+        if hermit_normalize:
+            Prim.normalization_constants[i] *= hermit_norm_coefficient(*projection)
 
 
 def create_normalized_GTO(
-    R: NDArray[np.float64], exp: float, total_L: int, charge: float = 1
+    R: NDArray[np.float64],
+    exp: float,
+    total_L: int,
+    charge: float = 1,
+    hermit_norm: bool = False,
 ) -> GTO:
     """
     Factory function to create a GTO object with computed angular momentum projections
@@ -158,6 +167,10 @@ def create_normalized_GTO(
         Gaussian exponent
     total_L : int
         Total angular momentum quantum number
+    charge : float, optional
+        Charge associated with the primitive, by default 1
+    hermit_norm : bool, optional
+        Whether to apply Hermite normalization to the GTO, by default False
 
     Returns
     -------
@@ -183,9 +196,13 @@ def create_normalized_GTO(
         l_projections=l_projections,
         normalization_constants=normalization_constants,
         charge=charge,
+        l_dim=len(l_projections),
     )
 
-    normalize_GTO(prim)
+    normalize_GTO(prim, hermit_normalize=hermit_norm)
+
+    # if hermit_norm:
+    #     hermit_normalize([prim])
 
     return prim
 
@@ -560,3 +577,51 @@ def eri(
             k_hyper,
         )
     )
+
+
+def S_3D_uncontracted_GTO_list(
+    gto_list: List[GTO],
+) -> NDArray[np.float64]:
+    """
+    Compute the full overlap matrix for a list of uncontracted GTOs.
+
+    Parameters
+    ----------
+    gto_list : List[GTO]
+        List of GTO objects representing the basis functions.
+
+    Returns
+    -------
+    NDArray[np.float64], shape(total_projections, total_projections)
+        Overlap matrix.
+    """
+    l_projections = [len(gto.l_projections) for gto in gto_list]
+    total_size = sum(l_projections)
+    S_matrix = np.zeros((total_size, total_size))
+
+    basis_start_index = [sum(l_projections[0:i]) for i in range(len(l_projections))]
+
+    for mu_idx, mu in enumerate(gto_list):
+        for nu_idx, nu in enumerate(gto_list):
+            for mu_proj_idx, muproj in enumerate(mu.l_projections):
+                for nu_proj_idx, nuproj in enumerate(nu.l_projections):
+                    idx_mu_and_proj = basis_start_index[mu_idx] + mu_proj_idx
+                    idx_nu_and_proj = basis_start_index[nu_idx] + nu_proj_idx
+
+                    S_matrix[idx_mu_and_proj, idx_nu_and_proj] = S_3D(
+                        mu,
+                        muproj,
+                        mu.normalization_constants[mu_proj_idx],
+                        nu,
+                        nuproj,
+                        nu.normalization_constants[nu_proj_idx],
+                    )
+
+    return S_matrix
+
+
+def hermit_norm_coefficient(i, j, k):
+    Fa = factorial2(2 * i - 1) if i > 0 else 1
+    Fb = factorial2(2 * j - 1) if j > 0 else 1
+    Fc = factorial2(2 * k - 1) if k > 0 else 1
+    return np.sqrt(Fa * Fb * Fc)
