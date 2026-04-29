@@ -1,4 +1,4 @@
-# Oatmeal: a tiny CS-SCF/CS-MP2 toy model
+# Oatmeal: a tiny CS-SCF/CS-MP2 and molecular integral kernel toy model 
 
 ## Features
 Currently the implemented features are:
@@ -14,7 +14,7 @@ Currently the implemented features are:
     - Complex scaled Restricted MP2.
     - Complex scaled Unrestricted MP2.  
 
-- Simple OS/MD integral evaluation for generalized $l$ CGTOs.
+- Simple OS/MD $S$, $T$, $V$ and ERIs matrix element evaluation for generalized $l$ CGTOs.
 
 For a complete list of Features, Tutorials, and the results of some calculations see the [documentation](docs/). 
 
@@ -50,7 +50,7 @@ Oatmeal/
 ```
 
 ## Usage 
-The current implementation depends on the integrals to be calculated elsewhere. In particular, PySCF's integrals were used. A custom code to perform integral evaluation was coded, but is currently abysmally slow in comparison to PySCF. Still an example of an "dependency-less" SCF calculation can be seen [here](notebooks/Integral%20evaluation/5_My_first_SCF.ipynb).
+The current implementation depends on the integrals to be calculated elsewhere. In particular, PySCF's integrals were used. A custom code to perform integral evaluation was built, but is currently abysmally slow in comparison to other well established codes. Still an example of an "dependency-less" SCF calculation can be seen [here](notebooks/Integral%20evaluation/5_My_first_SCF.ipynb).
 
 For usage examples see see the [Jupyter notebooks](notebooks/). 
 
