@@ -1,7 +1,7 @@
 from py_mods.src.integrals.CGTO import (
     create_CGTOClass,
     S_GTO_mat,
-    generate_angular_momentum_projections,
+    _generate_angular_momentum_projections,
     T_GTO_mat,
     V_GTO_mat,
     Eri_GTO_tensor,
@@ -15,7 +15,7 @@ def test_1s1s():
     # STO3g example:
     l = 0
     l_tags = ["S", "P", "D", "F", "G", "H"]
-    l_projs = len(generate_angular_momentum_projections(l))
+    l_projs = len(_generate_angular_momentum_projections(l))
 
     r1 = np.array([0.0, 0.0, 0.0])
     r2 = np.array([0.0, 0.0, 1.4])
@@ -86,7 +86,7 @@ def test_2p2p():
     # STO3g example:
     l = 1
     l_tags = ["S", "P", "D", "F", "G", "H"]
-    l_projs = len(generate_angular_momentum_projections(l))
+    l_projs = len(_generate_angular_momentum_projections(l))
 
     r1 = np.array([0.0, 0.0, 0.0])
     r2 = np.array([0.0, 0.0, 1.4])

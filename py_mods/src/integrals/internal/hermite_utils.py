@@ -1,6 +1,9 @@
+from typing import Union
 import numpy as np
+import math
 from numpy.typing import NDArray
 from py_mods.src.integrals.internal.special_functions import boys_hypergeom
+from py_mods.src.integrals.internal.array_utils import IDX3DC
 
 
 def R_tuv_n(
@@ -72,7 +75,240 @@ def R_tuv_n(
     return R_tuv_n_array
 
 
-def E(
+def E_bottoms_up(
+    A: NDArray[np.float64],
+    a: float,
+    i_max: int,
+    B: NDArray[np.float64],
+    b: float,
+    j_max: int,
+    t_max: int,
+    out: Union[None, NDArray] = None,
+) -> NDArray[np.float64]:
+    """
+    Bottoms-up calculation of Hermite expansion coefficients E_{ij}^t. In the
+    same way OS relations can be built upwards instead of recursive calling,
+    the same principle is applied here: build the zero cases and then
+    recursively build the whole E^{AB}_{t} Hermite polynomial coefficients
+    tensor.
+
+    Parameters
+    ----------
+    A: NDArray[float], of size (3,)
+        Cartesian coordinates of centre A.
+    a: float
+        Exponent of Gaussian centered at A.
+    i_max: int
+        Maximum angular momentum projection of A.
+    B: NDArray[float], of size (3,)
+        Cartesian coordinates of centre B.
+    b: float
+        Exponent of Gaussian centered at b.
+    i_max: int
+        Maximum angular momentum projection of B.
+    t_max: int
+        Maximum value t of the Hermite polynomial. t <= i + j
+
+    Returns
+    -------
+    E_ab_t_array: NDArray[float] of size (i_max, j_max, t)
+        Complete Hermite polynomial coefficient tensor
+    """
+
+    E_ab_t_array = np.zeros((i_max + 1, j_max + 1, t_max + 1), dtype=np.float64)
+
+    X_ab = B - A
+
+    p = a + b
+    mu = (a * b) / p
+    X_pa = b / p * X_ab
+    X_pb = -a / p * X_ab
+
+    # Base case i = j = t = 0 (Helgaker 9.5.8)
+    E_ab_t_array[0, 0, 0] = np.exp(-mu * X_ab**2)
+
+    # Compute the [i,0,0] entries (Helgaker 9.5.20)
+    for i in range(1, i_max + 1):
+        E_ab_t_array[i, 0, 0] += X_pa * E_ab_t_array[i - 1, 0, 0]
+        E_ab_t_array[i, 0, 0] += 1 / (2 * p) * ((i - 1) * E_ab_t_array[i - 2, 0, 0])
+
+    # Compute the [0,j,0] entries (Helgaker 9.5.21)
+    for j in range(1, j_max + 1):
+        E_ab_t_array[0, j, 0] += X_pb * E_ab_t_array[0, j - 1, 0]
+        E_ab_t_array[0, j, 0] += 1 / (2 * p) * ((j - 1) * E_ab_t_array[0, j - 2, 0])
+
+    # Compute the [i,0,t] entries (Helgaker 9.5.18)
+    for i in range(1, i_max + 1):
+        for t in range(1, min(i + 1, t_max + 1)):
+            E_ab_t_array[i, 0, t] = (
+                (2 * p) ** (-t) * math.comb(i, t) * E_ab_t_array[i - t, 0, 0]
+            )
+
+    # Compute the [0,j,t] entries (Helgaker 9.5.19)
+    for j in range(1, j_max + 1):
+        for t in range(1, min(j + 1, t_max + 1)):
+            E_ab_t_array[0, j, t] = (
+                (2 * p) ** (-t) * math.comb(j, t) * E_ab_t_array[0, j - t, 0]
+            )
+
+    # Compute the [i, j, 0] entries (Helgaker 9.5.20)
+    for i in range(1, i_max + 1):
+        for j in range(1, j_max + 1):
+            E_ab_t_array[i, j, 0] = X_pa * E_ab_t_array[i - 1, j, 0]
+            E_ab_t_array[i, j, 0] += (1 / (2 * p)) * (
+                (i - 1) * E_ab_t_array[i - 2, j, 0]
+                + (j) * E_ab_t_array[i - 1, j - 1, 0]
+            )
+
+    # Compute the rest entries (Helgaker 9.5.17)
+    for i in range(1, i_max + 1):
+        for j in range(1, j_max + 1):
+            for t in range(1, t_max + 1):
+                E_ab_t_array[i, j, t] = (
+                    1
+                    / (2 * p * t)
+                    * (
+                        i * E_ab_t_array[i - 1, j, t - 1]
+                        + j * E_ab_t_array[i, j - 1, t - 1]
+                    )
+                )
+
+    return E_ab_t_array
+
+
+def E_bottoms_up_flat(
+    A: NDArray[np.float64],
+    a: float,
+    i_max: int,
+    B: NDArray[np.float64],
+    b: float,
+    j_max: int,
+    t_max: int,
+    out: Union[None, NDArray] = None,
+) -> NDArray[np.float64]:
+    """
+    Bottoms-up calculation of Hermite expansion coefficients E_{ij}^t. In the
+    same way OS relations can be built upwards instead of recursive calling,
+    the same principle is applied here: build the zero cases and then
+    recursively build the whole E^{AB}_{t} Hermite polynomial coefficients
+    tensor.
+
+    The difference with the legacy one is that this operates in flat dimensions,
+    and can allow passing a buffer array to avoid memory allocation.
+
+    Parameters
+    ----------
+    A: NDArray[float], of size (3,)
+        Cartesian coordinates of centre A.
+    a: float
+        Exponent of Gaussian centered at A.
+    i_max: int
+        Maximum angular momentum projection of A.
+    B: NDArray[float], of size (3,)
+        Cartesian coordinates of centre B.
+    b: float
+        Exponent of Gaussian centered at b.
+    i_max: int
+        Maximum angular momentum projection of B.
+    t_max: int
+        Maximum value t of the Hermite polynomial. t <= i + j
+
+    Returns
+    -------
+    E_ab_t_array: NDArray[float] of size (i_max, j_max, t)
+        Complete Hermite polynomial coefficient tensor
+    """
+    if out is not None:
+        E_ab_t_array = out
+        E_ab_t_array[:] = 0
+    else:
+        E_ab_t_array = np.zeros(
+            [(i_max + 1) * (j_max + 1) * (t_max + 1)], dtype=np.float64
+        )
+
+    s_i = i_max + 1
+    s_j = j_max + 1
+    s_t = t_max + 1
+
+    X_ab = B - A
+
+    p = a + b
+    mu = (a * b) / p
+    X_pa = b / p * X_ab
+    X_pb = -a / p * X_ab
+
+    # Base case i = j = t = 0 (Helgaker 9.5.8)
+    E_ab_t_array[IDX3DC(0, 0, 0, s_i, s_j, s_t)] = np.exp(-mu * X_ab**2)
+
+    # Compute the [i,0,0] entries (Helgaker 9.5.20)
+    for i in range(1, i_max + 1):
+        E_ab_t_array[IDX3DC(i, 0, 0, s_i, s_j, s_t)] += (
+            X_pa * E_ab_t_array[IDX3DC(i - 1, 0, 0, s_i, s_j, s_t)]
+        )
+        E_ab_t_array[IDX3DC(i, 0, 0, s_i, s_j, s_t)] += (
+            1 / (2 * p) * ((i - 1) * E_ab_t_array[IDX3DC(i - 2, 0, 0, s_i, s_j, s_t)])
+        )
+
+    # Compute the [0,j,0] entries (Helgaker 9.5.21)
+    for j in range(1, j_max + 1):
+        E_ab_t_array[IDX3DC(0, j, 0, s_i, s_j, s_t)] += (
+            X_pb * E_ab_t_array[IDX3DC(0, j - 1, 0, s_i, s_j, s_t)]
+        )
+        E_ab_t_array[IDX3DC(0, j, 0, s_i, s_j, s_t)] += (
+            1 / (2 * p) * ((j - 1) * E_ab_t_array[IDX3DC(0, j - 2, 0, s_i, s_j, s_t)])
+        )
+
+    # Compute the [i,0,t] entries (Helgaker 9.5.18)
+    for i in range(1, i_max + 1):
+        for t in range(1, min(i + 1, t_max + 1)):
+            E_ab_t_array[IDX3DC(i, 0, t, s_i, s_j, s_t)] = (
+                (2 * p) ** (-t)
+                * math.comb(i, t)
+                * E_ab_t_array[IDX3DC(i - t, 0, 0, s_i, s_j, s_t)]
+            )
+
+    # Compute the [0,j,t] entries (Helgaker 9.5.19)
+    for j in range(1, j_max + 1):
+        for t in range(1, min(j + 1, t_max + 1)):
+            E_ab_t_array[IDX3DC(0, j, t, s_i, s_j, s_t)] = (
+                (2 * p) ** (-t)
+                * math.comb(j, t)
+                * E_ab_t_array[IDX3DC(0, j - t, 0, s_i, s_j, s_t)]
+            )
+
+    # Compute the [i, j, 0] entries (Helgaker 9.5.20)
+    for i in range(1, i_max + 1):
+        for j in range(1, j_max + 1):
+            E_ab_t_array[IDX3DC(i, j, 0, s_i, s_j, s_t)] = (
+                X_pa * E_ab_t_array[IDX3DC(i - 1, j, 0, s_i, s_j, s_t)]
+            )
+            E_ab_t_array[IDX3DC(i, j, 0, s_i, s_j, s_t)] += (1 / (2 * p)) * (
+                (i - 1) * E_ab_t_array[IDX3DC(i - 2, j, 0, s_i, s_j, s_t)]
+                + (j) * E_ab_t_array[IDX3DC(i - 1, j - 1, 0, s_i, s_j, s_t)]
+            )
+
+    # Compute the rest entries (Helgaker 9.5.17)
+    for i in range(1, i_max + 1):
+        for j in range(1, j_max + 1):
+            for t in range(1, t_max + 1):
+                E_ab_t_array[IDX3DC(i, j, t, s_i, s_j, s_t)] = (
+                    1
+                    / (2 * p * t)
+                    * (
+                        i * E_ab_t_array[IDX3DC(i - 1, j, t - 1, s_i, s_j, s_t)]
+                        + j * E_ab_t_array[IDX3DC(i, j - 1, t - 1, s_i, s_j, s_t)]
+                    )
+                )
+
+    return E_ab_t_array[: s_i * s_j * s_t].reshape(s_i, s_j, s_t)
+
+
+# =============================================================================
+# LEGACY CODE
+# =============================================================================
+
+
+def _E_legacy(
     Ax: NDArray[np.float64],
     a: float,
     i: int,
@@ -124,15 +360,15 @@ def E(
     # Recursive cases
     if t > 0:
         return (
-            i * E(Ax, a, i - 1, Bx, b, j, t - 1, dim)
-            + j * E(Ax, a, i, Bx, b, j - 1, t - 1, dim)
+            i * _E_legacy(Ax, a, i - 1, Bx, b, j, t - 1, dim)
+            + j * _E_legacy(Ax, a, i, Bx, b, j - 1, t - 1, dim)
         ) / (2.0 * p * t)
     if t == 0 and i > 0:
-        return X_pa * E(Ax, a, i - 1, Bx, b, j, 0, dim) + E(
+        return X_pa * _E_legacy(Ax, a, i - 1, Bx, b, j, 0, dim) + _E_legacy(
             Ax, a, i - 1, Bx, b, j, 1, dim
         )
     if t == 0 and j > 0:
-        return X_pb * E(Ax, a, i, Bx, b, j - 1, 0, dim) + E(
+        return X_pb * _E_legacy(Ax, a, i, Bx, b, j - 1, 0, dim) + _E_legacy(
             Ax, a, i, Bx, b, j - 1, 1, dim
         )
     else:

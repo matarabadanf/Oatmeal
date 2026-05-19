@@ -1,5 +1,5 @@
 from scipy.stats import f
-from ST_utils import obara_saika_bottom_up, S_1D
+from py_mods.src.integrals.internal.ST_utils import obara_saika_bottom_up, _S_1D_legacy
 from typing import Literal
 import numpy as np
 from numpy.typing import NDArray
@@ -32,19 +32,19 @@ def dipole_integral(
 
     match dimension:
         case 0:
-            d_ij = S_1D(ax, ax, a, b, i + 1, l) + ax * S_1D(ax, bx, a, b, i, l)
-            s_component_1 = S_1D(ay, by, a, b, j, m)
-            s_component_2 = S_1D(az, bz, a, b, k, n)
+            d_ij = _S_1D_legacy(ax, ax, a, b, i + 1, l) + ax * _S_1D_legacy(ax, bx, a, b, i, l)
+            s_component_1 = _S_1D_legacy(ay, by, a, b, j, m)
+            s_component_2 = _S_1D_legacy(az, bz, a, b, k, n)
 
         case 1:
-            d_ij = S_1D(ay, ay, a, b, j + 1, m) + ay * S_1D(ay, by, a, b, j, m)
-            s_component_1 = S_1D(ax, bx, a, b, i, l)
-            s_component_2 = S_1D(az, bz, a, b, k, n)
+            d_ij = _S_1D_legacy(ay, ay, a, b, j + 1, m) + ay * _S_1D_legacy(ay, by, a, b, j, m)
+            s_component_1 = _S_1D_legacy(ax, bx, a, b, i, l)
+            s_component_2 = _S_1D_legacy(az, bz, a, b, k, n)
 
         case 2:
-            d_ij = S_1D(az, az, a, b, k + 1, n) + az * S_1D(az, bz, a, b, k, n)
-            s_component_1 = S_1D(ax, bx, a, b, i, l)
-            s_component_2 = S_1D(ay, by, a, b, j, m)
+            d_ij = _S_1D_legacy(az, az, a, b, k + 1, n) + az * _S_1D_legacy(az, bz, a, b, k, n)
+            s_component_1 = _S_1D_legacy(ax, bx, a, b, i, l)
+            s_component_2 = _S_1D_legacy(ay, by, a, b, j, m)
 
     return d_ij * s_component_1 * s_component_2
 

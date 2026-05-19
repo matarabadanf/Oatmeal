@@ -86,7 +86,153 @@ def obara_saika_bottom_up(
     return S_ij_mat
 
 
-def S_1D(Ax: float, Bx: float, a: float, b: float, i: int, j: int) -> float:
+def T_ab_1d_matrix(
+    Ax: float, Bx: float, a: float, b: float, max_i: int, max_j: int
+) -> NDArray[np.float64]:
+    """
+    Calculate overlap integral T between two Gaussian basis functions in 1D.
+
+    Computes overlap between two cartesian Gaussians by calling Obara-Saika.
+    As in the overlap integral recurrence, instead of cacheing or calling
+    recursivelym the whole matrix is build from the independent (ii,0) and
+    (0,jj) cases.
+
+    When calling the OS for the overlap, a dimension of max+1 is called
+    due to the requirement in the recurrence relations.
+
+    Parameters
+    ----------
+    Ax : float
+        Center of the first Gaussian.
+    Bx : float
+        Center of the second Gaussian.
+    a : float
+        Exponent of the first Gaussian.
+    b : float
+        Exponent of the second Gaussian.
+    max_i : int
+        Maximum angular momentum for the first Gaussian.
+    max_j : int
+        Maximum angular momentum for the second Gaussian.
+
+    Returns
+    -------
+    T_ij : float
+        Kinetic energy in 1D of two Gaussian functions.
+
+        Notes
+    -----
+        - Calls obara_saika_bottom_up.
+        - The recurrence relations require overlap integrals S_[i+1,j] and S_[i,j+1],
+          so the function computes integrals up to max(ii, jj) + 1.
+        - The algorithm fills the kinetic energy matrix in the following order:
+            1. Base case T_00.
+            2. First row [i, 0] and first column [0, j].
+            3. Mixed indices.
+            4. Last element T_ij[max,max].
+    """
+    X_ab = Bx - Ax
+    p = a + b
+    X_pa = b / p * X_ab
+    X_pb = -a / p * X_ab
+
+    # Max dim + 1 and for it to be a square matrix
+    max_dim = max(max_i + 1, max_j + 1)
+    kinetic_energy = np.zeros([max_dim, max_dim], dtype=np.float64)
+
+    # Compute the overlap matrix terms
+    recurrence_integrals = obara_saika_bottom_up(Ax, Bx, a, b, max_dim, max_dim)
+
+    # Fill the T_00 case
+    kinetic_energy[0, 0] = (
+        a - 2 * a**2 * (X_pa**2 + 1 / (2 * p))
+    ) * recurrence_integrals[0, 0]
+
+    if max_i == max_j == 0:
+        return kinetic_energy
+
+    # First row and column
+    for i in range(0, max_dim - 1):
+        f_term = X_pa * kinetic_energy[i, 0]
+        s_term = 1 / (2 * p) * (i * kinetic_energy[i - 1, 0])
+
+        t_term_1 = b / p * (2 * a * recurrence_integrals[i + 1, 0])
+        t_term_2 = b / p * (-i * recurrence_integrals[i - 1, 0])
+        t_term = t_term_1 + t_term_2
+
+        kinetic_energy[i + 1, 0] = f_term + s_term + t_term
+
+    for j in range(0, max_dim - 1):
+
+        f_term = X_pb * kinetic_energy[0, j]
+        s_term = 1 / (2 * p) * (j * kinetic_energy[0, j - 1])
+
+        t_term_1 = a / p * (2 * b * recurrence_integrals[0, j + 1])
+        t_term_2 = a / p * (-j * recurrence_integrals[0, j - 1])
+        t_term = t_term_1 + t_term_2
+
+        kinetic_energy[0, j + 1] = f_term + s_term + t_term
+
+    # Iteration over the rows and columns
+    for total in range(0, max_dim - 1):
+        j = total
+        for i in range(0, max_dim - 1):
+            f_term = X_pa * kinetic_energy[i, j]
+            s_term = (
+                1
+                / (2 * p)
+                * (i * kinetic_energy[i - 1, j] + j * kinetic_energy[i, j - 1])
+            )
+
+            t_term_1 = b / p * (2 * a * recurrence_integrals[i + 1, j])
+            t_term_2 = b / p * (-i * recurrence_integrals[i - 1, j])
+            t_term = t_term_1 + t_term_2
+
+            kinetic_energy[i + 1, j] = f_term + s_term + t_term
+
+        i = total
+        for j in range(0, max_dim - 1):
+            f_term = X_pb * kinetic_energy[i, j]
+            s_term = (
+                1
+                / (2 * p)
+                * (i * kinetic_energy[i - 1, j] + j * kinetic_energy[i, j - 1])
+            )
+
+            t_term_1 = a / p * (2 * b * recurrence_integrals[i, j + 1])
+            t_term_2 = a / p * (-j * recurrence_integrals[i, j - 1])
+            t_term = t_term_1 + t_term_2
+
+            kinetic_energy[i, j + 1] = f_term + s_term + t_term
+
+    # Corner case
+    if max_i == max_j and max_i == max_dim - 1:
+
+        i = max_dim - 1
+        j = max_dim - 1
+
+        f_term = X_pa * kinetic_energy[i - 1, j]
+        s_term = (
+            1
+            / (2 * p)
+            * ((i - 1) * kinetic_energy[i - 2, j] + j * kinetic_energy[i - 1, j - 1])
+        )
+
+        t_term_1 = b / p * (2 * a * recurrence_integrals[i, j])
+        t_term_2 = b / p * (-(i - 1) * recurrence_integrals[i - 2, j])
+        t_term = t_term_1 + t_term_2
+
+        kinetic_energy[max_dim - 1, max_dim - 1] = f_term + s_term + t_term
+
+    return kinetic_energy
+
+
+# =============================================================================
+# LEGACY CODE
+# =============================================================================
+
+
+def _S_1D_legacy(Ax: float, Bx: float, a: float, b: float, i: int, j: int) -> float:
     """
     Calculate overlap integral S between two Gaussian basis functions in 1D.
 
@@ -127,7 +273,7 @@ def S_1D(Ax: float, Bx: float, a: float, b: float, i: int, j: int) -> float:
     return result
 
 
-def kinetic_energy_integrals(
+def _kinetic_energy_integrals_legacy(
     Ax: float, Bx: float, a: float, b: float, ii: int, jj: int
 ) -> float:
     """

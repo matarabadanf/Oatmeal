@@ -1,12 +1,14 @@
 from py_mods.src.integrals.GTO import (
     GTO,
     create_normalized_GTO,
-    generate_angular_momentum_projections,
-    S_3D,
-    T_3D,
-    V_3D,
-    eri,
+    _generate_angular_momentum_projections,
+    _S_3D_components_legacy,
+    _S_3D_legacy,
+    _T_3D_legacy,
+    _eri_legacy,
 )
+from py_mods.src.integrals.internal.coulomb_utils import _V_3D_legacy
+from py_mods.src.integrals.GTO import g_abcd_shell
 from dataclasses import dataclass
 from numpy.typing import NDArray
 import numpy as np
@@ -76,7 +78,7 @@ def create_CGTOClass(
     GTOClass
         Normalized GTOClass object.
     """
-    l_projections = generate_angular_momentum_projections(total_L)
+    l_projections = _generate_angular_momentum_projections(total_L)
     l_dim = l_projections.shape[0]
     primitives = [create_normalized_GTO(R, exp, total_L) for exp in exps]
 
@@ -183,7 +185,7 @@ def S_GTO_proj(cont_1: CGTOClass, proj_idx_1: int, cont_2: CGTOClass, proj_idx_2
             primitive_overlap = (
                 cont_1.d_i[i]
                 * cont_2.d_i[j]
-                * S_3D(
+                * _S_3D_legacy(
                     gto_1,
                     projection_vec_1,
                     N_a,
@@ -260,7 +262,7 @@ def T_GTO_proj(cont_1: CGTOClass, proj_idx_1: int, cont_2: CGTOClass, proj_idx_2
             T_primitive = (
                 cont_1.d_i[i]
                 * cont_2.d_i[j]
-                * T_3D(
+                * _T_3D_legacy(
                     gto_1,
                     projection_vec_1,
                     N_a,
@@ -363,7 +365,7 @@ def V_GTO_proj(
                 V_primitive = (
                     cont_1.d_i[i]
                     * cont_2.d_i[j]
-                    * V_3D(
+                    * _V_3D_legacy(
                         gto_1,
                         projection_vec_1,
                         N_a,
@@ -424,6 +426,25 @@ def Eri_GTO_tensor(
     return eri_tensor
 
 
+def Eri_GTO_tensor_intermediates(
+    cont_1: CGTOClass, cont_2: CGTOClass, cont_3: CGTOClass, cont_4: CGTOClass
+) -> NDArray[np.float64]:
+
+    eri_mat = np.zeros((cont_1.l_dim, cont_2.l_dim, cont_3.l_dim, cont_4.l_dim))
+
+    for i, gto_1 in enumerate(cont_1.primitives):
+        for j, gto_2 in enumerate(cont_2.primitives):
+            for k, gto_3 in enumerate(cont_3.primitives):
+                for l, gto_4 in enumerate(cont_4.primitives):
+                    prim_tensor = g_abcd_shell(gto_1, gto_2, gto_3, gto_4)
+
+                    eri_mat += (
+                        cont_1.d_i[i] * cont_2.d_i[j] * cont_3.d_i[k] * cont_4.d_i[l]
+                    ) * prim_tensor
+
+    return eri_mat * cont_1.N_a * cont_2.N_a * cont_3.N_a * cont_4.N_a
+
+
 def eri_GTO_proj(
     cont_1: CGTOClass,
     proj_idx_1: int,
@@ -481,7 +502,7 @@ def eri_GTO_proj(
                         * cont_2.d_i[j]
                         * cont_3.d_i[k]
                         * cont_4.d_i[l]
-                        * eri(
+                        * _eri_legacy(
                             gto_1,
                             projection_vec_1,
                             N_a,

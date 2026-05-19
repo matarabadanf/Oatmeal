@@ -3,6 +3,7 @@ from py_mods.src.integrals.CGTO import (
     T_GTO_mat,
     V_GTO_mat,
     Eri_GTO_tensor,
+    Eri_GTO_tensor_intermediates,
     CGTOClass,
 )
 from dataclasses import dataclass
@@ -202,6 +203,53 @@ def eri_basis_set(basis_set: BasisSetClass) -> NDArray[np.float64]:
                         index_k:index_k_stop,
                         index_l:index_l_stop,
                     ] = Eri_GTO_tensor(
+                        basis_set.CGTOs[i],
+                        basis_set.CGTOs[j],
+                        basis_set.CGTOs[k],
+                        basis_set.CGTOs[l],
+                    )
+
+    return eri_tensor
+
+
+def eri_basis_set_intermediates(basis_set: BasisSetClass) -> NDArray[np.float64]:
+    """
+    Calculate electron repulsion integral (ERI) tensor of a given basis set.
+
+    Parameters
+    ----------
+    basis_set : BasisSetClass
+        Basis set.
+
+    Returns
+    -------
+    NDArray[np.float64]
+        ERI tensor.
+    """
+    n_CGTOs = basis_set.n_CGTOs
+    dim = basis_set.matrix_indices[-1]
+    eri_tensor = np.zeros((dim, dim, dim, dim))
+
+    for i in range(n_CGTOs):
+        for j in range(n_CGTOs):
+            for k in range(n_CGTOs):
+                for l in range(n_CGTOs):
+
+                    index_i = basis_set.matrix_indices[i]
+                    index_i_stop = basis_set.matrix_indices[i + 1]
+                    index_j = basis_set.matrix_indices[j]
+                    index_j_stop = basis_set.matrix_indices[j + 1]
+                    index_k = basis_set.matrix_indices[k]
+                    index_k_stop = basis_set.matrix_indices[k + 1]
+                    index_l = basis_set.matrix_indices[l]
+                    index_l_stop = basis_set.matrix_indices[l + 1]
+
+                    eri_tensor[
+                        index_i:index_i_stop,
+                        index_j:index_j_stop,
+                        index_k:index_k_stop,
+                        index_l:index_l_stop,
+                    ] = Eri_GTO_tensor_intermediates(
                         basis_set.CGTOs[i],
                         basis_set.CGTOs[j],
                         basis_set.CGTOs[k],
