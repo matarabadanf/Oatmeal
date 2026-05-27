@@ -259,16 +259,22 @@ def unflatten_rel_T(
     T : NDArray[np.complex128]
         Full 4c relativistic kinetic energy matrix.
     """
-    c0 = retriangularize(kinarray[0:351], n_bas, True)
-    c1 = retriangularize(kinarray[351 : 351 * 2], n_bas, True)
-    c2 = retriangularize(kinarray[351 * 2 : 351 * 3], n_bas, True)
-    c3 = retriangularize(kinarray[-351:], n_bas, True)
+    n_tri = n_bas * (n_bas + 1) // 2
 
-    T = quaternion_to_matrix(c0, c1, c2, c3) * 2
+    assert len(kinarray) == 4 * n_tri, (
+        f"kinarray length {len(kinarray)} != 4×{n_tri}={4*n_tri} " f"for n_bas={n_bas}"
+    )
+
+    c0 = retriangularize(kinarray[0:n_tri], n_bas, True)
+    c1 = retriangularize(kinarray[n_tri : n_tri * 2], n_bas, True)
+    c2 = retriangularize(kinarray[n_tri * 2 : n_tri * 3], n_bas, True)
+    c3 = retriangularize(kinarray[3 * n_tri :], n_bas, True)
+
+    T = quaternion_to_matrix(c0, c1, c2, c3) 
     return T
 
 
-def build_S_V_W_T_from_h5(h5filename:str):
+def build_S_V_W_T_from_h5(h5filename: str):
     """
     Build the 4c S, V, W, and T matrices from the HDF5 file.
 
@@ -318,5 +324,17 @@ def build_4c_one_Fock_from_h5(h5filename: str) -> NDArray[np.complex128]:
     S, V, W, T = build_S_V_W_T_from_h5(h5filename)
 
     Fock_4c = T + V + W
+
+    # assertion for now:
+
+    _, _, overlap, _, fockarra = extract_arrays_from_h5(h5filename)
+
+    n_bas = int((np.sqrt(1 + 8 * len(overlap)) - 1) / 2)
+
+    focsquare = fockarra.reshape(4,n_bas,n_bas) # or manually, but this is convenient
+    f0, f1, f2, f3 = focsquare[0], focsquare[1], focsquare[2], focsquare[3]
+    Qf = quaternion_to_matrix(f0,f1,f2,f3)
+
+    assert np.all(Fock_4c == Qf)
 
     return Fock_4c

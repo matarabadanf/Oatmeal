@@ -87,3 +87,6 @@ notebooks/dirac-matrix-elements/*.inp*
 notebooks/dirac-matrix-elements/*.xyz*
 notebooks/dirac-matrix-elements/*.out*
 notebooks/*/inter*/*
+*tgz*
+*out*
+*OPERATORS*
