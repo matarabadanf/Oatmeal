@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Literal
 from dataclasses import dataclass
 
 import numpy as np
@@ -13,7 +13,6 @@ from py_mods.src.integrals.GTO import (
 )
 from py_mods.src.integrals.internal.coulomb_utils import V_ab_Z_shell
 from py_mods.src.SCF.plot_utilities import plot_map
-
 
 # =============================================================================
 #  Dataclasses
@@ -201,7 +200,11 @@ def V_UncontractedBasisSet(
     return V
 
 
-def ERIs_Uncontracted(UBS):
+def ERIs_Uncontracted(UBS, kernel: Literal["interest", "oatmeal"] = "interest"):
+
+    if kernel == "interest":
+        return _interest_ERIs_Uncontracted(UBS)
+
     n = UBS.n_mat_elem
     ERI = np.zeros((n, n, n, n), dtype=np.float64)
 
@@ -223,5 +226,15 @@ def ERIs_Uncontracted(UBS):
                     )
 
                     ERI[i0:i1, j0:j1, k0:k1, l0:l1] = block
+
+    return ERI
+
+
+def _interest_ERIs_Uncontracted(UBS, buffer_1=None, symm=None):
+    from py_mods.src.integrals.external.interest.interest import interest_full_tensor
+
+    gto_list = UBS.GTO_list
+
+    ERI = interest_full_tensor(gto_list, buffer_1, symm)
 
     return ERI

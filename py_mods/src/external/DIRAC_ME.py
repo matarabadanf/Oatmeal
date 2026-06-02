@@ -1,4 +1,4 @@
-from typing import Optional, Tuple, Union, List
+from typing import Optional, Tuple, Union, List, Literal
 
 import h5py
 import numpy as np
@@ -6,6 +6,12 @@ from numpy.typing import NDArray
 import matplotlib.pyplot as plt
 
 from py_mods.src.algebra.quaternion import quaternion_to_matrix
+from py_mods.src.integrals.GTO import create_GTO
+from py_mods.src.integrals.UncontractedBasisSet import (
+    UncontractedBasisSet,
+    create_UncontractedBasisSet,
+    ERIs_Uncontracted,
+)
 
 c = 137.035999177
 
@@ -127,6 +133,25 @@ def plot_trinagular_packed(
     plt.show()
 
     return M
+
+
+def get_nuc_charge(h5filename: str) -> int:
+    """Extract the total nuclear charge from the HDF5 file.
+
+    Parameters
+    ----------
+    h5filename : str
+        Path to the HDF5 file containing the matrices.
+
+    Returns
+    -------
+    int
+        Total nuclear charge.
+    """
+    with h5py.File(h5filename, "r") as f:
+        nuc_charge = np.asarray(f["input/molecule/nuc_charge"][()])
+
+    return int(nuc_charge)
 
 
 def extract_arrays_from_h5(
@@ -270,7 +295,7 @@ def unflatten_rel_T(
     c2 = retriangularize(kinarray[n_tri * 2 : n_tri * 3], n_bas, True)
     c3 = retriangularize(kinarray[3 * n_tri :], n_bas, True)
 
-    T = quaternion_to_matrix(c0, c1, c2, c3) 
+    T = quaternion_to_matrix(c0, c1, c2, c3)
     return T
 
 
@@ -331,10 +356,57 @@ def build_4c_one_Fock_from_h5(h5filename: str) -> NDArray[np.complex128]:
 
     n_bas = int((np.sqrt(1 + 8 * len(overlap)) - 1) / 2)
 
-    focsquare = fockarra.reshape(4,n_bas,n_bas) # or manually, but this is convenient
+    focsquare = fockarra.reshape(4, n_bas, n_bas)  # or manually, but this is convenient
     f0, f1, f2, f3 = focsquare[0], focsquare[1], focsquare[2], focsquare[3]
-    Qf = quaternion_to_matrix(f0,f1,f2,f3)
+    Qf = quaternion_to_matrix(f0, f1, f2, f3)
 
     assert np.all(Fock_4c == Qf)
 
     return Fock_4c
+
+
+def extract_basis_data(
+    h5filename: str, component: Literal["Large", "Small"] = "Large"
+) -> Tuple[NDArray[np.float64], NDArray[np.float64], NDArray[np.int16]]:
+
+    if component not in ["Large", "Small"]:
+        raise ValueError("Component must be either 'Large' or 'Small'")
+
+    basis_number = "1" if component == "Large" else "2"
+
+    with h5py.File(h5filename, "r") as f:
+        R_array = np.asarray(f[f"input/aobasis/{basis_number}/center"][()], dtype=np.float64)
+        R_array = R_array.reshape(-1, 3)
+        exps_array = np.asarray(f[f"input/aobasis/{basis_number}/exponents"][()], dtype=np.float64)
+        l_array = np.asarray(f[f"input/aobasis/{basis_number}/orbmom"][()], dtype=np.int16)
+
+    return R_array, exps_array, l_array
+
+
+def build_uncontracted_basis_from_checkpoint(h5filename) -> UncontractedBasisSet:
+    Ldata = extract_basis_data(h5filename, "Large")
+    Sdata = extract_basis_data(h5filename, "Small")
+
+    LC_list = []
+
+    for R, alpha, l in zip(*Ldata):
+        gto_instance = create_GTO(R, alpha, l - 1)
+        LC_list.append(gto_instance)
+
+    SC_list = []
+    for R, alpha, l in zip(*Sdata):
+        gto_instance = create_GTO(R, alpha, l - 1)
+        SC_list.append(gto_instance)
+
+    total_basis = LC_list + SC_list
+
+    Unc_bas_set = create_UncontractedBasisSet(total_basis)
+
+    return Unc_bas_set
+
+
+def full_eri_from_checkpoint(h5filename) -> NDArray[np.float64]:
+    h_basis = build_uncontracted_basis_from_checkpoint(h5filename)
+    eri_tensor = ERIs_Uncontracted(h_basis)
+
+    return eri_tensor
