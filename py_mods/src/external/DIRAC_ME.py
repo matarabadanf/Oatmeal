@@ -65,7 +65,7 @@ def retriangularize(
         Square matrix reconstructed from the packed array.
 
     """
-    M = np.zeros((n_basis, n_basis), dtype=array.dtype)
+    M = np.zeros((n_basis, n_basis), dtype=np.float64)
     k = 0
 
     for j in range(n_basis):
@@ -184,11 +184,11 @@ def extract_arrays_from_h5(
         Quaternion packed one-electron Fock matrix.
     """
     with h5py.File(f"{h5filename}", "r") as f:
-        kinarray = np.asarray(f["result/operators/ao_matrices/RELKINEN"][()])
-        molfield = np.asarray(f["result/operators/ao_matrices/MOLFIELDTFFT"][()])
-        fockarra = np.asarray(f["result/operators/ao_matrices/ONEFOCK"][()])
-        betamatarr = np.asarray(f["result/operators/ao_matrices/BETAMAT FFFT"][()])
-        overlap = np.asarray(f["result/operators/ao_matrices/OVERLAP TFFT"][()])
+        kinarray = np.asarray(f["result/operators/ao_matrices/RELKINEN"][()], dtype=np.float64)
+        molfield = np.asarray(f["result/operators/ao_matrices/MOLFIELDTFFT"][()], dtype=np.float64)
+        fockarra = np.asarray(f["result/operators/ao_matrices/ONEFOCK"][()], dtype=np.float64)
+        betamatarr = np.asarray(f["result/operators/ao_matrices/BETAMAT FFFT"][()], dtype=np.float64)
+        overlap = np.asarray(f["result/operators/ao_matrices/OVERLAP TFFT"][()], dtype=np.float64)
 
     return kinarray, molfield, overlap, betamatarr, fockarra
 
