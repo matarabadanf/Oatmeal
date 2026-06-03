@@ -331,7 +331,7 @@ def build_S_V_W_T_from_h5(h5filename: str):
     return S, V, W, T
 
 
-def build_4c_one_Fock_from_h5(h5filename: str) -> NDArray[np.complex128]:
+def build_4c_one_Fock_from_h5(h5filename: str, guess: str='barenuc') -> NDArray[np.complex128]:
     """
     Build the full 4c one-electron Fock matrix from the HDF5 file.
 
@@ -344,13 +344,18 @@ def build_4c_one_Fock_from_h5(h5filename: str) -> NDArray[np.complex128]:
     -------
     Fock_4c : NDArray[np.complex128]
         Full 4c one-electron Fock matrix.
+
+    Notes
+    ----
+    The current implementation assumes the 
     """
 
     S, V, W, T = build_S_V_W_T_from_h5(h5filename)
 
-    Fock_4c = T + V + W
-
-    # assertion for now:
+    if guess == "barenuc":
+        Fock_4c = T + V + W
+    else:
+        raise RuntimeError('"barenuc" is the only guess allowed in the current implementation')
 
     _, _, overlap, _, fockarra = extract_arrays_from_h5(h5filename)
 
