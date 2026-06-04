@@ -151,7 +151,7 @@ def get_nuc_charge(h5filename: str) -> int:
     with h5py.File(h5filename, "r") as f:
         nuc_charge = np.asarray(f["input/molecule/nuc_charge"][()])
 
-    return int(nuc_charge)
+    return int(sum(nuc_charge))
 
 
 def extract_arrays_from_h5(

@@ -28,6 +28,11 @@ def transformation_matrix(
     -------
     X : NDArray[np.float64]
         Transformation matrix.
+    
+    Notes
+    ----
+    Canonical orthogonalization: X = U @ s^(-1/2)
+    Symmetric orthogonalization: X = U @ s^(-1/2) @ U.T
     """
     assert method in [
         "canonical",
