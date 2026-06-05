@@ -2,7 +2,7 @@ import matplotlib.pyplot as plt
 from numpy.typing import NDArray
 from typing import Literal, Tuple, Union, List
 import numpy as np
-from py_mods.src.SCF.types import CSUHFResults
+from py_mods.src.SCF.CS_SCF_types import CSUHFResults
 
 
 # --- Plot Utilities ---

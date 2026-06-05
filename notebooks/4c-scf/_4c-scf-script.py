@@ -1,11 +1,5 @@
 import numpy as np
-from numpy.typing import NDArray
 
-import scipy
-
-import matplotlib.pyplot as plt
-
-from py_mods.src.SCF.plot_utilities import plot_map
 from py_mods.src.SCF.linalg import transformation_matrix
 from py_mods.src.external.DIRAC_ME import (
     build_4c_one_Fock_from_h5,
@@ -13,7 +7,7 @@ from py_mods.src.external.DIRAC_ME import (
     get_nuc_charge,
     full_eri_from_checkpoint,
 )
-from py_mods.src.SCF.scf_kernels import calc_p_matrix_comp, calc_g_matrix
+from py_mods.src.SCF.scf_kernels import calc_p_matrix_comp
 
 
 def J_LL(P_total, eri_LLLL, eri_LLSS, nL):
@@ -148,7 +142,7 @@ def scf_iteration(F_1, X, nL, reference=None):
 
 def scf_steps(n_steps):
     energy_step = []
-    for i in range(n_steps):
+    for i in range(0, n_steps):
         if i == 0:
             G_new = np.zeros_like(H_core)
         else:
@@ -159,7 +153,7 @@ def scf_steps(n_steps):
         print(f"\n\nSCF energy for iteration {i}: {e_scf.real} Hartree")
         energy_step.append(e_scf)
     
-    return np.array(energy_step).real
+    return np.array(energy_step, dtype=np.complex128).real
 
 
 if __name__ == "__main__":

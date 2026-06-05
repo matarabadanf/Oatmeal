@@ -184,11 +184,21 @@ def extract_arrays_from_h5(
         Quaternion packed one-electron Fock matrix.
     """
     with h5py.File(f"{h5filename}", "r") as f:
-        kinarray = np.asarray(f["result/operators/ao_matrices/RELKINEN"][()], dtype=np.float64)
-        molfield = np.asarray(f["result/operators/ao_matrices/MOLFIELDTFFT"][()], dtype=np.float64)
-        fockarra = np.asarray(f["result/operators/ao_matrices/ONEFOCK"][()], dtype=np.float64)
-        betamatarr = np.asarray(f["result/operators/ao_matrices/BETAMAT FFFT"][()], dtype=np.float64)
-        overlap = np.asarray(f["result/operators/ao_matrices/OVERLAP TFFT"][()], dtype=np.float64)
+        kinarray = np.asarray(
+            f["result/operators/ao_matrices/RELKINEN"][()], dtype=np.float64
+        )
+        molfield = np.asarray(
+            f["result/operators/ao_matrices/MOLFIELDTFFT"][()], dtype=np.float64
+        )
+        fockarra = np.asarray(
+            f["result/operators/ao_matrices/ONEFOCK"][()], dtype=np.float64
+        )
+        betamatarr = np.asarray(
+            f["result/operators/ao_matrices/BETAMAT FFFT"][()], dtype=np.float64
+        )
+        overlap = np.asarray(
+            f["result/operators/ao_matrices/OVERLAP TFFT"][()], dtype=np.float64
+        )
 
     return kinarray, molfield, overlap, betamatarr, fockarra
 
@@ -198,6 +208,7 @@ def unflatten_S_V_W(
     overlap: NDArray[np.float64],
     betamatarr: NDArray[np.float64],
     n_bas: int,
+    c:float=c
 ) -> Tuple[NDArray[np.float64], NDArray[np.float64], NDArray[np.float64]]:
     """
     Convert Triangular packed arrays to square matrix forms.
@@ -331,7 +342,9 @@ def build_S_V_W_T_from_h5(h5filename: str):
     return S, V, W, T
 
 
-def build_4c_one_Fock_from_h5(h5filename: str, guess: str='barenuc') -> NDArray[np.complex128]:
+def build_4c_one_Fock_from_h5(
+    h5filename: str, guess: str = "barenuc"
+) -> NDArray[np.complex128]:
     """
     Build the full 4c one-electron Fock matrix from the HDF5 file.
 
@@ -347,7 +360,7 @@ def build_4c_one_Fock_from_h5(h5filename: str, guess: str='barenuc') -> NDArray[
 
     Notes
     ----
-    The current implementation assumes the 
+    The current implementation assumes the
     """
 
     S, V, W, T = build_S_V_W_T_from_h5(h5filename)
@@ -355,7 +368,9 @@ def build_4c_one_Fock_from_h5(h5filename: str, guess: str='barenuc') -> NDArray[
     if guess == "barenuc":
         Fock_4c = T + V + W
     else:
-        raise RuntimeError('"barenuc" is the only guess allowed in the current implementation')
+        raise RuntimeError(
+            '"barenuc" is the only guess allowed in the current implementation'
+        )
 
     _, _, overlap, _, fockarra = extract_arrays_from_h5(h5filename)
 
@@ -370,7 +385,7 @@ def build_4c_one_Fock_from_h5(h5filename: str, guess: str='barenuc') -> NDArray[
     return Fock_4c
 
 
-def extract_basis_data(
+def extract_basis_data_from_h5(
     h5filename: str, component: Literal["Large", "Small"] = "Large"
 ) -> Tuple[NDArray[np.float64], NDArray[np.float64], NDArray[np.int16]]:
 
@@ -380,17 +395,25 @@ def extract_basis_data(
     basis_number = "1" if component == "Large" else "2"
 
     with h5py.File(h5filename, "r") as f:
-        R_array = np.asarray(f[f"input/aobasis/{basis_number}/center"][()], dtype=np.float64)
+        R_array = np.asarray(
+            f[f"input/aobasis/{basis_number}/center"][()], dtype=np.float64
+        )
         R_array = R_array.reshape(-1, 3)
-        exps_array = np.asarray(f[f"input/aobasis/{basis_number}/exponents"][()], dtype=np.float64)
-        l_array = np.asarray(f[f"input/aobasis/{basis_number}/orbmom"][()], dtype=np.int16)
+        exps_array = np.asarray(
+            f[f"input/aobasis/{basis_number}/exponents"][()], dtype=np.float64
+        )
+        l_array = np.asarray(
+            f[f"input/aobasis/{basis_number}/orbmom"][()], dtype=np.int16
+        )
 
     return R_array, exps_array, l_array
 
 
-def build_uncontracted_basis_from_checkpoint(h5filename) -> UncontractedBasisSet:
-    Ldata = extract_basis_data(h5filename, "Large")
-    Sdata = extract_basis_data(h5filename, "Small")
+def build_uncontracted_basis_from_h5(
+    h5filename,
+) -> Tuple[UncontractedBasisSet, int, int]:
+    Ldata = extract_basis_data_from_h5(h5filename, "Large")
+    Sdata = extract_basis_data_from_h5(h5filename, "Small")
 
     LC_list = []
 
@@ -405,13 +428,16 @@ def build_uncontracted_basis_from_checkpoint(h5filename) -> UncontractedBasisSet
 
     total_basis = LC_list + SC_list
 
+    nL = sum(len(bas.l_projections) for bas in LC_list)
+    nS = sum(len(bas.l_projections) for bas in SC_list)
+
     Unc_bas_set = create_UncontractedBasisSet(total_basis)
 
-    return Unc_bas_set
+    return Unc_bas_set, nL, nS
 
 
-def full_eri_from_checkpoint(h5filename) -> NDArray[np.float64]:
-    h_basis = build_uncontracted_basis_from_checkpoint(h5filename)
+def full_eri_from_h5(h5filename) -> NDArray[np.float64]:
+    h_basis, nL, nS = build_uncontracted_basis_from_h5(h5filename)
     eri_tensor = ERIs_Uncontracted(h_basis)
 
     return eri_tensor

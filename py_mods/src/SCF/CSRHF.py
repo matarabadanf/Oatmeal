@@ -24,7 +24,7 @@ from py_mods.src.SCF.linalg import (
     sign_convention,
 )
 
-from py_mods.src.SCF.types import (
+from py_mods.src.SCF.CS_SCF_types import (
     CSRHFContext,
     CSRHFResults,
     CSRHFState,
