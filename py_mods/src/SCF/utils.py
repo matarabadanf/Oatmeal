@@ -170,7 +170,7 @@ def check_unpaired(
     return (calc_mult == multiplicity), calc_mult
 
 
-def validate_rhf_context_input(ctx):
+def validate_rhf_context_input(ctx: CSUHFContext):
     if not len(ctx.T) == len(ctx.V) == len(ctx.S):
         raise ValueError(
             f"Matrices T, V, S must have the same dimensions. Got N_S={len(ctx.S)}, N_T={len(ctx.T)}, N_V={len(ctx.V)}"

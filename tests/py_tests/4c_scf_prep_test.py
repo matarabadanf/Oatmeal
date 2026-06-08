@@ -71,10 +71,12 @@ def test_He_SCF():
     h5_filename = f"{notebook_path}/He_checkpoint.h5"
     He_ctx = generate_primitive_KUSCFContext_from_h5(h5_filename)
 
+    H_core = He_ctx.T + He_ctx.V + He_ctx.W
+
     X = transformation_matrix(He_ctx.S)
 
     scf_energies = scf_steps(
-        15, He_ctx.H_core, He_ctx.eri_classess, X, He_ctx.occupation
+        15, H_core, He_ctx.eri_classess, X, He_ctx.occ
     )
     scf_reference_energies = np.loadtxt(f"{notebook_path}/He_scf_energy.dat")
 

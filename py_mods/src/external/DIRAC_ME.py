@@ -13,7 +13,7 @@ from py_mods.src.integrals.UncontractedBasisSet import (
     ERIs_Uncontracted,
 )
 
-from py_mods.src.SCF_4c_dev.types_4c import _primitive_KUSCFContext
+from py_mods.src.SCF_4c_dev.types_4c import CS_4c_KU_SCF_Context
 from py_mods.src.SCF_4c_dev.KUSCF_dev import occupation_4c, eri_classified
 
 c = 137.035999177
@@ -450,7 +450,7 @@ def generate_primitive_KUSCFContext_from_h5(
     h5_filename: str,
     total_charge: int = 0,
     occupation_det: Optional[NDArray[np.int_]] = None,
-) -> _primitive_KUSCFContext:
+) -> CS_4c_KU_SCF_Context:
 
     S, V, W, T = build_S_V_W_T_from_h5(h5_filename)
     H_core = V + W + T
@@ -464,8 +464,7 @@ def generate_primitive_KUSCFContext_from_h5(
 
     occ_det = occupation_4c(nS, nL, n_elec, occupation_det)
 
-    return _primitive_KUSCFContext(
-        n_bas=nL * nS,
+    return CS_4c_KU_SCF_Context(
         nL=nL,
         nS=nS,
         S=S,
@@ -474,6 +473,5 @@ def generate_primitive_KUSCFContext_from_h5(
         W=W,
         eri_classess=eri,
         n_electrons=nuc_charge,
-        occupation=occ_det,
-        H_core=H_core,
+        occ=occ_det,
     )
