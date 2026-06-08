@@ -2,7 +2,7 @@ import numpy as np
 from numpy.typing import NDArray
 from typing import Tuple
 from py_mods.src.SCF.CSRHF import CS_RHF
-from py_mods.src.SCF.types import CSRHFContext
+from py_mods.src.SCF.CS_SCF_types import CSRHFContext
 import copy
 
 from py_mods.src.SCF.scf_kernels import (
@@ -25,7 +25,7 @@ from py_mods.src.SCF.linalg import (
     sign_convention,
 )
 
-from py_mods.src.SCF.types import (
+from py_mods.src.SCF.CS_SCF_types import (
     CSUHFContext,
     CSUHFResults,
     CSUHFConstants,

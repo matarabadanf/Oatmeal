@@ -2,7 +2,7 @@ import numpy as np
 from numpy.typing import NDArray
 from typing import Union, Tuple, Literal
 
-from py_mods.src.SCF.types import CSUHFContext
+from py_mods.src.SCF.CS_SCF_types import CSUHFContext
 
 
 def validate_determinant(

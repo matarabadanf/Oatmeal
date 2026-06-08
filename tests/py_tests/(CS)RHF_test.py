@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 from py_mods.src.SCF.CSRHF import CS_RHF, rhf_theta_traj
-from py_mods.src.SCF.types import CSRHFContext, CSUHFContext
+from py_mods.src.SCF.CS_SCF_types import CSRHFContext, CSUHFContext
 from py_mods.src.SCF.CSUHF import UHF_theta_traj
 from py_mods.src.SCF._drafts.RHF import RHF
 from pathlib import Path

@@ -1,5 +1,5 @@
 from typing import Union
-from py_mods.src.SCF.types import CSRHFContext, CSUHFContext
+from py_mods.src.SCF.CS_SCF_types import CSRHFContext, CSUHFContext
 from pyscf import gto
 from pyscf.lib.exceptions import BasisNotFoundError
 

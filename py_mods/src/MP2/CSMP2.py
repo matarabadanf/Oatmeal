@@ -2,7 +2,7 @@ import numpy as np
 from numpy.typing import NDArray
 from typing import Literal, Union
 from dataclasses import dataclass
-from py_mods.src.SCF.types import CSRHFResults
+from py_mods.src.SCF.CS_SCF_types import CSRHFResults
 from py_mods.src.SCF.CSUHF import CSUHFResults
 
 
