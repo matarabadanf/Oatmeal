@@ -13,6 +13,9 @@ from py_mods.src.integrals.UncontractedBasisSet import (
     ERIs_Uncontracted,
 )
 
+from py_mods.src.SCF_4c_dev.types_4c import _primitive_KUSCFContext
+from py_mods.src.SCF_4c_dev.KUSCF_dev import occupation_4c, eri_classified
+
 c = 137.035999177
 
 
@@ -208,7 +211,7 @@ def unflatten_S_V_W(
     overlap: NDArray[np.float64],
     betamatarr: NDArray[np.float64],
     n_bas: int,
-    c:float=c
+    c: float = c,
 ) -> Tuple[NDArray[np.float64], NDArray[np.float64], NDArray[np.float64]]:
     """
     Convert Triangular packed arrays to square matrix forms.
@@ -441,3 +444,36 @@ def full_eri_from_h5(h5filename) -> NDArray[np.float64]:
     eri_tensor = ERIs_Uncontracted(h_basis)
 
     return eri_tensor
+
+
+def generate_primitive_KUSCFContext_from_h5(
+    h5_filename: str,
+    total_charge: int = 0,
+    occupation_det: Optional[NDArray[np.int_]] = None,
+) -> _primitive_KUSCFContext:
+
+    S, V, W, T = build_S_V_W_T_from_h5(h5_filename)
+    H_core = V + W + T
+    nuc_charge = get_nuc_charge(h5_filename)
+
+    _, nL, nS = build_uncontracted_basis_from_h5(h5_filename)
+    eri = full_eri_from_h5(h5_filename)
+    eri = eri_classified(eri, nL)
+
+    n_elec = nuc_charge + total_charge
+
+    occ_det = occupation_4c(nS, nL, n_elec, occupation_det)
+
+    return _primitive_KUSCFContext(
+        n_bas=nL * nS,
+        nL=nL,
+        nS=nS,
+        S=S,
+        T=T,
+        V=V,
+        W=W,
+        eri_classess=eri,
+        n_electrons=nuc_charge,
+        occupation=occ_det,
+        H_core=H_core,
+    )
