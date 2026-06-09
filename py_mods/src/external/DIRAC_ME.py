@@ -6,7 +6,7 @@ from numpy.typing import NDArray
 import matplotlib.pyplot as plt
 
 from py_mods.src.algebra.quaternion import quaternion_to_matrix
-from py_mods.src.integrals.GTO import create_GTO
+from py_mods.src.integrals.GTO import create_GTO, create_normalized_GTO
 from py_mods.src.integrals.UncontractedBasisSet import (
     UncontractedBasisSet,
     create_UncontractedBasisSet,
@@ -16,7 +16,7 @@ from py_mods.src.integrals.UncontractedBasisSet import (
 from py_mods.src.SCF_4c_dev.types_4c import CS_4c_KU_SCF_Context
 from py_mods.src.SCF_4c_dev.KUSCF_dev import occupation_4c, eri_classified
 
-c = 137.035999177
+c = 137.035999177 
 
 
 def show_h5cont(filename: str) -> List[str]:
@@ -238,7 +238,7 @@ def unflatten_S_V_W(
     """
     S = retriangularize(overlap, n_bas)
     V = retriangularize(molfield, n_bas)
-    W = -retriangularize(betamatarr, n_bas) * c**2 * 2
+    W = -retriangularize(betamatarr, n_bas) * c ** 2 * 2
 
     return S, V, W
 
@@ -421,22 +421,20 @@ def build_uncontracted_basis_from_h5(
     LC_list = []
 
     for R, alpha, l in zip(*Ldata):
-        gto_instance = create_GTO(R, alpha, l - 1)
+        gto_instance = create_normalized_GTO(R, alpha, l - 1, hermit_norm=True)
         LC_list.append(gto_instance)
 
     SC_list = []
     for R, alpha, l in zip(*Sdata):
-        gto_instance = create_GTO(R, alpha, l - 1)
+        gto_instance = create_normalized_GTO(R, alpha, l - 1, hermit_norm=True)
         SC_list.append(gto_instance)
 
-    total_basis = LC_list + SC_list
+    h_basis = create_UncontractedBasisSet(LC_list + SC_list)
 
-    nL = sum(len(bas.l_projections) for bas in LC_list)
-    nS = sum(len(bas.l_projections) for bas in SC_list)
+    nL = sum(b.l_dim for b in LC_list)
+    nS = sum(b.l_dim for b in SC_list)
 
-    Unc_bas_set = create_UncontractedBasisSet(total_basis)
-
-    return Unc_bas_set, nL, nS
+    return h_basis, nL, nS
 
 
 def full_eri_from_h5(h5filename) -> NDArray[np.float64]:
