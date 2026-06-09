@@ -2,7 +2,7 @@ import numpy as np
 from numpy.typing import NDArray
 from typing import Union, Tuple, Literal
 
-from py_mods.src.SCF.CS_SCF_types import CSUHFContext
+from py_mods.src.SCF.CS_SCF_types import CSRHFContext, CSUHFContext
 
 
 def validate_determinant(
@@ -170,7 +170,7 @@ def check_unpaired(
     return (calc_mult == multiplicity), calc_mult
 
 
-def validate_rhf_context_input(ctx: CSUHFContext):
+def validate_rhf_context_input(ctx: CSRHFContext):
     if not len(ctx.T) == len(ctx.V) == len(ctx.S):
         raise ValueError(
             f"Matrices T, V, S must have the same dimensions. Got N_S={len(ctx.S)}, N_T={len(ctx.T)}, N_V={len(ctx.V)}"

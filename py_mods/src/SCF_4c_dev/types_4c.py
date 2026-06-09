@@ -35,9 +35,9 @@ class CS_4c_KU_SCF_Context:
     theta : float, optional
         Complex-scaling angle in radians. Default is 0.0.
     occ : int, NDArray[np.int32] or None, optional
-        Occupation vector. 
-        If same size as nL, it is expanded to include small components. 
-        If same size as 2*(nL+nS), it is used directly. 
+        Occupation vector.
+        If same size as nL, it is expanded to include small components.
+        If same size as 2*(nL+nS), it is used directly.
         If an array, it explicitly defines the occupation numbers.
         If None, a default occupation is built based on `n_electrons`. Default is None.
     max_iter : int, optional
@@ -73,7 +73,7 @@ class CS_4c_KU_SCF_Context:
 
     # Optional
     theta: float = 0.0
-    occ: Union[int, NDArray[np.int32], None] = None
+    occ: Union[int, NDArray[np.int8], None] = None
     max_iter: int = 100
     threshold: float = 1e-12
     p_guess: Literal["core", "ones", "INPORB"] = "core"
@@ -96,9 +96,11 @@ class CS_4c_KU_SCF_Constants:
 
     Attributes
     ----------
+    dim : int
+        Total number of basis functions 2*(nL + nS).
     X : NDArray[np.complex128]
         Orthogonalization matrix (S^{-1/2} for canonical orthogonalization).
-    full_det : NDArray[np.int32]
+    full_det : NDArray[np.int8]
         Occupation vector including small and large components.
     eri_scaled : NDArray[np.complex128]
         Complex-scaled class eris in the atomic orbital basis.
@@ -114,8 +116,9 @@ class CS_4c_KU_SCF_Constants:
         Boolean indicating if convergence acceleration (DIIS/CROP) is requested. Default is False.
     """
 
+    dim: int
     X: NDArray[np.complex128]
-    full_det: NDArray[np.int32]
+    full_det: NDArray[np.int8]
     eri_scaled: NDArray[np.complex128]
     H_core: NDArray[np.complex128]
     core_mask: NDArray[np.bool]
@@ -272,13 +275,14 @@ def allocate_CS_4c_KU_SCF_extended_context(
     nS = ctx.nS
     dim = nL + nS
     X = np.zeros((dim, dim), dtype=np.complex128)
-    full_det = np.zeros(dim, dtype=np.int32)
+    full_det = np.zeros(dim, dtype=np.int8)
     eri_scaled = np.zeros((dim, dim, dim, dim), dtype=np.complex128)
     H_core = np.zeros((dim, dim), dtype=np.complex128)
     core_mask = np.zeros((dim, dim), dtype=np.bool)
     _eigensolver = ctx._eigensolver
 
     return CS_4c_KU_SCF_Constants(
+        dim=dim,
         X=X,
         full_det=full_det,
         eri_scaled=eri_scaled,

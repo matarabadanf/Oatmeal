@@ -1,3 +1,4 @@
+from re import I
 from typing import Optional, Tuple, Union, List, Literal
 
 import numpy as np
@@ -9,6 +10,24 @@ from py_mods.src.integrals.UncontractedBasisSet import (
 )
 
 from py_mods.src.SCF.scf_kernels import calc_p_matrix_comp
+
+import numpy as np
+import scipy
+
+from py_mods.src.SCF_4c_dev.types_4c import (
+    CS_4c_KU_SCF_Context,
+    CS_4c_KU_SCF_Constants,
+    CS_4c_KU_SCF_State,
+)
+
+from py_mods.src.SCF.linalg import transformation_matrix
+from py_mods.src.SCF.CSRHF import guess_density_RHF
+
+from py_mods.src.SCF.utils import initialize_conv_acc
+
+from py_mods.src.SCF_4c_dev.utils import validate_4c_determinant
+
+from py_mods.src.SCF_4c_dev.scf_4c_kernels import scale_4c_integrals
 
 
 def full_eri_from_Uncontracted_Basis(UBS: UncontractedBasisSet):
@@ -29,9 +48,9 @@ def eri_classified(eri: NDArray[np.float64], nL: int) -> NDArray[np.float64]:
 
 
 def occupation_4c(
-    nS, nL, n_electrons, electronic_occ_det: Union[None, NDArray[np.int_]] = None
+    nS, nL, n_electrons, electronic_occ_det: Union[None, NDArray[np.int8]] = None
 ):
-    occ = np.zeros(2 * (nS + nL), dtype=np.uint8)
+    occ = np.zeros(2 * (nS + nL), dtype=np.int8)
 
     n_positron_states = 2 * nS
 
@@ -121,3 +140,149 @@ def scf_steps(n_steps, H_core, eri, X, total_occ_det):
         P_old = P_2
 
     return energy_step
+
+
+# -------------------------------------------------------------
+#  CS-4c-KU-SCF Initialization Functions
+# -------------------------------------------------------------
+
+
+def initialize_CS_4c_KU_SCF_extended_context(
+    ctx: CS_4c_KU_SCF_Context, rhf_ext_ctx: CS_4c_KU_SCF_Constants
+) -> None:
+    """
+    Setup extended context with transformation matrix, validated determinant and scaled integrals.  Also set up convergence acceleration parameters.
+
+    Parameters
+    ----------
+    ctx : CS_4c_KU_SCF_Context
+        Original context with integrals and parameters.
+    rhf_ext_ctx : CSRHFConstants
+        Initialized extended context to compute.
+
+    Returns
+    -------
+    None
+    """
+
+    rhf_ext_ctx.dim = len(ctx.S)
+    rhf_ext_ctx.X = transformation_matrix(ctx.S.astype(np.complex128)).astype(
+        np.complex128
+    )
+
+    # validate occupation
+    rhf_ext_ctx.full_det, _ = validate_4c_determinant(
+        ctx.nS, ctx.nL, ctx.n_electrons, ctx.occ
+    )
+
+    # rescaling the integrals
+    T_scaled, V_scaled, W_scaled, rhf_ext_ctx.eri_scaled = scale_4c_integrals(
+        ctx.T, ctx.V, ctx.W, ctx.eri_classess, ctx.theta
+    )
+
+    rhf_ext_ctx.H_core = T_scaled + V_scaled + W_scaled
+    rhf_ext_ctx.core_mask = np.abs(rhf_ext_ctx.H_core) > 1e-10
+
+    # eigensolver enforced
+    if ctx.theta != 0:
+        rhf_ext_ctx._eigensolver = "eig"
+    else:
+        rhf_ext_ctx._eigensolver = ctx._eigensolver
+
+    # Convergence acceleration setup
+    rhf_ext_ctx.acc_iteration_start, rhf_ext_ctx.acc_requested = initialize_conv_acc(
+        ctx.acc_hist_size, ctx.conv_type, ctx.acc_iteration_start
+    )
+
+    return
+
+
+def initialize_CS_4c_KU_SCF_state_variable(
+    ext_ctx: CS_4c_KU_SCF_Constants, state: CS_4c_KU_SCF_State
+) -> None:
+    state.use_conv_acc = False
+    state.converged = False
+    state.F_guess = []
+    state.residuals = []
+    state.F_next = np.zeros_like(ext_ctx.H_core)
+    state.e_orb = np.zeros(ext_ctx.dim, dtype=np.complex128)
+    state.C_prime = np.zeros((ext_ctx.dim, ext_ctx.dim), dtype=np.complex128)
+    state.C_munu = np.zeros_like(state.C_prime, dtype=np.complex128)
+    state.error = np.complex128(1e10)
+
+    return
+
+
+def initialize_rhf_P_and_E(
+    ctx: CS_4c_KU_SCF_Context,
+    rhf_state: CS_4c_KU_SCF_State,
+) -> None:
+
+    if ctx.theta != 0.0:
+        # TODO: this cannot be filled until the routine has been adapted
+        pass
+        P = guess_density_RHF(ctx.p_guess, len(ctx.S), ctx.initial_orbitals)
+        E_prev = np.complex128(0.0)
+        # P, unscaled_E_RHF = compute_rhf_unscaled_density(ctx, ctx.verbose)
+        # E_prev = np.complex128(unscaled_E_RHF)
+
+    else:
+        P = guess_density_RHF(ctx.p_guess, len(ctx.S), ctx.initial_orbitals)
+        E_prev = np.complex128(0.0)
+
+    rhf_state.P = P
+    rhf_state.E_prev = E_prev
+
+    return
+
+
+# TODO: this has to be adaoted once the scf kernel is defined
+# def compute_rhf_unscaled_density(
+#     ctx: CSRHFContext, verbose: bool
+# ) -> Tuple[NDArray[np.complex128], np.complex128]:
+#     """
+#     Compute unscaled density matrix for theta=0.
+
+#     Parameters
+#     ----------
+#     ctx : CSRHFContext
+#         Original context with integrals and parameters.
+#     verbose : bool
+#         If True, print status.
+
+#     Returns
+#     -------
+#     P : NDArray[np.complex128]
+#         Unscaled density matrix.
+#     E_RHF : np.complex128
+#         Unscaled RHF energy.
+#     """
+#     if verbose:
+#         print("Converging unscaled case:")
+#     unscaled_ctx = CSRHFContext(
+#         S=ctx.S,
+#         T=ctx.T,
+#         V=ctx.V,
+#         eri=ctx.eri,
+#         n_electrons=ctx.n_electrons,
+#         theta=0.0,
+#         occupation=ctx.occupation,
+#         max_iter=ctx.max_iter,
+#         threshold=ctx.threshold,
+#         p_guess=ctx.p_guess,
+#         guess_max_iter=ctx.guess_max_iter,
+#         initial_orbitals=ctx.initial_orbitals,
+#         verbose=ctx.verbose,
+#         conv_type=ctx.conv_type,
+#         acc_hist_size=ctx.acc_hist_size,
+#         acc_iteration_start=10,
+#     )
+
+#     unscaled_res = CS_RHF(unscaled_ctx)
+
+#     if verbose:
+#         print("Unscaled energy: ", unscaled_res.E_RHF)
+#         print("\n\n\nConverging scaled case from unscaled density as reference:")
+
+#     P = unscaled_res.P
+#     return P, unscaled_res.E_RHF
