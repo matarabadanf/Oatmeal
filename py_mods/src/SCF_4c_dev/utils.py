@@ -51,7 +51,7 @@ def validate_4c_determinant(
     nS: int,
     nL: int,
     n_electrons: int,
-    full_det: Union[int, NDArray[np.int32], None],
+    det: Union[int, NDArray[np.int32], None],
 ) -> Tuple[NDArray[np.int8], bool]:
     """
     Validate or construct occupation determinant.
@@ -60,7 +60,7 @@ def validate_4c_determinant(
     ----------
     n_electrons : int
         Total electron count.
-    full_det : int, NDArray[np.int32], or None
+    det : int, NDArray[np.int32], or None
         If -1/None, build aufbau ordered occupation in the positive energy solutions.
     expected_dim : int
         Expected vector length.
@@ -74,11 +74,11 @@ def validate_4c_determinant(
     """
     natural_occupation = True
 
-    if full_det is None:
-        full_det = -1
+    if det is None:
+        det = -1
 
-    if isinstance(full_det, int):
-        if full_det == -1:
+    if isinstance(det, int):
+        if det == -1:
             det_arr = np.zeros(2 * (nL + nS), dtype=np.int8)
             n_occ = n_electrons
             det_arr[2 * nS : 2 * nS + n_occ] = 1
@@ -86,11 +86,11 @@ def validate_4c_determinant(
         else:
             raise TypeError("determinant must be -1, None or a numpy array")
 
-    if not isinstance(full_det, np.ndarray):
-        raise TypeError("determinant must be a numpy.ndarray when not -1/None")
+    if not isinstance(det, np.ndarray):
+        raise TypeError("Occupation vector must be an integer, array-like or None.")
 
     natural_occupation = False
-    det_arr = full_det.astype(np.int8)
+    det_arr = det.astype(np.int8)
 
     if int(np.sum(det_arr)) != n_electrons:
         raise ValueError(

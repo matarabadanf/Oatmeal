@@ -9,25 +9,39 @@ from py_mods.src.integrals.UncontractedBasisSet import (
     ERIs_Uncontracted,
 )
 
-from py_mods.src.SCF.scf_kernels import calc_p_matrix_comp
-
-import numpy as np
+from py_mods.src.SCF.scf_kernels import calc_p_matrix_comp, calc_residual_commutator
+from py_mods.src.SCF.CSRHF import (
+    is_converged,
+    update_rhf_acc_hist_size,
+    conv_acc_criteria_met,
+    print_table_header,
+)
 import scipy
 
 from py_mods.src.SCF_4c_dev.types_4c import (
     CS_4c_KU_SCF_Context,
     CS_4c_KU_SCF_Constants,
     CS_4c_KU_SCF_State,
+    CS_4c_KU_SCF_Results,
+    allocate_CS_4c_KU_SCF_extended_context,
+    allocate_CS_4c_KU_SCF_state,
+    pack_CS_4c_KU_SCF_results,
 )
 
-from py_mods.src.SCF.linalg import transformation_matrix
+from py_mods.src.SCF.linalg import transformation_matrix, sign_convention
 from py_mods.src.SCF.CSRHF import guess_density_RHF
 
 from py_mods.src.SCF.utils import initialize_conv_acc
 
-from py_mods.src.SCF_4c_dev.utils import validate_4c_determinant
+from py_mods.src.SCF_4c_dev.utils import (
+    validate_4c_determinant,
+    validate_CS_4c_KU_SCF_context_input,
+)
 
-from py_mods.src.SCF_4c_dev.scf_4c_kernels import scale_4c_integrals
+from py_mods.src.SCF_4c_dev.scf_4c_kernels import (
+    scale_4c_integrals,
+    calculate_P_next_4c,
+)
 
 
 def full_eri_from_Uncontracted_Basis(UBS: UncontractedBasisSet) -> NDArray[np.float64]:
@@ -76,7 +90,10 @@ def eri_classified(eri: NDArray[np.float64], nL: int) -> NDArray[np.float64]:
 
 
 def occupation_4c(
-    nS: int, nL: int, n_electrons: int, electronic_occ_det: Union[None, NDArray[np.int8]] = None
+    nS: int,
+    nL: int,
+    n_electrons: int,
+    electronic_occ_det: Union[None, NDArray[np.int8]] = None,
 ) -> NDArray[np.int8]:
     """
     Build the occupation vector for 4c calculations.
@@ -165,8 +182,13 @@ def g_matrix_4c(
 
 
 def scf_iteration(
-    F_1: NDArray[np.complex128], X: NDArray[np.complex128], total_occ_det: NDArray[np.int8]
-) -> Tuple[NDArray[np.complex128], NDArray[np.complex128], NDArray[np.complex128], NDArray[np.complex128]]:
+    F_1: NDArray[np.complex128], X: NDArray[np.complex128], det: NDArray[np.int8]
+) -> Tuple[
+    NDArray[np.complex128],
+    NDArray[np.complex128],
+    NDArray[np.complex128],
+    NDArray[np.complex128],
+]:
     """
     Perform a single SCF iteration step.
 
@@ -199,7 +221,7 @@ def scf_iteration(
     w1 = w1[:, idx]
 
     c_alpha_beta1 = X @ w1
-    P_1 = calc_p_matrix_comp(c_alpha_beta1.conj().T, c_alpha_beta1, total_occ_det)
+    P_1 = calc_p_matrix_comp(c_alpha_beta1.conj().T, c_alpha_beta1, det)
 
     return e1, w1, F_p1, P_1
 
@@ -209,7 +231,7 @@ def scf_steps(
     H_core: NDArray[np.complex128],
     eri: NDArray[np.complex128],
     X: NDArray[np.complex128],
-    total_occ_det: NDArray[np.int8]
+    det: NDArray[np.int8],
 ) -> List[float]:
     """
     For loop that wraps scf iterations.
@@ -247,7 +269,7 @@ def scf_steps(
 
         F_new = H_core + G_new
 
-        e_new, w_new, F_p_new, P_2 = scf_iteration(F_new, X, total_occ_det)
+        e_new, w_new, F_p_new, P_2 = scf_iteration(F_new, X, det)
 
         if i == 0:
             e_scf = np.linalg.trace(P_2 @ H_core)
@@ -283,14 +305,10 @@ def initialize_CS_4c_KU_SCF_extended_context(
     """
 
     ext_ctx.dim = len(ctx.S)
-    ext_ctx.X = transformation_matrix(ctx.S.astype(np.complex128)).astype(
-        np.complex128
-    )
+    ext_ctx.X = transformation_matrix(ctx.S.astype(np.complex128)).astype(np.complex128)
 
     # validate occupation
-    ext_ctx.full_det, _ = validate_4c_determinant(
-        ctx.nS, ctx.nL, ctx.n_electrons, ctx.occ
-    )
+    ext_ctx.det, _ = validate_4c_determinant(ctx.nS, ctx.nL, ctx.n_electrons, ctx.occ)
 
     # rescaling the integrals
     T_scaled, V_scaled, W_scaled, ext_ctx.eri_scaled = scale_4c_integrals(
@@ -298,7 +316,6 @@ def initialize_CS_4c_KU_SCF_extended_context(
     )
 
     ext_ctx.H_core = T_scaled + V_scaled + W_scaled
-    ext_ctx.core_mask = np.abs(ext_ctx.H_core) > 1e-10
 
     # eigensolver enforced
     if ctx.theta != 0:
@@ -430,3 +447,160 @@ def initialize_CS_4c_KU_SCF_P_and_E(
 
 #     P = unscaled_res.P
 #     return P, unscaled_res.E_RHF
+
+
+def update_CS_4c_KU_SCF_F_and_r_comp(
+    ctx: CS_4c_KU_SCF_Context,
+    ext_ctx: CS_4c_KU_SCF_Constants,
+    state: CS_4c_KU_SCF_State,
+) -> None:
+    G = g_matrix_4c(state.P, ext_ctx.eri_scaled)
+    state.F = ext_ctx.H_core + G
+    state.r = calc_residual_commutator(state.F, state.P, ctx.S.astype(np.complex128))
+    state.error = float(np.linalg.norm(state.r.flatten()))
+
+
+def update_CS_4c_KU_SCF_energy(
+    ext_ctx: CS_4c_KU_SCF_Constants,
+    state: CS_4c_KU_SCF_State,
+) -> None:
+    e_scf = np.linalg.trace(state.P @ (ext_ctx.H_core + state.F)) * 0.5
+    state.E_SCF = e_scf
+    state.E_diff = state.E_SCF - state.E_prev
+    state.E_prev = state.E_SCF
+
+
+def print_cycle_data_4c(convergence_criteria: str, state: CS_4c_KU_SCF_State) -> None:
+    print(
+        f"{state.iteration:5}     {state.E_SCF:45.16f}     {state.E_diff:45.16f}     {state.error:8.4E}"
+    )
+
+
+def update_CS_4c_KU_SCF_F_matrix(
+    ctx: CS_4c_KU_SCF_Context,
+    state: CS_4c_KU_SCF_State,
+) -> None:
+    if not state.use_conv_acc:
+        F_next = state.F
+    else:
+        try:
+            F_opt, r_opt = calc_diis_extrapolation_4c(
+                state.residuals, state.F_guess, ctx.theta
+            )
+            F_next = F_opt
+
+            if ctx.conv_type == "CROP":
+                state.F_guess[-1] = F_opt
+                state.residuals[-1] = r_opt
+        except np.linalg.LinAlgError:
+            if ctx.verbose:
+                print(
+                    "!!!!!!!!!!!!!!!! CONVERGENCE ACCELERATION CAUSED A SINGULAR MATRIX. REVERTING TO STANDARD SCF !!!!!!!!!!!!!!!"
+                )
+            state.use_conv_acc = False
+            F_next = state.F
+
+    state.F_next = F_next
+
+
+def calc_diis_extrapolation_4c(
+    residuals: List[NDArray[np.complex128]],
+    F_guesses: List[NDArray[np.complex128]],
+    theta: float,
+) -> Tuple[NDArray[np.complex128], NDArray[np.complex128]]:
+    n_guesses = len(residuals)
+    eq_sis_dim = n_guesses + 1
+
+    B_matrix = np.zeros((eq_sis_dim, eq_sis_dim), dtype=np.complex128)
+    B_matrix[-1, :] = 1
+    B_matrix[:, -1] = 1
+    B_matrix[-1, -1] = 0
+
+    for i in range(n_guesses):
+        for j in range(n_guesses):
+            if theta == 0.0:
+                # We have to use complex conjugation because the DF Hamiltonian is
+                # complex. In the case of the NR case we could just do the scalar
+                # product since the hamiltonian is real so we could get away
+                # with using np.dot in both cases.
+                B_matrix[i, j] = np.vdot(residuals[i].ravel(), residuals[j].ravel())
+            else:
+                # c-norm metric inner product for complex scaling
+                B_matrix[i, j] = np.dot(residuals[i].ravel(), residuals[j].ravel())
+
+    solution = np.zeros(eq_sis_dim, dtype=np.complex128)
+    solution[-1] = 1
+
+    try:
+        c = np.linalg.solve(B_matrix, solution)
+    except np.linalg.LinAlgError:
+        raise np.linalg.LinAlgError("DIIS matrix singular")
+
+    coeffs = c[:-1]
+
+    F_conv = np.zeros_like(F_guesses[0])
+    r_conv = np.zeros_like(residuals[0])
+
+    for k, coef in enumerate(coeffs):
+        F_conv += coef * F_guesses[k]
+        r_conv += coef * residuals[k]
+
+    return F_conv, r_conv
+
+
+def update_CS_4c_KU_SCF_density(
+    ctx: CS_4c_KU_SCF_Context,
+    ext_ctx: CS_4c_KU_SCF_Constants,
+    state: CS_4c_KU_SCF_State,
+) -> None:
+    state.P, state.e_orb, state.C_munu, state.C_prime = calculate_P_next_4c(
+        state.F_next, ext_ctx.X, ext_ctx.det, ext_ctx._eigensolver, ctx.theta
+    )
+
+    state.C_munu = sign_convention(state.C_munu)
+    return
+
+
+def _kuscf_kernel(ctx: CS_4c_KU_SCF_Context) -> CS_4c_KU_SCF_Results:
+    validate_CS_4c_KU_SCF_context_input(ctx)
+
+    ext_ctx = allocate_CS_4c_KU_SCF_extended_context(ctx)
+    state = allocate_CS_4c_KU_SCF_state(ctx)
+
+    initialize_CS_4c_KU_SCF_extended_context(ctx, ext_ctx)
+
+    initialize_CS_4c_KU_SCF_P_and_E(ctx, state)
+    initialize_CS_4c_KU_SCF_state_variable(ext_ctx, state)
+
+    if ctx.verbose:
+        print_table_header()
+
+    for iter_idx in range(ctx.max_iter):
+        state.iteration += 1
+
+        update_CS_4c_KU_SCF_F_and_r_comp(ctx, ext_ctx, state)
+        update_CS_4c_KU_SCF_energy(ext_ctx, state)
+
+        if ctx.verbose:
+            print_cycle_data_4c(ctx._convergence_criteria, state)
+
+        # Reused RHF functions (duck-typed)
+        state.converged = is_converged(ctx, state)  # type: ignore
+        if state.converged:
+            break
+
+        update_rhf_acc_hist_size(ctx, state)  # type: ignore
+        state.P_old = state.P.copy()
+
+        update_CS_4c_KU_SCF_F_matrix(ctx, state)
+
+        update_CS_4c_KU_SCF_density(ctx, ext_ctx, state)
+
+        state.use_conv_acc = conv_acc_criteria_met(ctx, ext_ctx, state)  # type: ignore
+
+    update_CS_4c_KU_SCF_density(ctx, ext_ctx, state)
+    state.F_next = state.F
+
+    results = pack_CS_4c_KU_SCF_results(ctx, ext_ctx, state)
+
+    return results

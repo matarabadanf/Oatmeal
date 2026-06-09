@@ -100,7 +100,7 @@ class CS_4c_KU_SCF_Constants:
         Total number of basis functions 2*(nL + nS).
     X : NDArray[np.complex128]
         Orthogonalization matrix (S^{-1/2} for canonical orthogonalization).
-    full_det : NDArray[np.int8]
+    det : NDArray[np.int8]
         Occupation vector including small and large components.
     eri_scaled : NDArray[np.complex128]
         Complex-scaled class eris in the atomic orbital basis.
@@ -118,7 +118,7 @@ class CS_4c_KU_SCF_Constants:
 
     dim: int
     X: NDArray[np.complex128]
-    full_det: NDArray[np.int8]
+    det: NDArray[np.int8]
     eri_scaled: NDArray[np.complex128]
     H_core: NDArray[np.complex128]
     core_mask: NDArray[np.bool_]
@@ -211,7 +211,7 @@ class CS_4c_KU_SCF_Results:
         Electronic solution orbital energies (size is 2*nL).
     n_elec : np.int32
         Final number of electrons.
-    full_det : NDArray[np.int32]
+    det : NDArray[np.int32]
         Occupation vector.
     H_core : NDArray[np.complex128]
         (CS)H_core.
@@ -241,7 +241,7 @@ class CS_4c_KU_SCF_Results:
     e_orb: NDArray[np.complex128]
     e_electronic_orb: NDArray[np.complex128]
     n_elec: np.int32
-    full_det: NDArray[np.int32]
+    det: NDArray[np.int32]
     H_core: NDArray[np.complex128]
     X: NDArray[np.complex128]
     F_final: NDArray[np.complex128]
@@ -276,7 +276,7 @@ def allocate_CS_4c_KU_SCF_extended_context(
     spatial_dim = nL + nS
     full_dim = 2 * spatial_dim
     X = np.zeros((full_dim, full_dim), dtype=np.complex128)
-    full_det = np.zeros(full_dim, dtype=np.int8)
+    det = np.zeros(full_dim, dtype=np.int8)
     eri_scaled = np.zeros(
         (spatial_dim, spatial_dim, spatial_dim, spatial_dim), dtype=np.complex128
     )
@@ -287,7 +287,7 @@ def allocate_CS_4c_KU_SCF_extended_context(
     return CS_4c_KU_SCF_Constants(
         dim=full_dim,
         X=X,
-        full_det=full_det,
+        det=det,
         eri_scaled=eri_scaled,
         H_core=H_core,
         core_mask=core_mask,
@@ -379,7 +379,7 @@ def pack_CS_4c_KU_SCF_results(
         e_orb=state.e_orb,
         e_electronic_orb=state.e_electronic_orb,
         n_elec=np.int32(ctx.n_electrons),
-        full_det=ext_ctx.full_det,
+        det=ext_ctx.det,
         H_core=ext_ctx.H_core,
         X=ext_ctx.X,
         F_final=state.F_next,

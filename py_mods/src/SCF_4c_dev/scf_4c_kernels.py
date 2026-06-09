@@ -43,3 +43,43 @@ def scale_4c_integrals(
         (W * exp_t1).astype(np.complex128),
         (eri_classess * exp_t1).astype(np.complex128),
     )
+
+from typing import Literal
+
+def calculate_P_next_4c(
+    F_next: NDArray[np.complex128],
+    X: NDArray[np.complex128],
+    det: NDArray[np.int8],
+    solver: Literal["eig", "eigh"],
+    theta: float
+) -> Tuple[
+    NDArray[np.complex128],
+    NDArray[np.complex128],
+    NDArray[np.complex128],
+    NDArray[np.complex128],
+]:
+    from py_mods.src.SCF.scf_kernels import calc_p_matrix_comp
+
+    F_prime = X.T @ F_next @ X
+    
+    if solver == "eigh":
+        e_values, C_prime = np.linalg.eigh(F_prime)
+        idx = np.argsort(e_values.real)
+        e_values = e_values[idx]
+        C_prime = C_prime[:, idx]
+    else:
+        e_values, C_prime = np.linalg.eig(F_prime)
+        idx = np.argsort(e_values.real)
+        e_values = e_values[idx]
+        C_prime = C_prime[:, idx]
+        
+    C_munu = X @ C_prime
+    
+    if theta == 0.0:
+        L_munu = C_munu.conj().T
+    else:
+        L_munu = C_munu.T
+        
+    P_munu = calc_p_matrix_comp(L_munu, C_munu, det)
+
+    return P_munu, e_values, C_munu, C_prime
