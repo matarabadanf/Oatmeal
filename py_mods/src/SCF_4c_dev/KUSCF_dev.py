@@ -30,13 +30,41 @@ from py_mods.src.SCF_4c_dev.utils import validate_4c_determinant
 from py_mods.src.SCF_4c_dev.scf_4c_kernels import scale_4c_integrals
 
 
-def full_eri_from_Uncontracted_Basis(UBS: UncontractedBasisSet):
+def full_eri_from_Uncontracted_Basis(UBS: UncontractedBasisSet) -> NDArray[np.float64]:
+    """
+    Compute full ERI tensor from uncontracted basis set.
+
+    Parameters
+    ----------
+    UBS : UncontractedBasisSet
+        The uncontracted basis set.
+
+    Returns
+    -------
+    eri_tensor : NDArray[np.float64]
+        The full ERI tensor.
+    """
     eri_tensor = ERIs_Uncontracted(UBS)
 
     return eri_tensor
 
 
 def eri_classified(eri: NDArray[np.float64], nL: int) -> NDArray[np.float64]:
+    """
+    Filter ERI tensor to keep only (LL|LL), (SS|LL), (LL|SS), (SS|SS) terms.
+
+    Parameters
+    ----------
+    eri : NDArray[np.float64]
+        The full electron repulsion integrals tensor.
+    nL : int
+        Number of large component basis functions.
+
+    Returns
+    -------
+    eri_classess : NDArray[np.float64]
+        The classified ERI tensor.
+    """
     eri_classess = np.zeros_like(eri, dtype=np.float64)
 
     eri_classess[:nL, :nL, :nL, :nL] = eri[:nL, :nL, :nL, :nL]  # LL-LL block
@@ -48,8 +76,27 @@ def eri_classified(eri: NDArray[np.float64], nL: int) -> NDArray[np.float64]:
 
 
 def occupation_4c(
-    nS, nL, n_electrons, electronic_occ_det: Union[None, NDArray[np.int8]] = None
-):
+    nS: int, nL: int, n_electrons: int, electronic_occ_det: Union[None, NDArray[np.int8]] = None
+) -> NDArray[np.int8]:
+    """
+    Build the occupation vector for 4c calculations.
+
+    Parameters
+    ----------
+    nS : int
+        Number of small component basis functions.
+    nL : int
+        Number of large component basis functions.
+    n_electrons : int
+        Number of electrons.
+    electronic_occ_det : Union[None, NDArray[np.int8]], optional
+        Occupation determinant for electronic states (positive energy solutions). Defaults to None.
+
+    Returns
+    -------
+    occ : NDArray[np.int8]
+        Occupation determinant for electronic and positronic states.
+    """
     occ = np.zeros(2 * (nS + nL), dtype=np.int8)
 
     n_positron_states = 2 * nS
@@ -68,7 +115,24 @@ def occupation_4c(
     return occ
 
 
-def g_matrix_4c(P, eri):
+def g_matrix_4c(
+    P: NDArray[np.complex128], eri: NDArray[np.complex128]
+) -> NDArray[np.complex128]:
+    """
+    Construct G matrix (J-K) from the density matrix.
+
+    Parameters
+    ----------
+    P : NDArray[np.complex128]
+        Density matrix.
+    eri : NDArray[np.complex128]
+        Electron repulsion integrals tensor.
+
+    Returns
+    -------
+    G_full : NDArray[np.complex128]
+        Full G matrix.
+    """
     n_bas = P.shape[0]
     n_bas_half = n_bas // 2
 
@@ -100,7 +164,32 @@ def g_matrix_4c(P, eri):
     return G_full
 
 
-def scf_iteration(F_1, X, total_occ_det):
+def scf_iteration(
+    F_1: NDArray[np.complex128], X: NDArray[np.complex128], total_occ_det: NDArray[np.int8]
+) -> Tuple[NDArray[np.complex128], NDArray[np.complex128], NDArray[np.complex128], NDArray[np.complex128]]:
+    """
+    Perform a single SCF iteration step.
+
+    Parameters
+    ----------
+    F_1 : NDArray[np.complex128]
+        Current Fock matrix.
+    X : NDArray[np.complex128]
+        Transformation matrix.
+    total_occ_det : NDArray[np.int8]
+        Occupation determinant.
+
+    Returns
+    -------
+    e1 : NDArray[np.complex128]
+        Eigenvalues (orbital energies).
+    w1 : NDArray[np.complex128]
+        Eigenvectors in orthogonal basis.
+    F_p1 : NDArray[np.complex128]
+        Transformed Fock matrix.
+    P_1 : NDArray[np.complex128]
+        Updated density matrix.
+    """
     F_p1 = X.T @ F_1 @ X
 
     e1, w1 = np.linalg.eigh(F_p1)
@@ -115,7 +204,34 @@ def scf_iteration(F_1, X, total_occ_det):
     return e1, w1, F_p1, P_1
 
 
-def scf_steps(n_steps, H_core, eri, X, total_occ_det):
+def scf_steps(
+    n_steps: int,
+    H_core: NDArray[np.complex128],
+    eri: NDArray[np.complex128],
+    X: NDArray[np.complex128],
+    total_occ_det: NDArray[np.int8]
+) -> List[float]:
+    """
+    For loop that wraps scf iterations.
+
+    Parameters
+    ----------
+    n_steps : int
+        Number of steps to run.
+    H_core : NDArray[np.complex128]
+        Core Hamiltonian matrix.
+    eri : NDArray[np.complex128]
+        Electron repulsion integrals tensor.
+    X : NDArray[np.complex128]
+        Transformation matrix.
+    total_occ_det : NDArray[np.int8]
+        Occupation determinant.
+
+    Returns
+    -------
+    energy_step : List[float]
+        Energies at each iteration step.
+    """
     energy_step = []
     P_old = np.zeros_like(H_core)
 
@@ -148,16 +264,17 @@ def scf_steps(n_steps, H_core, eri, X, total_occ_det):
 
 
 def initialize_CS_4c_KU_SCF_extended_context(
-    ctx: CS_4c_KU_SCF_Context, rhf_ext_ctx: CS_4c_KU_SCF_Constants
+    ctx: CS_4c_KU_SCF_Context, ext_ctx: CS_4c_KU_SCF_Constants
 ) -> None:
     """
-    Setup extended context with transformation matrix, validated determinant and scaled integrals.  Also set up convergence acceleration parameters.
+    Setup extended context with transformation matrix, validated determinant and scaled integrals.
+    Also set up convergence acceleration parameters.
 
     Parameters
     ----------
     ctx : CS_4c_KU_SCF_Context
         Original context with integrals and parameters.
-    rhf_ext_ctx : CSRHFConstants
+    ext_ctx : CS_4c_KU_SCF_Constants
         Initialized extended context to compute.
 
     Returns
@@ -165,32 +282,32 @@ def initialize_CS_4c_KU_SCF_extended_context(
     None
     """
 
-    rhf_ext_ctx.dim = len(ctx.S)
-    rhf_ext_ctx.X = transformation_matrix(ctx.S.astype(np.complex128)).astype(
+    ext_ctx.dim = len(ctx.S)
+    ext_ctx.X = transformation_matrix(ctx.S.astype(np.complex128)).astype(
         np.complex128
     )
 
     # validate occupation
-    rhf_ext_ctx.full_det, _ = validate_4c_determinant(
+    ext_ctx.full_det, _ = validate_4c_determinant(
         ctx.nS, ctx.nL, ctx.n_electrons, ctx.occ
     )
 
     # rescaling the integrals
-    T_scaled, V_scaled, W_scaled, rhf_ext_ctx.eri_scaled = scale_4c_integrals(
+    T_scaled, V_scaled, W_scaled, ext_ctx.eri_scaled = scale_4c_integrals(
         ctx.T, ctx.V, ctx.W, ctx.eri_classess, ctx.theta
     )
 
-    rhf_ext_ctx.H_core = T_scaled + V_scaled + W_scaled
-    rhf_ext_ctx.core_mask = np.abs(rhf_ext_ctx.H_core) > 1e-10
+    ext_ctx.H_core = T_scaled + V_scaled + W_scaled
+    ext_ctx.core_mask = np.abs(ext_ctx.H_core) > 1e-10
 
     # eigensolver enforced
     if ctx.theta != 0:
-        rhf_ext_ctx._eigensolver = "eig"
+        ext_ctx._eigensolver = "eig"
     else:
-        rhf_ext_ctx._eigensolver = ctx._eigensolver
+        ext_ctx._eigensolver = ctx._eigensolver
 
     # Convergence acceleration setup
-    rhf_ext_ctx.acc_iteration_start, rhf_ext_ctx.acc_requested = initialize_conv_acc(
+    ext_ctx.acc_iteration_start, ext_ctx.acc_requested = initialize_conv_acc(
         ctx.acc_hist_size, ctx.conv_type, ctx.acc_iteration_start
     )
 
@@ -200,6 +317,20 @@ def initialize_CS_4c_KU_SCF_extended_context(
 def initialize_CS_4c_KU_SCF_state_variable(
     ext_ctx: CS_4c_KU_SCF_Constants, state: CS_4c_KU_SCF_State
 ) -> None:
+    """
+    Initialize SCF state variables.
+
+    Parameters
+    ----------
+    ext_ctx : CS_4c_KU_SCF_Constants
+        Extended context providing basis dimension info.
+    state : CS_4c_KU_SCF_State
+        State object to be initialized.
+
+    Returns
+    -------
+    None
+    """
     state.use_conv_acc = False
     state.converged = False
     state.F_guess = []
@@ -213,25 +344,38 @@ def initialize_CS_4c_KU_SCF_state_variable(
     return
 
 
-def initialize_rhf_P_and_E(
+def initialize_CS_4c_KU_SCF_P_and_E(
     ctx: CS_4c_KU_SCF_Context,
-    rhf_state: CS_4c_KU_SCF_State,
+    state: CS_4c_KU_SCF_State,
 ) -> None:
+    """
+    Initialize density matrix and starting energy.
 
+    Parameters
+    ----------
+    ctx : CS_4c_KU_SCF_Context
+        Original context.
+    state : CS_4c_KU_SCF_State
+        State object to be populated with the initial guess.
+
+    Returns
+    -------
+    None
+    """
     if ctx.theta != 0.0:
         # TODO: this cannot be filled until the routine has been adapted
         pass
         P = guess_density_RHF(ctx.p_guess, len(ctx.S), ctx.initial_orbitals)
         E_prev = np.complex128(0.0)
-        # P, unscaled_E_RHF = compute_rhf_unscaled_density(ctx, ctx.verbose)
-        # E_prev = np.complex128(unscaled_E_RHF)
+        # P, unscaled_E = compute_unscaled_density(ctx, ctx.verbose)
+        # E_prev = np.complex128(unscaled_E)
 
     else:
         P = guess_density_RHF(ctx.p_guess, len(ctx.S), ctx.initial_orbitals)
         E_prev = np.complex128(0.0)
 
-    rhf_state.P = P
-    rhf_state.E_prev = E_prev
+    state.P = P
+    state.E_prev = E_prev
 
     return
 

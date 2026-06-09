@@ -106,7 +106,7 @@ class CS_4c_KU_SCF_Constants:
         Complex-scaled class eris in the atomic orbital basis.
     H_core : NDArray[np.complex128]
         Complex-scaled core Hamiltonian matrix (T + V).
-    core_mask : NDArray[np.bool]
+    core_mask : NDArray[np.bool_]
         Boolean mask of Hcore interactions.
     _eigensolver : {'eig', 'eigh'}
         Solver to use for diagonalization.
@@ -121,7 +121,7 @@ class CS_4c_KU_SCF_Constants:
     full_det: NDArray[np.int8]
     eri_scaled: NDArray[np.complex128]
     H_core: NDArray[np.complex128]
-    core_mask: NDArray[np.bool]
+    core_mask: NDArray[np.bool_]
     _eigensolver: Literal["eig", "eigh"]
     acc_iteration_start: int = 10
     acc_requested: bool = False
@@ -273,16 +273,19 @@ def allocate_CS_4c_KU_SCF_extended_context(
     """
     nL = ctx.nL
     nS = ctx.nS
-    dim = nL + nS
-    X = np.zeros((dim, dim), dtype=np.complex128)
-    full_det = np.zeros(dim, dtype=np.int8)
-    eri_scaled = np.zeros((dim, dim, dim, dim), dtype=np.complex128)
-    H_core = np.zeros((dim, dim), dtype=np.complex128)
-    core_mask = np.zeros((dim, dim), dtype=np.bool)
+    spatial_dim = nL + nS
+    full_dim = 2 * spatial_dim
+    X = np.zeros((full_dim, full_dim), dtype=np.complex128)
+    full_det = np.zeros(full_dim, dtype=np.int8)
+    eri_scaled = np.zeros(
+        (spatial_dim, spatial_dim, spatial_dim, spatial_dim), dtype=np.complex128
+    )
+    H_core = np.zeros((full_dim, full_dim), dtype=np.complex128)
+    core_mask = np.zeros((full_dim, full_dim), dtype=np.bool_)
     _eigensolver = ctx._eigensolver
 
     return CS_4c_KU_SCF_Constants(
-        dim=dim,
+        dim=full_dim,
         X=X,
         full_det=full_det,
         eri_scaled=eri_scaled,

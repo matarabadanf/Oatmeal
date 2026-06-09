@@ -61,7 +61,7 @@ def validate_4c_determinant(
     n_electrons : int
         Total electron count.
     full_det : int, NDArray[np.int32], or None
-        If -1/None, build aufbau ordered occupation in the positive energy solutions. 
+        If -1/None, build aufbau ordered occupation in the positive energy solutions.
     expected_dim : int
         Expected vector length.
 
@@ -79,13 +79,12 @@ def validate_4c_determinant(
 
     if isinstance(full_det, int):
         if full_det == -1:
-            det_arr = np.zeros(2*(nL+nS), dtype=np.int8)
-            n_occ = n_electrons 
-            det_arr[2*nS:2*nS+n_occ] = 2
+            det_arr = np.zeros(2 * (nL + nS), dtype=np.int8)
+            n_occ = n_electrons
+            det_arr[2 * nS : 2 * nS + n_occ] = 1
             return det_arr, natural_occupation
         else:
             raise TypeError("determinant must be -1, None or a numpy array")
-        
 
     if not isinstance(full_det, np.ndarray):
         raise TypeError("determinant must be a numpy.ndarray when not -1/None")
@@ -97,18 +96,18 @@ def validate_4c_determinant(
         raise ValueError(
             f"determinant sum ({int(np.sum(det_arr))}) != n_electrons ({n_electrons})"
         )
-    
-    if int(np.sum(det_arr[:2*nS])) != 0 and len(det_arr) == 2*(nL+nS): 
+
+    if int(np.sum(det_arr[: 2 * nS])) != 0 and len(det_arr) == 2 * (nL + nS):
         raise ValueError(
             f"Positron states must be unoccupied. Got sum {int(np.sum(det_arr[:2*nS]))} in the first 2*nS."
         )
-    
-    expected_dim = 2*(nL+nS)
+
+    expected_dim = 2 * (nL + nS)
 
     if len(det_arr) != expected_dim:
         new_occ = np.zeros(expected_dim, dtype=np.int8)
         length = min(len(det_arr), expected_dim)
-        new_occ[2*nS:2*nS + length] = det_arr[:length]
+        new_occ[2 * nS : 2 * nS + length] = det_arr[:length]
         det_arr = new_occ
 
     return det_arr, natural_occupation

@@ -107,6 +107,24 @@ def _csrhf_kernel(ctx: CSRHFContext) -> CSRHFResults:
 
 
 def CS_RHF(ctx: CSRHFContext) -> CSRHFResults:
+    """
+    Perform a Complex Scaled Restricted Hartree-Fock calculation.
+
+    Takes a context with overlap, kinetic, nuclear attraction, and two-electron
+    integrals, optionally applies complex scaling by an angle `theta`, and runs
+    the RHF loop using biorthogonal diagonalization. If `theta != 0`, an
+    unscaled calculation is performed first to generate a starting guess density.
+
+    Parameters
+    ----------
+    ctx : CSRHFContext
+        Context object containing all parameters for the calculation.
+
+    Returns
+    -------
+    CSRHFResults
+        Results object containing energies, orbitals, and convergence info.
+    """
 
     if ctx.theta == 0:
         return _csrhf_kernel(ctx)
