@@ -447,7 +447,8 @@ def full_eri_from_h5(h5filename, kernel: Literal['interest', 'oatmeal']='interes
 def generate_primitive_KUSCFContext_from_h5(
     h5_filename: str,
     total_charge: int = 0,
-    occupation_det: Optional[NDArray[np.int_]] = None,
+    occupation_det: Optional[NDArray[np.int8]] = None,
+    **kwargs,
 ) -> CS_4c_KU_SCF_Context:
 
     S, V, W, T = build_S_V_W_T_from_h5(h5_filename)
@@ -472,4 +473,6 @@ def generate_primitive_KUSCFContext_from_h5(
         eri_classess=eri,
         n_electrons=nuc_charge,
         occ=occ_det,
+        verbose=True,
+        **kwargs
     )

@@ -81,8 +81,8 @@ class CS_4c_KU_SCF_Context:
     initial_orbitals: Union[NDArray[np.float64], NDArray[np.complex128], None] = None
     verbose: bool = False
     conv_type: Literal[None, "DIIS", "CROP"] = "DIIS"
-    acc_hist_size: int = 10
-    acc_iteration_start: int = 12
+    acc_hist_size: int = 5
+    acc_iteration_start: int = 6
 
     # Internal
     _eigensolver: Literal["eig", "eigh"] = "eigh"
@@ -377,7 +377,7 @@ def pack_CS_4c_KU_SCF_results(
         converged=state.converged,
         E_SCF=state.E_SCF,
         e_orb=state.e_orb,
-        e_electronic_orb=state.e_electronic_orb,
+        e_electronic_orb=state.e_orb[-2*ctx.nL:],
         n_elec=np.int32(ctx.n_electrons),
         det=ext_ctx.det,
         H_core=ext_ctx.H_core,
