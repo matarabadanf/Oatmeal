@@ -392,12 +392,14 @@ def conv_acc_criteria_met(
     rhf_ext_ctx: CSRHFConstants,
     rhf_state: CSRHFState,
 ) -> bool:
-    use_conv_acc = False
+    use_conv_acc = rhf_state.use_conv_acc
     if (
-        rhf_state.iteration - 1 == rhf_ext_ctx.acc_iteration_start
+        not use_conv_acc
+        and rhf_state.iteration - 1 >= rhf_ext_ctx.acc_iteration_start
         and rhf_ext_ctx.acc_requested
     ):
         use_conv_acc = True
+
         if ctx.verbose:
             print("-" * 30, f"   STARTED {ctx.conv_type}  ", "-" * 30)
     return use_conv_acc
@@ -490,7 +492,7 @@ def update_rhf_F_matrix(
     else:
         try:
             F_opt, r_opt = calc_diis_extrapolation(
-                rhf_state.residuals, rhf_state.F_guess
+                rhf_state.residuals, rhf_state.F_guess, ctx.theta
             )
             F_next = F_opt
 

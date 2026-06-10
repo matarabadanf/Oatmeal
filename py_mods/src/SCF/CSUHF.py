@@ -417,11 +417,14 @@ def conv_acc_criteria_met(
     uhf_ext_ctx: CSUHFConstants,
     uhf_state: CSUHFState,
 ) -> bool:
-    use_conv_acc = False
+    use_conv_acc = uhf_state.use_conv_acc
     if (
-        uhf_state.iteration == ctx.acc_iteration_start and uhf_ext_ctx.acc_requested
+        not use_conv_acc
+        and uhf_state.iteration >= ctx.acc_iteration_start
+        and uhf_ext_ctx.acc_requested
     ):  #  and error < conv_thresh and not use_conv:
         use_conv_acc = True
+
         if ctx.verbose:
             print("-" * 30, f"   STARTED {ctx.conv_type}  ", "-" * 30)
 
@@ -534,10 +537,10 @@ def update_uhf_F_matrix(
     elif uhf_state.use_conv_acc:
         try:
             F_opt_alph, r_opt_alpha = calc_diis_extrapolation(
-                uhf_state.residuals_alpha, uhf_state.F_guess_alpha
+                uhf_state.residuals_alpha, uhf_state.F_guess_alpha, ctx.theta
             )
             F_opt_beta, r_opt_beta = calc_diis_extrapolation(
-                uhf_state.residuals_beta, uhf_state.F_guess_beta
+                uhf_state.residuals_beta, uhf_state.F_guess_beta, ctx.theta
             )
 
             # Default is DIIS

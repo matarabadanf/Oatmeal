@@ -437,9 +437,9 @@ def build_uncontracted_basis_from_h5(
     return h_basis, nL, nS
 
 
-def full_eri_from_h5(h5filename) -> NDArray[np.float64]:
+def full_eri_from_h5(h5filename, kernel: Literal['interest', 'oatmeal']='interest' ,symmetry:Literal[None, 4, 8] = 4) -> NDArray[np.float64]:
     h_basis, nL, nS = build_uncontracted_basis_from_h5(h5filename)
-    eri_tensor = ERIs_Uncontracted(h_basis)
+    eri_tensor = ERIs_Uncontracted(h_basis, kernel=kernel, symm=symmetry)
 
     return eri_tensor
 

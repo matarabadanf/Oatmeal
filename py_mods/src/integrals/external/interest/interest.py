@@ -1,4 +1,4 @@
-from typing import List, Tuple
+from typing import List, Literal, Tuple
 
 import numpy as np
 from numpy.typing import NDArray
@@ -72,7 +72,10 @@ def interest_shell_tensor(
 
 _buffer1 = np.zeros(_buffer_size)
 
-def interest_full_tensor(gto_list: List[GTO], buffer_1 = None, symm = None) -> NDArray[np.float64]:
+
+def interest_full_tensor(
+    gto_list: List[GTO], buffer_1=None, symm: Literal[None, 4, 8] = None
+) -> NDArray[np.float64]:
     """Do not use 8-fold. It will not work."""
     projections = [len(primitive.l_projections) for primitive in gto_list]
     shell_start = [sum(projections[0:i]) for i in range(len(projections))]
@@ -91,7 +94,7 @@ def interest_full_tensor(gto_list: List[GTO], buffer_1 = None, symm = None) -> N
 
             for J, J_gto in enumerate(gto_list):  # j
                 J_size, J_start, J_end, J_consts = _unpack_primitive(projections, shell_start, J, J_gto)
-                
+
                 for I, I_gto in enumerate(gto_list):  # i
                     I_size, I_start, I_end, I_consts = _unpack_primitive(projections, shell_start, I, I_gto)
 
@@ -134,6 +137,7 @@ def interest_full_tensor(gto_list: List[GTO], buffer_1 = None, symm = None) -> N
     eri = eri_tensor
     return eri
 
+
 def _compute_block(L_gto, L_size, L_consts, K_gto, K_size, K_consts, J_gto, J_size, J_consts, I_gto, I_size, I_consts):
     shell_total_size = I_size * J_size * K_size * L_size
     _buffer1[:shell_total_size] = 0.0
@@ -162,5 +166,3 @@ def _unpack_primitive(projections, shell_start, index, gto):
     L_end = shell_start[index] + L_size
     L_consts = gto.normalization_constants
     return L_size, L_start, L_end, L_consts
-
-

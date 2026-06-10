@@ -200,10 +200,14 @@ def V_UncontractedBasisSet(
     return V
 
 
-def ERIs_Uncontracted(UBS, kernel: Literal["interest", "oatmeal"] = "interest"):
+def ERIs_Uncontracted(
+    UBS,
+    kernel: Literal["interest", "oatmeal"] = "interest",
+    symm: Literal[None, 4, 8] = 4,
+):
 
     if kernel == "interest":
-        return _interest_ERIs_Uncontracted(UBS)
+        return _interest_ERIs_Uncontracted(UBS, symm=symm)
 
     n = UBS.n_mat_elem
     ERI = np.zeros((n, n, n, n), dtype=np.float64)

@@ -333,6 +333,7 @@ def calc_residual_commutator(
 def calc_diis_extrapolation(
     residuals: Sequence[NDArray[np.complex128]],
     F_guesses: Sequence[NDArray[np.complex128]],
+    theta: float,
 ) -> Tuple[NDArray[np.complex128], NDArray[np.complex128]]:
     """
     Calculate DIIS extrapolation.
@@ -343,6 +344,8 @@ def calc_diis_extrapolation(
         History of residuals.
     F_guesses : Sequence[NDArray]
         History of Fock matrices.
+    theta : float
+        Complex scaling angle.
 
     Returns
     -------
@@ -359,8 +362,10 @@ def calc_diis_extrapolation(
 
     for i in range(n_guesses):
         for j in range(n_guesses):
-            # dot product of flattened arrays
-            B_matrix[i, j] = np.dot(residuals[i].ravel(), residuals[j].ravel())
+            if theta == 0.0:
+                B_matrix[i, j] = np.vdot(residuals[i].ravel(), residuals[j].ravel())
+            else:
+                B_matrix[i, j] = np.dot(residuals[i].ravel(), residuals[j].ravel())
 
     solution = np.zeros(eq_sis_dim, dtype=np.complex128)
     solution[-1] = 1

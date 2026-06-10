@@ -584,7 +584,7 @@ def _kuscf_kernel(ctx: CS_4c_KU_SCF_Context) -> CS_4c_KU_SCF_Results:
         if ctx.verbose:
             print_cycle_data_4c(ctx._convergence_criteria, state)
 
-        # Reused RHF functions (duck-typed)
+
         state.converged = is_converged(ctx, state)  # type: ignore
         if state.converged:
             break
