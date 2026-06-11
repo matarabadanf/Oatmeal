@@ -1,4 +1,3 @@
-from scipy.stats import f
 from py_mods.src.integrals.internal.ST_utils import obara_saika_bottom_up, _S_1D_legacy
 from typing import Literal
 import numpy as np

@@ -8,11 +8,11 @@ from py_mods.src.external.DIRAC_ME import (
     full_eri_from_h5,
     build_uncontracted_basis_from_h5,
 )
-from py_mods.src.SCF_4c_dev.KUSCF_dev import (
+from py_mods.src.SCF_4c_dev.scf_4c_kernels import (
     occupation_4c,
     eri_classified,
-    _kuscf_kernel,
 )
+from py_mods.src.SCF_4c_dev.KUSCF_dev import _kuscf_kernel
 
 notebook_path = Path(__file__).parent.parent.parent / "notebooks" / "4c-scf" / "data"
 

@@ -52,7 +52,7 @@ def validate_4c_determinant(
     nL: int,
     n_electrons: int,
     det: Union[int, NDArray[np.int32], None],
-) -> Tuple[NDArray[np.int8], bool]:
+) -> Tuple[NDArray[np.int32], bool]:
     """
     Validate or construct occupation determinant.
 
@@ -79,7 +79,7 @@ def validate_4c_determinant(
 
     if isinstance(det, int):
         if det == -1:
-            det_arr = np.zeros(2 * (nL + nS), dtype=np.int8)
+            det_arr = np.zeros(2 * (nL + nS), dtype=np.int32)
             n_occ = n_electrons
             det_arr[2 * nS : 2 * nS + n_occ] = 1
             return det_arr, natural_occupation
@@ -90,7 +90,7 @@ def validate_4c_determinant(
         raise TypeError("Occupation vector must be an integer, array-like or None.")
 
     natural_occupation = False
-    det_arr = det.astype(np.int8)
+    det_arr = det.astype(np.int32)
 
     if int(np.sum(det_arr)) != n_electrons:
         raise ValueError(
@@ -105,7 +105,7 @@ def validate_4c_determinant(
     expected_dim = 2 * (nL + nS)
 
     if len(det_arr) != expected_dim:
-        new_occ = np.zeros(expected_dim, dtype=np.int8)
+        new_occ = np.zeros(expected_dim, dtype=np.int32)
         length = min(len(det_arr), expected_dim)
         new_occ[2 * nS : 2 * nS + length] = det_arr[:length]
         det_arr = new_occ

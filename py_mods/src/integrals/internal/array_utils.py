@@ -135,15 +135,15 @@ def IDX5DC(
     return i * j_s * k_s * l_s * m_s + j * k_s * l_s * m_s + k * l_s * m_s + l * m_s + m
 
 
-def IDXnDC(indices: NDArray[int], sizes: NDArray[int], ndim: int) -> int:
+def IDXnDC(indices: NDArray[np.int64], sizes: NDArray[np.int64], ndim: int) -> int:
     """
     Obtain the flat index of a (sizes[0], sizes[1], ..., sizes[ndim-1]) tensor at (indices[0], indices[1], ..., indices[ndim-1]), assuming C-style ordering (row-major).
 
     Parameters
     ----------
-    indices : NDArray[int]
+    indices : NDArray[np.int64]
         Indices of the tensor.
-    sizes : NDArray[int]
+    sizes : NDArray[np.int64]
         Sizes of the tensor.
     ndim : int
         Number of dimensions.
@@ -301,15 +301,15 @@ def IDX5DF(
     return i + j * i_s + k * i_s * j_s + l * i_s * j_s * k_s + m * i_s * j_s * k_s * l_s
 
 
-def IDXnDF(indices: NDArray[int], sizes: NDArray[int], ndim: int) -> int:
+def IDXnDF(indices: NDArray[np.int64], sizes: NDArray[np.int64], ndim: int) -> int:
     """
     Obtain the flat index of a (sizes[0], sizes[1], ..., sizes[ndim-1]) tensor at (indices[0], indices[1], ..., indices[ndim-1]), assuming Fortran-style ordering (column-major).
 
     Parameters
     ----------
-    indices : NDArray[int]
+    indices : NDArray[np.int64]
         Indices of the tensor.
-    sizes : NDArray[int]
+    sizes : NDArray[np.int64]
         Sizes of the tensor.
     ndim : int
         Number of dimensions.

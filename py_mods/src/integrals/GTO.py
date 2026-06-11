@@ -212,19 +212,19 @@ def create_normalized_GTO(
             l_z = total_L - l_x - l_y
             l_projections.append([l_x, l_y, l_z])
 
-    l_projections = np.array(l_projections, dtype=np.int32)
+    l_projections_arr = np.array(l_projections, dtype=np.int32)
 
     # Compute normalization constants for each projection
-    normalization_constants = np.zeros(len(l_projections)) + 1
+    normalization_constants = np.zeros(len(l_projections_arr)) + 1
 
     prim = GTO(
         R=R,
         exp=exp,
         total_L=total_L,
-        l_projections=l_projections,
+        l_projections=l_projections_arr,
         normalization_constants=normalization_constants,
         charge=charge,
-        l_dim=len(l_projections),
+        l_dim=len(l_projections_arr),
     )
 
     _normalize_GTO(prim, hermit_normalize=hermit_norm)

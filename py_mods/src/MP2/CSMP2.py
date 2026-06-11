@@ -56,13 +56,13 @@ def CS_MP2_RHF(CS_RHF_Context: CSRHFResults) -> CSMP2Results:
     returnClass: CSMP2Results
         Dataclass containing the MP2 energy correction.
     """
-    mp_type = "RMP2"
+    mp_type: Literal["RMP2", "UMP2"] = "RMP2"
 
     # naive approach: no symm
     C_munu = CS_RHF_Context.C_munu
 
     if np.isclose(CS_RHF_Context.context.theta, 0.0):
-        C_munu = C_munu.real
+        C_munu = np.array(C_munu.real, dtype=np.complex128)
 
     # rest of info
     e_orb = CS_RHF_Context.e_orb
@@ -138,15 +138,15 @@ def CS_MP2_UHF(CS_UHF_Context: CSUHFResults) -> CSMP2Results:
 
     verbose = CS_UHF_Context.context.verbose
 
-    mp_type = "RMP2"
+    mp_type: Literal["RMP2", "UMP2"] = "UMP2"
 
     # naive approach: no symm
     C_alph = CS_UHF_Context.C_alpha
     C_beta = CS_UHF_Context.C_beta
 
     if np.isclose(CS_UHF_Context.context.theta, 0.0):
-        C_alph = C_alph.real
-        C_beta = C_beta.real
+        C_alph = np.array(C_alph.real, dtype=np.complex128)
+        C_beta = np.array(C_beta.real, dtype=np.complex128)
 
     n_spatorb = len(C_alph)
     n_spinorb = n_spatorb * 2
@@ -286,13 +286,13 @@ def CS_MP2_UHF(CS_UHF_Context: CSUHFResults) -> CSMP2Results:
 
     E_MP2 = CS_UHF_Context.E_UHF + E_corr
 
-    returnClass = CSMP2Results(CS_UHF_Context, E_MP2, E_corr, mp_type, None, None)
+    returnClass = CSMP2Results(CS_UHF_Context, E_MP2, E_corr, mp_type, None, np.zeros(0, dtype=np.complex128))
 
     return returnClass
 
 
 def ao_to_ovov(
-    C_munu: NDArray[np.complex128], eris_ao: NDArray[np.complex128], o: slice, v: slice
+    C_munu: NDArray[np.complex128], eris_ao: NDArray[np.complex128], o: NDArray[np.int64], v: NDArray[np.int64]
 ) -> NDArray[np.complex128]:
     # (ia|jb) = L_mi L_nj (mn|ls) R_la R_sb
     tmp = np.einsum("mP, mnls -> Pnls", C_munu[:, o], eris_ao)

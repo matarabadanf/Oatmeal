@@ -11,15 +11,10 @@ from py_mods.src.external.DIRAC_ME import (
 
 from py_mods.src.external.DIRAC_ME import (
     build_S_V_W_T_from_h5,
-    get_nuc_charge,
-    full_eri_from_h5,
-    build_uncontracted_basis_from_h5,
     generate_primitive_KUSCFContext_from_h5,
 )
 
-from py_mods.src.SCF_4c_dev.KUSCF_dev import (
-    occupation_4c,
-    eri_classified,
+from py_mods.src.SCF_4c_dev.scf_4c_kernels import (
     scf_steps,
 )
 

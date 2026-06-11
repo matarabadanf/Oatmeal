@@ -1,6 +1,6 @@
 import numpy as np
 from numpy.typing import NDArray
-from typing import Any, Literal, Union, Tuple, Dict
+from typing import Literal, Union, Tuple, Dict
 from scipy.linalg import block_diag
 import warnings
 

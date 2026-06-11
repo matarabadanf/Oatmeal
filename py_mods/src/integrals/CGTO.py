@@ -2,7 +2,6 @@ from py_mods.src.integrals.GTO import (
     GTO,
     create_normalized_GTO,
     _generate_angular_momentum_projections,
-    _S_3D_components_legacy,
     _S_3D_legacy,
     _T_3D_legacy,
     _eri_legacy,

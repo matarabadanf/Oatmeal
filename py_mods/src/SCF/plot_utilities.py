@@ -1,6 +1,6 @@
 import matplotlib.pyplot as plt
 from numpy.typing import NDArray
-from typing import Literal, Tuple, Union, List
+from typing import Union, List
 import numpy as np
 from py_mods.src.SCF.CS_SCF_types import CSUHFResults
 
@@ -226,7 +226,7 @@ def _plot_UHF_MO_energies(
             elif "LUMO" in ylim[0]:
                 ylim_index = eval(ylim[0].replace("LUMO", f"{lumo_index}"))
 
-            ylim[0] = min(e_alpha[ylim_index], e_beta[ylim_index])
+            ylim[0] = float(min(e_alpha[ylim_index].real, e_beta[ylim_index].real))
             ylim[0] += ylim[0] * 0.1
 
         if isinstance(ylim[1], str):
@@ -236,7 +236,7 @@ def _plot_UHF_MO_energies(
             elif "LUMO" in ylim[1]:
                 ylim_index = eval(ylim[1].replace("LUMO", f"{lumo_index}"))
 
-            ylim[1] = min(e_alpha[ylim_index], e_beta[ylim_index])
+            ylim[1] = float(min(e_alpha[ylim_index].real, e_beta[ylim_index].real))
             ylim[1] += ylim[1] * 0.1
 
         ylim_dist = abs(ylim[1] - ylim[0])

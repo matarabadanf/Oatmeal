@@ -1,6 +1,6 @@
 import numpy as np
 from numpy.typing import NDArray
-from typing import Literal, Optional, Union, Tuple, Sequence
+from typing import Literal, Union, Tuple, Sequence
 import scipy
 from py_mods.src.SCF.linalg import diagonalize_biorthogonal
 

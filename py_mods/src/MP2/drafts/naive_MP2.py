@@ -2,14 +2,13 @@ import numpy as np
 from numpy.typing import NDArray
 from typing import Literal, Union
 from dataclasses import dataclass
-from py_mods.src.SCF.CSRHF import CS_RHF_ResultsClass
-from py_mods.src.SCF.CSUHF import CS_UHF_ResultsClass
-from py_mods.src.SCF.plot_utilities import plot_map
+from py_mods.src.SCF.CSRHF import CSRHFResults
+from py_mods.src.SCF.CSUHF import CSUHFResults
 
 
 @dataclass
 class CS_MP2_Results(object):
-    CS_MP2Context: Union[CS_RHF_ResultsClass, CS_UHF_ResultsClass]
+    CS_MP2Context: Union[CSRHFResults, CSUHFResults]
     E_MP2: np.complex128
     E_corr: np.complex128
     MP_type: Literal["RMP2", "UMP2"]
@@ -17,13 +16,13 @@ class CS_MP2_Results(object):
 
 
 def CS_MP2(
-    CS_MP2Context: Union[CS_RHF_ResultsClass, CS_UHF_ResultsClass],
+    CS_MP2Context: Union[CSRHFResults, CSUHFResults],
 ) -> CS_MP2_Results:
     """Compute the MP2 energy correction using complex scaled UHF or RHF reference.
 
     Parameters
     ----------
-    CS_RHF_Context: Union[CS_RHF_ResultsClass, CS_UHF_ResultsClass]
+    CS_RHF_Context: Union[CSRHFResults, CSUHFResults]
         Dataclass containing converged CS-RHF results.
 
     Returns
@@ -31,24 +30,24 @@ def CS_MP2(
     returnClass: CS_MP2_Results
         Dataclass containing the MP2 energy correction.
     """
-    if isinstance(CS_MP2Context, CS_RHF_ResultsClass):
+    if isinstance(CS_MP2Context, CSRHFResults):
         mp2_result = CS_MP2_RHF(CS_MP2Context)
     # elif isinstance(CS_MP2Context, CS_UHF_ResultsClass):
     #     mp2_result = CS_MP2_UHF(CS_MP2Context)
     else:
         raise TypeError(
-            f"CS_MP2Context must be either CS_RHF_ResultsClass or CS_UHF_ResultsClass. Type is {type(CS_MP2Context)}"
+            f"CS_MP2Context must be either CSRHFResults or CSUHFResults. Type is {type(CS_MP2Context)}"
         )
 
     return mp2_result
 
 
-def CS_MP2_RHF(CS_RHF_Context: CS_RHF_ResultsClass) -> CS_MP2_Results:
+def CS_MP2_RHF(CS_RHF_Context: CSRHFResults) -> CS_MP2_Results:
     """Compute the MP2 energy correction using complex scaled RHF reference.
 
     Parameters
     ----------
-    CS_RHF_Context: CS_RHF_ResultsClass
+    CS_RHF_Context: CSRHFResults
         Dataclass containing converged CS-RHF results.
 
     Returns
@@ -56,13 +55,13 @@ def CS_MP2_RHF(CS_RHF_Context: CS_RHF_ResultsClass) -> CS_MP2_Results:
     returnClass: CS_MP2_Results
         Dataclass containing the MP2 energy correction.
     """
-    mp_type = "RMP2"
+    mp_type: Literal["RMP2", "UMP2"] = "RMP2"
 
     # naive approach: no symm
     C_munu = CS_RHF_Context.C_munu
 
     if np.isclose(CS_RHF_Context.context.theta, 0.0):
-        C_munu = C_munu.real
+        C_munu = np.array(C_munu.real, dtype=np.complex128)
 
     # rest of info
     e_orb = CS_RHF_Context.e_orb
@@ -77,7 +76,7 @@ def CS_MP2_RHF(CS_RHF_Context: CS_RHF_ResultsClass) -> CS_MP2_Results:
 
     eris_mo = ao_to_mo(C_munu, eris_ao)
 
-    mp2_ener = 0.0
+    mp2_ener = np.complex128(0.0)
 
     # occupied are a,b virtual are r,s
     # occupied

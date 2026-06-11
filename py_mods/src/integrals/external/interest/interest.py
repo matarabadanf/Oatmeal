@@ -1,4 +1,4 @@
-from typing import List, Literal, Tuple
+from typing import List, Literal
 
 import numpy as np
 from numpy.typing import NDArray
@@ -6,8 +6,7 @@ from numpy.ctypeslib import ndpointer
 
 import ctypes as ct
 
-from py_mods.src.integrals.GTO import GTO, create_GTO
-from py_mods.src.integrals.CGTO import Eri_GTO_tensor
+from py_mods.src.integrals.GTO import GTO
 
 import pathlib
 

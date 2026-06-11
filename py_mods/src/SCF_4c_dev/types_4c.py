@@ -73,7 +73,7 @@ class CS_4c_KU_SCF_Context:
 
     # Optional
     theta: float = 0.0
-    occ: Union[int, NDArray[np.int8], None] = None
+    occ: Union[int, NDArray[np.int32], None] = None
     max_iter: int = 100
     threshold: float = 1e-12
     p_guess: Literal["core", "ones", "INPORB"] = "core"
@@ -118,7 +118,7 @@ class CS_4c_KU_SCF_Constants:
 
     dim: int
     X: NDArray[np.complex128]
-    det: NDArray[np.int8]
+    det: NDArray[np.int32]
     eri_scaled: NDArray[np.complex128]
     H_core: NDArray[np.complex128]
     core_mask: NDArray[np.bool_]
@@ -276,7 +276,7 @@ def allocate_CS_4c_KU_SCF_extended_context(
     spatial_dim = nL + nS
     full_dim = 2 * spatial_dim
     X = np.zeros((full_dim, full_dim), dtype=np.complex128)
-    det = np.zeros(full_dim, dtype=np.int8)
+    det = np.zeros(full_dim, dtype=np.int32)
     eri_scaled = np.zeros(
         (spatial_dim, spatial_dim, spatial_dim, spatial_dim), dtype=np.complex128
     )

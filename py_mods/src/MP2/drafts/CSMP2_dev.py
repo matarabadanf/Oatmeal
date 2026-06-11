@@ -2,15 +2,13 @@ import numpy as np
 from numpy.typing import NDArray
 from typing import Literal, Union
 from dataclasses import dataclass
-from py_mods.src.SCF.CSRHF import CS_RHF_ResultsClass
-from py_mods.src.SCF.CSUHF import CS_UHF_ResultsClass
-from py_mods.src.SCF.plot_utilities import plot_map
-from time import time
+from py_mods.src.SCF.CSRHF import CSRHFResults
+from py_mods.src.SCF.CSUHF import CSUHFResults
 
 
 @dataclass
 class CS_MP2_Results(object):
-    CS_MP2Context: Union[CS_RHF_ResultsClass, CS_UHF_ResultsClass]
+    CS_MP2Context: Union[CSRHFResults, CSUHFResults]
     E_MP2: np.complex128
     E_corr: np.complex128
     MP_type: Literal["RMP2", "UMP2"]
@@ -19,13 +17,13 @@ class CS_MP2_Results(object):
 
 
 def CS_MP2(
-    CS_MP2Context: Union[CS_RHF_ResultsClass, CS_UHF_ResultsClass],
+    CS_MP2Context: Union[CSRHFResults, CSUHFResults],
 ) -> CS_MP2_Results:
     """Compute the MP2 energy correction using complex scaled UHF or RHF reference.
 
     Parameters
     ----------
-    CS_RHF_Context: Union[CS_RHF_ResultsClass, CS_UHF_ResultsClass]
+    CS_RHF_Context: Union[CSRHFResults, CSUHFResults]
         Dataclass containing converged CS-RHF results.
 
     Returns
@@ -33,24 +31,24 @@ def CS_MP2(
     returnClass: CS_MP2_Results
         Dataclass containing the MP2 energy correction.
     """
-    if isinstance(CS_MP2Context, CS_RHF_ResultsClass):
+    if isinstance(CS_MP2Context, CSRHFResults):
         mp2_result = CS_MP2_RHF(CS_MP2Context)
-    elif isinstance(CS_MP2Context, CS_UHF_ResultsClass):
+    elif isinstance(CS_MP2Context, CSUHFResults):
         mp2_result = CS_MP2_UHF(CS_MP2Context)
     else:
         raise TypeError(
-            f"CS_MP2Context must be either CS_RHF_ResultsClass or CS_UHF_ResultsClass. Type is {type(CS_MP2Context)}"
+            f"CS_MP2Context must be either CSRHFResults or CSUHFResults. Type is {type(CS_MP2Context)}"
         )
 
     return mp2_result
 
 
-def CS_MP2_RHF(CS_RHF_Context: CS_RHF_ResultsClass) -> CS_MP2_Results:
+def CS_MP2_RHF(CS_RHF_Context: CSRHFResults) -> CS_MP2_Results:
     """Compute the MP2 energy correction using complex scaled RHF reference.
 
     Parameters
     ----------
-    CS_RHF_Context: CS_RHF_ResultsClass
+    CS_RHF_Context: CSRHFResults
         Dataclass containing converged CS-RHF results.
 
     Returns
@@ -58,17 +56,17 @@ def CS_MP2_RHF(CS_RHF_Context: CS_RHF_ResultsClass) -> CS_MP2_Results:
     returnClass: CS_MP2_Results
         Dataclass containing the MP2 energy correction.
     """
-    mp_type = "RMP2"
+    mp_type: Literal["RMP2", "UMP2"] = "RMP2"
 
     # naive approach: no symm
     C_munu = CS_RHF_Context.C_munu
 
     if np.isclose(CS_RHF_Context.context.theta, 0.0):
-        C_munu = C_munu.real
+        C_munu = np.array(C_munu.real, dtype=np.complex128)
 
     # rest of info
     e_orb = CS_RHF_Context.e_orb
-    eris_ao = CS_RHF_Context.context.eri
+    eris_ao = CS_RHF_Context.scaled_eris
     n_occ: int = int(CS_RHF_Context.n_elec // 2)
     n_tot: int = len(CS_RHF_Context.context.S)
     n_virt: int = n_tot - n_occ
@@ -123,13 +121,13 @@ def CS_MP2_RHF(CS_RHF_Context: CS_RHF_ResultsClass) -> CS_MP2_Results:
     return returnClass
 
 
-def CS_MP2_UHF(CS_UHF_Context: CS_UHF_ResultsClass) -> CS_MP2_Results:
+def CS_MP2_UHF(CS_UHF_Context: CSUHFResults) -> CS_MP2_Results:
     """
     Compute the MP2 energy correction using complex scaled UHF reference.
 
     Parameters
     ----------
-    CS_UHF_Context: CS_UHF_ResultsClass
+    CS_UHF_Context: CSUHFResults
         Dataclass containing converged CS-UHF results.
 
     Returns
@@ -140,15 +138,15 @@ def CS_MP2_UHF(CS_UHF_Context: CS_UHF_ResultsClass) -> CS_MP2_Results:
 
     verbose = CS_UHF_Context.context.verbose
 
-    mp_type = "RMP2"
+    mp_type: Literal["RMP2", "UMP2"] = "UMP2"
 
     # naive approach: no symm
     C_alph = CS_UHF_Context.C_alpha
     C_beta = CS_UHF_Context.C_beta
 
     if np.isclose(CS_UHF_Context.context.theta, 0.0):
-        C_alph = C_alph.real
-        C_beta = C_beta.real
+        C_alph = np.array(C_alph.real, dtype=np.complex128)
+        C_beta = np.array(C_beta.real, dtype=np.complex128)
 
     n_spatorb = len(C_alph)
     n_spinorb = n_spatorb * 2
@@ -288,12 +286,12 @@ def CS_MP2_UHF(CS_UHF_Context: CS_UHF_ResultsClass) -> CS_MP2_Results:
 
     E_MP2 = CS_UHF_Context.E_UHF - E_corr
 
-    returnClass = CS_MP2_Results(CS_UHF_Context, E_MP2, E_corr, mp_type, None, None)
+    returnClass = CS_MP2_Results(CS_UHF_Context, E_MP2, E_corr, mp_type, None, np.zeros(0, dtype=np.complex128))
 
     return returnClass
 
 
-def ao_to_ovov(C_munu, eris_ao, o: slice, v: slice):
+def ao_to_ovov(C_munu: NDArray[np.complex128], eris_ao: NDArray[np.complex128], o: NDArray[np.int64], v: NDArray[np.int64]):
     # (ia|jb) = L_mi L_nj (mn|ls) R_la R_sb
     tmp = np.einsum("mP, mnls -> Pnls", C_munu[:, o], eris_ao)
     tmp = np.einsum("lR, PQls -> PQRs", C_munu[:, o], tmp)

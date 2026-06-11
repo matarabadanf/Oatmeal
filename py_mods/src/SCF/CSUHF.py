@@ -1,6 +1,4 @@
 import numpy as np
-from numpy.typing import NDArray
-from typing import Tuple
 from py_mods.src.SCF.CSRHF import CS_RHF
 from py_mods.src.SCF.CS_SCF_types import CSRHFContext
 import copy

@@ -717,7 +717,7 @@ class CSUHFResults(object):
     C_alpha: NDArray[np.complex128]
     C_beta: NDArray[np.complex128]
     S_diagnostics: UHFSpinDiagnostics
-    error: float
+    error: Union [float, complex]
     iterations: int
     scaled_eris: NDArray[np.complex128]
     homo_index: int
@@ -895,7 +895,7 @@ def pack_uhf_results(
         C_alpha=uhf_state.C_munu_alpha,
         C_beta=uhf_state.C_munu_beta,
         S_diagnostics=S_diagnostics,
-        error=max(uhf_state.error_alpha, uhf_state.error_beta),
+        error=max(uhf_state.error_alpha, uhf_state.error_beta, key=abs),
         iterations=uhf_state.iteration,
         scaled_eris=uhf_ext_ctx.eri_scaled,
         homo_index=int(

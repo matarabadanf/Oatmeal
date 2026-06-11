@@ -6,7 +6,7 @@ from numpy.typing import NDArray
 import matplotlib.pyplot as plt
 
 from py_mods.src.algebra.quaternion import quaternion_to_matrix
-from py_mods.src.integrals.GTO import create_GTO, create_normalized_GTO
+from py_mods.src.integrals.GTO import create_normalized_GTO
 from py_mods.src.integrals.UncontractedBasisSet import (
     UncontractedBasisSet,
     create_UncontractedBasisSet,
@@ -14,7 +14,7 @@ from py_mods.src.integrals.UncontractedBasisSet import (
 )
 
 from py_mods.src.SCF_4c_dev.types_4c import CS_4c_KU_SCF_Context
-from py_mods.src.SCF_4c_dev.KUSCF_dev import occupation_4c, eri_classified
+from py_mods.src.SCF_4c_dev.scf_4c_kernels import occupation_4c, eri_classified
 
 c = 137.035999177 
 
@@ -447,7 +447,7 @@ def full_eri_from_h5(h5filename, kernel: Literal['interest', 'oatmeal']='interes
 def generate_primitive_KUSCFContext_from_h5(
     h5_filename: str,
     total_charge: int = 0,
-    occupation_det: Optional[NDArray[np.int8]] = None,
+    occupation_det: Optional[NDArray[np.int32]] = None,
     **kwargs,
 ) -> CS_4c_KU_SCF_Context:
 

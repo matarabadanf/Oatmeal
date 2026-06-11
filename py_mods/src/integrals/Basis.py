@@ -52,12 +52,12 @@ def construct_basis_from_lists(
     cgto_indices = [sum(projections[:i]) for i in range(len(cgto_list))]
     cgto_indices.append(projections[-1] + cgto_indices[-1])
 
-    cgto_indices = np.array(cgto_indices, dtype=np.int16)
+    cgto_indices_arr = np.array(cgto_indices, dtype=np.int16)
 
     basis_set = BasisSetClass(
         CGTOs=cgto_list,
         n_CGTOs=len(cgto_list),
-        matrix_indices=cgto_indices,
+        matrix_indices=cgto_indices_arr,
         l_dims=np.array(projections, dtype=np.int16),
         r_atoms=np.array(r_atom_list, dtype=np.float64),
         q_atoms=np.array(q_atom_list, dtype=np.float64),

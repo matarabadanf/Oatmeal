@@ -6,13 +6,11 @@ from numpy.typing import NDArray
 
 from py_mods.src.integrals.GTO import (
     GTO,
-    create_normalized_GTO,
     S_ab_shell,
     T_ab_shell,
     g_abcd_shell,
 )
 from py_mods.src.integrals.internal.coulomb_utils import V_ab_Z_shell
-from py_mods.src.SCF.plot_utilities import plot_map
 
 # =============================================================================
 #  Dataclasses

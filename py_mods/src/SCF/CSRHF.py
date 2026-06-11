@@ -1,7 +1,6 @@
 import numpy as np
 import copy
-from numpy.typing import NDArray
-from typing import Literal, Tuple
+from typing import Literal
 
 from py_mods.src.SCF.scf_kernels import (
     calc_g_matrix_comp,

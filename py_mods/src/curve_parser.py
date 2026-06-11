@@ -1,9 +1,8 @@
 import numpy as np 
 import pandas as pd 
 import argparse 
-from typing import List, Dict
+from typing import List, Dict, Tuple
 from numpy.typing import NDArray
-import matplotlib.pyplot as plt
 import plotly.express as px
 
 parser = argparse.ArgumentParser("Asdf")
@@ -16,7 +15,7 @@ args = parser.parse_args()
 with open(args.file, 'r') as f:
     cont = f.readlines()
 
-def extract_distances(filecont: List[str]) -> NDArray[np.float32]:
+def extract_distances(filecont: List[str]) -> Tuple[NDArray[np.float32], NDArray[np.int32]]:
 
     distances = []
     distances = [float(i.strip().split()[-1]) for i in cont if 'EVAL DIST' in i and '$DIST' not in i]
@@ -27,7 +26,7 @@ def extract_distances(filecont: List[str]) -> NDArray[np.float32]:
 
 def assess_n_roots(filecont: List[str]) -> Dict:
 
-    energy_tipe_calc_dict = {}
+    energy_tipe_calc_dict: Dict[str, int] = {}
 
     currtype = ''
 
