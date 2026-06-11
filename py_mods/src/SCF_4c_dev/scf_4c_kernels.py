@@ -59,7 +59,7 @@ def calculate_P_next_4c(
     NDArray[np.complex128],
 ]:
 
-    F_prime = X.T @ F_next @ X
+    F_prime = X.conj().T @ F_next @ X
 
     if solver == "eigh" and theta == 0.0:
         e_values, C_prime = np.linalg.eigh(F_prime)
@@ -83,8 +83,9 @@ def calculate_P_next_4c(
         overlap = np.sum(L_prime * C_prime.T, axis=1)
         L_prime = L_prime / overlap[:, None]
 
+        # Return left and right eigenvectors to AO basis: L_AO = L_prime @ X.dagg, C_AO = X @ C_prime
         C_munu = X @ C_prime
-        L_munu = L_prime @ X.T
+        L_munu = L_prime @ X.conj().T
 
     P_munu = calc_p_matrix_comp(L_munu, C_munu, det)
 

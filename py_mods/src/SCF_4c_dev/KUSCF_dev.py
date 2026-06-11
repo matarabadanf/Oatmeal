@@ -212,7 +212,7 @@ def scf_iteration(
     P_1 : NDArray[np.complex128]
         Updated density matrix.
     """
-    F_p1 = X.T @ F_1 @ X
+    F_p1 = X.conj().T @ F_1 @ X
 
     e1, w1 = np.linalg.eigh(F_p1)
 
@@ -307,8 +307,14 @@ def initialize_CS_4c_KU_SCF_extended_context(
     ext_ctx.dim = len(ctx.S)
     ext_ctx.X = transformation_matrix(ctx.S.astype(np.complex128)).astype(np.complex128)
 
+    n_lindep = np.abs(ext_ctx.X.shape[0] - ext_ctx.X.shape[1]) # The difference between row and column size is the number of lindeps
+
     # validate occupation
     ext_ctx.det, _ = validate_4c_determinant(ctx.nS, ctx.nL, ctx.n_electrons, ctx.occ)
+
+    if n_lindep > 0: 
+        assert np.sum(ext_ctx.det[-n_lindep:]) == 0 , "Linear dependency removal encountered occupied linearly dependent electronic states"
+        ext_ctx.det = ext_ctx.det[:-n_lindep]
 
     # rescaling the integrals
     T_scaled, V_scaled, W_scaled, ext_ctx.eri_scaled = scale_4c_integrals(

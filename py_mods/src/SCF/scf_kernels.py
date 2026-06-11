@@ -370,12 +370,18 @@ def calc_diis_extrapolation(
     solution = np.zeros(eq_sis_dim, dtype=np.complex128)
     solution[-1] = 1
 
+    # Here we are imposing a sageguard to avoid singular DIIS matrices.
+    # If the matrix is singular we will use last Fock matrix guess, because 
+    # That way even if it is not an extrapolation, it will just perform a single
+    # Regular scf step instead of extrapolating, which can lead to numerical 
+    # noise and thus to erroneous computations
     try:
         c = np.linalg.solve(B_matrix, solution)
+        if np.max(np.abs(c[:-1])) > 1e3:
+            raise np.linalg.LinAlgError("Ill-conditioned DIIS matrix")
     except np.linalg.LinAlgError:
-        raise np.linalg.LinAlgError("DIIS matrix singular")
-
-    # Reconstruct
+        c = np.zeros(eq_sis_dim, dtype=np.complex128)
+        c[-2] = 1.0
     coeffs = c[:-1]
 
     F_conv = np.zeros_like(F_guesses[0])
@@ -422,9 +428,7 @@ def calculate_P_next(
     ------
     Diagonalization algorithm used is np.linalg.eigh due to the matrix being symmetric.
     """
-    F = F.reshape(X.shape)
-
-    F_prime = X @ F @ X.T
+    F_prime = X.conj().T @ F @ X
 
     mat_norm = np.linalg.norm(F_prime)
 
@@ -537,10 +541,11 @@ def calculate_unrestricted_F_and_r_comp(
     G_alpha, G_beta = calc_g_matrix_spin_comp(P_alpha, P_beta, eri)
     F_alpha = H_core + G_alpha
     F_beta = H_core + G_beta
+    
     r_alpha = calc_residual_commutator(F_alpha, P_alpha, S)
     r_beta = calc_residual_commutator(F_beta, P_beta, S)
 
-    return F_alpha.flatten(), r_alpha.flatten(), F_beta.flatten(), r_beta.flatten()
+    return F_alpha, r_alpha, F_beta, r_beta
 
 
 def calc_g_matrix_spin_comp(

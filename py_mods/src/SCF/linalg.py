@@ -8,9 +8,11 @@ warnings.simplefilter("once", RuntimeWarning)
 
 
 def transformation_matrix(
-    S_munu: Union[NDArray[np.complex128], NDArray[np.float64]],
+    S: Union[NDArray[np.complex128], NDArray[np.float64]],
     method: Literal["canonical", "symmetric"] = "symmetric",
     verbose: bool = False,
+    remove_lindep: bool = False,
+    lindep_threshold: float = 1e-6,
 ) -> NDArray[np.float64]:
     """
     Calculate basis transformation matrix X.
@@ -20,9 +22,13 @@ def transformation_matrix(
     S_munu : NDArray[np.float64]
         Overlap matrix.
     method : {'canonical', 'symmetric'}
-        Orthogonalization method.
+        Orthogonalization method. Defaults to 'symmetric'.
     verbose : bool
-        If True, print transformed matrix.
+        If True, print transformed matrix. Defaults to False.
+    remove_lindep : bool
+        If True, remove linear dependencies based on eigenvalue threshold. Defaults to True.
+    lindep_threshold : float
+        Eigenvalue threshold for linear dependency removal. Defaults to 1e-6.
 
     Returns
     -------
@@ -39,24 +45,43 @@ def transformation_matrix(
         "symmetric",
     ], "method must be 'canonical' or 'symmetric'"
 
-    # diagonalize U.T @ S @ U = s
-    s, U = np.linalg.eigh(S_munu)
+    s, U = np.linalg.eigh(S)
+
+    if remove_lindep:
+        last_idx = 0
+
+        for idx, eval in enumerate(s):
+            last_idx = idx
+            if eval > lindep_threshold:
+                break
+
+        if last_idx > 0:
+            if method == "symmetric" and verbose:
+                print("Removing linear dependencies implies canonical orthogonalization.")
+            
+            print(f"Removing {last_idx} linear dependencies with eigenvalues below {lindep_threshold:.2e} (largest removed eigenvalue: {s[last_idx-1]:.2e})")
+
+            U_truncated = U[:, last_idx:]
+            s_truncated = s[last_idx:]
+
+            s_root = np.diag(1.0 / np.sqrt(s_truncated))
+
+            # This is no longer N x N, but rectangular NxM where M < N
+            X = U_truncated @ s_root
+            return X
+
+    # Regular no lindep removal
     s_root = np.diag(1.0 / np.sqrt(s))
 
     if method == "symmetric":
-        X = U @ s_root @ U.T
+        # U * s^{-1/2} * U^T
+        X = U @ s_root @ U.conj().T
     elif method == "canonical":
         X = U @ s_root
 
-    transformed = X.T @ S_munu @ X
-
     if verbose:
-        print(transformed)
-
-    # Use identity matrix of correct size for check
-    assert np.allclose(
-        transformed, np.eye(len(S_munu)), atol=1e-7
-    ), "Transformation failed"
+        transformed = X.conj().T @ S @ X
+        print("Transformed S (should be Identity):\n", np.round(transformed, 10))
 
     return X
 

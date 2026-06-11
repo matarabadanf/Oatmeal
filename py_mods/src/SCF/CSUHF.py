@@ -376,7 +376,7 @@ def guess_density_UHF(
 
                 uhf_state.P_alpha /= 4
                 uhf_state.P_beta /= 4
-
+                
         elif ctx.break_symm == "random":
             raise NotImplementedError("Random symmetry breaking not implemented yet.")
 
