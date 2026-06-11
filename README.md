@@ -1,4 +1,4 @@
-# Oatmeal: a tiny CS-SCF/CS-MP2 and molecular integral kernel toy model 
+# Oatmeal: a tiny CS-SCF/CS-MP2, CS-4C-SCF and molecular integral kernel toy model 
 
 ## Features
 Currently the implemented features are:
@@ -6,13 +6,13 @@ Currently the implemented features are:
     - Restricted Hartree-Fock (RHF).
     - Complex Scaled RHF (CS-RHF) with occupation selection.
     - Complex Scaled UHF (CS-UHF) with occupation selection.
-    - Support for convergence acceleration methods:
-        - DIIS ([Pulay](https://doi.org/10.1002/jcc.540030413)).
-        - CROP ([Ettenhuber, Jorgensen](https://doi.org/10.1021/ct501114q)).
+
+- Complex scaled four component Self Consistent Field routines:
+    - Complex Scaled four component Krammers Unrestricted Prototype.
 
 - Complex scaled Møller-Plesset perturbation theory:
     - Complex scaled Restricted MP2.
-    - Complex scaled Unrestricted MP2.  
+    - Complex scaled Unrestricted MP2.
 
 - Simple OS/MD $S$, $T$, $V$ and ERIs matrix element evaluation for generalized $l$ CGTOs.
 
