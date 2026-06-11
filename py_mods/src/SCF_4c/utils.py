@@ -1,4 +1,4 @@
-from py_mods.src.SCF_4c_dev.types_4c import CS_4c_KU_SCF_Context
+from py_mods.src.SCF_4c.types_4c import CS_4c_KU_SCF_Context
 import numpy as np
 
 from typing import Tuple, Union

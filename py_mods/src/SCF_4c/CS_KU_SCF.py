@@ -4,7 +4,7 @@ import numpy as np
 from py_mods.src.SCF.scf_kernels import calc_residual_commutator
 from py_mods.src.SCF.CSRHF import print_table_header
 
-from py_mods.src.SCF_4c_dev.types_4c import (
+from py_mods.src.SCF_4c.types_4c import (
     CS_4c_KU_SCF_Context,
     CS_4c_KU_SCF_Constants,
     CS_4c_KU_SCF_State,
@@ -15,7 +15,7 @@ from py_mods.src.SCF_4c_dev.types_4c import (
 )
 
 from py_mods.src.SCF.linalg import transformation_matrix, sign_convention
-from py_mods.src.SCF_4c_dev.scf_4c_kernels import (
+from py_mods.src.SCF_4c.scf_4c_kernels import (
     guess_density_4c,
     g_matrix_4c,
     calc_diis_extrapolation_4c,
@@ -23,12 +23,12 @@ from py_mods.src.SCF_4c_dev.scf_4c_kernels import (
 
 from py_mods.src.SCF.utils import initialize_conv_acc
 
-from py_mods.src.SCF_4c_dev.utils import (
+from py_mods.src.SCF_4c.utils import (
     validate_4c_determinant,
     validate_CS_4c_KU_SCF_context_input,
 )
 
-from py_mods.src.SCF_4c_dev.scf_4c_kernels import (
+from py_mods.src.SCF_4c.scf_4c_kernels import (
     scale_4c_integrals,
     calculate_P_next_4c,
     guess_density_4c,
@@ -276,7 +276,7 @@ def is_converged_4c(
             converged = True
 
     if converged and ctx.verbose:
-        print("-" * 135)
+        print("-" * 133)
         print(f"Convergence achieved after {state.iteration} iterations.")
 
     return converged
@@ -308,7 +308,7 @@ def conv_acc_criteria_met_4c(
 
         if ctx.verbose:
             msg = f" STARTED {ctx.conv_type} "
-            print(f"|{msg:-^133}|")
+            print(f"|{msg:-^131}|")
 
     return use_conv_acc
 

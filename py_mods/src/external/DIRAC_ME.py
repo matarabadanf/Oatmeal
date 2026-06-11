@@ -13,8 +13,8 @@ from py_mods.src.integrals.UncontractedBasisSet import (
     ERIs_Uncontracted,
 )
 
-from py_mods.src.SCF_4c_dev.types_4c import CS_4c_KU_SCF_Context
-from py_mods.src.SCF_4c_dev.scf_4c_kernels import occupation_4c, eri_classified
+from py_mods.src.SCF_4c.types_4c import CS_4c_KU_SCF_Context
+from py_mods.src.SCF_4c.scf_4c_kernels import occupation_4c, eri_classified
 
 c = 137.035999177 
 

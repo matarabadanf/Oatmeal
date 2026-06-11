@@ -14,7 +14,7 @@ from py_mods.src.external.DIRAC_ME import (
     generate_primitive_KUSCFContext_from_h5,
 )
 
-from py_mods.src.SCF_4c_dev.scf_4c_kernels import (
+from py_mods.src.SCF_4c.scf_4c_kernels import (
     scf_steps,
 )
 

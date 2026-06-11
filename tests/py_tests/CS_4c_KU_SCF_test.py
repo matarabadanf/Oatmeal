@@ -2,17 +2,17 @@ import numpy as np
 from pathlib import Path
 import pytest
 
-from py_mods.src.SCF_4c_dev.types_4c import CS_4c_KU_SCF_Context
+from py_mods.src.SCF_4c.types_4c import CS_4c_KU_SCF_Context
 from py_mods.src.external.DIRAC_ME import (
     build_S_V_W_T_from_h5,
     full_eri_from_h5,
     build_uncontracted_basis_from_h5,
 )
-from py_mods.src.SCF_4c_dev.scf_4c_kernels import (
+from py_mods.src.SCF_4c.scf_4c_kernels import (
     occupation_4c,
     eri_classified,
 )
-from py_mods.src.SCF_4c_dev.KUSCF_dev import _kuscf_kernel
+from py_mods.src.SCF_4c.CS_KU_SCF import _kuscf_kernel
 
 notebook_path = Path(__file__).parent.parent.parent / "notebooks" / "4c-scf" / "data"
 
