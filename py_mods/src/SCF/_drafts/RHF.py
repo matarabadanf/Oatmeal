@@ -173,7 +173,8 @@ def RHF(
         if iter == conv_ITER_START and conv_REQUESTED:
             use_conv = True
             if verbose:
-                print("-" * 30, f"   STARTED {conv_type}  ", "-" * 30)
+                msg = f" STARTED {conv_type} "
+                print(f"|{msg:-^133}|")
 
     return converged, E_RHF, orbital_energies, C_munu, P
 

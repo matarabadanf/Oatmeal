@@ -1,4 +1,4 @@
-from re import I
+import copy
 from typing import Optional, Tuple, Union, List, Literal
 
 import numpy as np
@@ -10,12 +10,7 @@ from py_mods.src.integrals.UncontractedBasisSet import (
 )
 
 from py_mods.src.SCF.scf_kernels import calc_p_matrix_comp, calc_residual_commutator
-from py_mods.src.SCF.CSRHF import (
-    is_converged,
-    update_rhf_acc_hist_size,
-    conv_acc_criteria_met,
-    print_table_header,
-)
+from py_mods.src.SCF.CSRHF import print_table_header
 import scipy
 
 from py_mods.src.SCF_4c_dev.types_4c import (
@@ -29,7 +24,7 @@ from py_mods.src.SCF_4c_dev.types_4c import (
 )
 
 from py_mods.src.SCF.linalg import transformation_matrix, sign_convention
-from py_mods.src.SCF.CSRHF import guess_density_RHF
+from py_mods.src.SCF_4c_dev.scf_4c_kernels import guess_density_4c
 
 from py_mods.src.SCF.utils import initialize_conv_acc
 
@@ -41,6 +36,7 @@ from py_mods.src.SCF_4c_dev.utils import (
 from py_mods.src.SCF_4c_dev.scf_4c_kernels import (
     scale_4c_integrals,
     calculate_P_next_4c,
+    guess_density_4c,
 )
 
 
@@ -307,13 +303,17 @@ def initialize_CS_4c_KU_SCF_extended_context(
     ext_ctx.dim = len(ctx.S)
     ext_ctx.X = transformation_matrix(ctx.S.astype(np.complex128)).astype(np.complex128)
 
-    n_lindep = np.abs(ext_ctx.X.shape[0] - ext_ctx.X.shape[1]) # The difference between row and column size is the number of lindeps
+    n_lindep = np.abs(
+        ext_ctx.X.shape[0] - ext_ctx.X.shape[1]
+    )  # The difference between row and column size is the number of lindeps
 
     # validate occupation
     ext_ctx.det, _ = validate_4c_determinant(ctx.nS, ctx.nL, ctx.n_electrons, ctx.occ)
 
-    if n_lindep > 0: 
-        assert np.sum(ext_ctx.det[-n_lindep:]) == 0 , "Linear dependency removal encountered occupied linearly dependent electronic states"
+    if n_lindep > 0:
+        assert (
+            np.sum(ext_ctx.det[-n_lindep:]) == 0
+        ), "Linear dependency removal encountered occupied linearly dependent electronic states"
         ext_ctx.det = ext_ctx.det[:-n_lindep]
 
     # rescaling the integrals
@@ -369,7 +369,7 @@ def initialize_CS_4c_KU_SCF_state_variable(
 
 def initialize_CS_4c_KU_SCF_P_and_E(
     ctx: CS_4c_KU_SCF_Context,
-    state: CS_4c_KU_SCF_State,
+    rhf_state: CS_4c_KU_SCF_State,
 ) -> None:
     """
     Initialize density matrix and starting energy.
@@ -385,74 +385,14 @@ def initialize_CS_4c_KU_SCF_P_and_E(
     -------
     None
     """
-    if ctx.theta != 0.0:
-        # TODO: this cannot be filled until the routine has been adapted
-        pass
-        P = guess_density_RHF(ctx.p_guess, len(ctx.S), ctx.initial_orbitals)
-        E_prev = np.complex128(0.0)
-        # P, unscaled_E = compute_unscaled_density(ctx, ctx.verbose)
-        # E_prev = np.complex128(unscaled_E)
 
-    else:
-        P = guess_density_RHF(ctx.p_guess, len(ctx.S), ctx.initial_orbitals)
-        E_prev = np.complex128(0.0)
+    P = guess_density_4c(ctx.p_guess, len(ctx.S), ctx.initial_orbitals)
+    E_prev = np.complex128(0.0)
 
-    state.P = P
-    state.E_prev = E_prev
+    rhf_state.P = P
+    rhf_state.E_prev = E_prev
 
     return
-
-
-# TODO: this has to be adaoted once the scf kernel is defined
-# def compute_rhf_unscaled_density(
-#     ctx: CSRHFContext, verbose: bool
-# ) -> Tuple[NDArray[np.complex128], np.complex128]:
-#     """
-#     Compute unscaled density matrix for theta=0.
-
-#     Parameters
-#     ----------
-#     ctx : CSRHFContext
-#         Original context with integrals and parameters.
-#     verbose : bool
-#         If True, print status.
-
-#     Returns
-#     -------
-#     P : NDArray[np.complex128]
-#         Unscaled density matrix.
-#     E_RHF : np.complex128
-#         Unscaled RHF energy.
-#     """
-#     if verbose:
-#         print("Converging unscaled case:")
-#     unscaled_ctx = CSRHFContext(
-#         S=ctx.S,
-#         T=ctx.T,
-#         V=ctx.V,
-#         eri=ctx.eri,
-#         n_electrons=ctx.n_electrons,
-#         theta=0.0,
-#         occupation=ctx.occupation,
-#         max_iter=ctx.max_iter,
-#         threshold=ctx.threshold,
-#         p_guess=ctx.p_guess,
-#         guess_max_iter=ctx.guess_max_iter,
-#         initial_orbitals=ctx.initial_orbitals,
-#         verbose=ctx.verbose,
-#         conv_type=ctx.conv_type,
-#         acc_hist_size=ctx.acc_hist_size,
-#         acc_iteration_start=10,
-#     )
-
-#     unscaled_res = CS_RHF(unscaled_ctx)
-
-#     if verbose:
-#         print("Unscaled energy: ", unscaled_res.E_RHF)
-#         print("\n\n\nConverging scaled case from unscaled density as reference:")
-
-#     P = unscaled_res.P
-#     return P, unscaled_res.E_RHF
 
 
 def update_CS_4c_KU_SCF_F_and_r_comp(
@@ -477,9 +417,10 @@ def update_CS_4c_KU_SCF_energy(
 
 
 def print_cycle_data_4c(convergence_criteria: str, state: CS_4c_KU_SCF_State) -> None:
-    print(
-        f"{state.iteration:5}     {state.E_SCF:45.16f}     {state.E_diff:45.16f}     {state.error:8.4E}"
-    )
+    if convergence_criteria == "norm":
+        print(f"| {state.iteration:^8} | {state.E_SCF:^45.16f} | {state.E_diff:^45.16f} | {state.error:^22.4E} |")
+    elif convergence_criteria == "max":
+        print(f"| {state.iteration:^8} | {state.E_SCF:^45.16f} | {state.E_diff:^45.16f} | {state.error:^22.4E} |")
 
 
 def update_CS_4c_KU_SCF_F_matrix(
@@ -567,6 +508,46 @@ def update_CS_4c_KU_SCF_density(
     return
 
 
+def CS_4c_KU_SCF(ctx: CS_4c_KU_SCF_Context) -> CS_4c_KU_SCF_Results:
+    """
+    Perform a Complex Scaled 4-Component Kramers-Unrestricted Self-Consistent Field (CS-4c-KU-SCF) calculation.
+
+    Takes a context with overlap, kinetic, nuclear attraction, and two-electron
+    integrals, optionally applies complex scaling by an angle `theta`, and runs
+    the CS-4c-KU-SCF loop using biorthogonal diagonalization. If `theta != 0`, an
+    unscaled calculation is performed first to generate a starting guess density.
+
+    Parameters
+    ----------
+    ctx : CSRHFContext
+        Context object containing all parameters for the calculation.
+
+    Returns
+    -------
+    CSRHFResults
+        Results object containing energies, orbitals, and convergence info.
+    """
+    if ctx.theta == 0:
+        return _kuscf_kernel(ctx)
+
+    else:
+        scaled_context = copy.deepcopy(ctx)
+
+        # perform unscaled calculation first
+        if ctx.verbose:
+            print("Converging unscaled case:")
+        ctx.theta = 0
+        unscaled_rhf = _kuscf_kernel(ctx)
+
+        # use results for scaled calculation
+        if ctx.verbose:
+            print("Unscaled energy: ", unscaled_rhf.E_SCF)
+            print("\n\n\nConverging scaled case from unscaled density as reference:")
+        scaled_context.p_guess = "INPORB"
+        scaled_context.initial_orbitals = unscaled_rhf.P
+        return _kuscf_kernel(scaled_context)
+
+
 def _kuscf_kernel(ctx: CS_4c_KU_SCF_Context) -> CS_4c_KU_SCF_Results:
     validate_CS_4c_KU_SCF_context_input(ctx)
 
@@ -590,19 +571,18 @@ def _kuscf_kernel(ctx: CS_4c_KU_SCF_Context) -> CS_4c_KU_SCF_Results:
         if ctx.verbose:
             print_cycle_data_4c(ctx._convergence_criteria, state)
 
-
-        state.converged = is_converged(ctx, state)  # type: ignore
+        state.converged = is_converged_4c(ctx, state)
         if state.converged:
             break
 
-        update_rhf_acc_hist_size(ctx, state)  # type: ignore
+        update_CS_4c_KU_SCF_acc_hist_size(ctx, state)
         state.P_old = state.P.copy()
 
         update_CS_4c_KU_SCF_F_matrix(ctx, state)
 
         update_CS_4c_KU_SCF_density(ctx, ext_ctx, state)
 
-        state.use_conv_acc = conv_acc_criteria_met(ctx, ext_ctx, state)  # type: ignore
+        state.use_conv_acc = conv_acc_criteria_met_4c(ctx, ext_ctx, state)
 
     update_CS_4c_KU_SCF_density(ctx, ext_ctx, state)
     state.F_next = state.F
@@ -610,3 +590,108 @@ def _kuscf_kernel(ctx: CS_4c_KU_SCF_Context) -> CS_4c_KU_SCF_Results:
     results = pack_CS_4c_KU_SCF_results(ctx, ext_ctx, state)
 
     return results
+
+
+def is_converged_4c(
+    ctx: CS_4c_KU_SCF_Context,
+    state: CS_4c_KU_SCF_State,
+) -> bool:
+    """
+    Check convergence based on residual norms.
+
+    Parameters
+    ----------
+    ctx : CS_4c_KU_SCF_Context
+        Context object containing convergence criteria and threshold.
+    state : CS_4c_KU_SCF_State
+        Current SCF state.
+
+    Returns
+    -------
+    converged : bool
+        True if converged, else False.
+    """
+    converged: bool = False
+
+    if ctx._convergence_criteria == "max":
+        error_re: float = float(np.max(np.abs(state.r.real)))
+        error_im: float = float(np.max(np.abs(state.r.imag)))
+        if state.iteration > 1 and np.max([error_re, error_im]) < ctx.threshold:
+            converged = True
+
+    elif ctx._convergence_criteria == "norm":
+        error = np.linalg.norm(state.r)
+        if state.iteration > 1 and error < ctx.threshold:
+            converged = True
+
+    if converged and ctx.verbose:
+        print("-" * 135)
+        print(f"Convergence achieved after {state.iteration} iterations.")
+
+    return converged
+
+
+def update_CS_4c_KU_SCF_acc_hist_size(
+    ctx: CS_4c_KU_SCF_Context, state: CS_4c_KU_SCF_State
+) -> None:
+    state.F_guess.append(state.F)
+    state.residuals.append(state.r)
+
+    if len(state.F_guess) > ctx.acc_hist_size:
+        state.F_guess.pop(0)
+        state.residuals.pop(0)
+
+    return
+
+
+def conv_acc_criteria_met_4c(
+    ctx: CS_4c_KU_SCF_Context,
+    ext_ctx: CS_4c_KU_SCF_Constants,
+    state: CS_4c_KU_SCF_State,
+) -> bool:
+    use_conv_acc = state.use_conv_acc
+    if (
+        not use_conv_acc
+        and state.iteration + 1 >= ctx.acc_iteration_start
+        and ext_ctx.acc_requested
+    ):
+        use_conv_acc = True
+
+        if ctx.verbose:
+            msg = f" STARTED {ctx.conv_type} "
+            print(f"|{msg:-^133}|")
+
+    return use_conv_acc
+
+
+def CS_4c_KU_SCF_theta_traj(max_theta, n_points, ctx: CS_4c_KU_SCF_Context):
+    """
+    Sample energies along theta trajectory for CS-4c-KU-SCF.
+
+    Parameters
+    ----------
+    max_theta : float
+        Max theta (radians).
+    n_points : int
+        Steps.
+    ctx : CS_4c_KU_SCF_Context
+        Base context.
+
+    Returns
+    -------
+    thetas, energies : Tuple[NDArray, NDArray]
+        Sampled angles & energies.
+    """
+    thetas = np.linspace(0, max_theta, n_points)
+    energies = []
+    for th in thetas:
+        ctx.theta = th
+        res = CS_4c_KU_SCF(ctx)
+        if res.converged:
+            energies.append(res.E_SCF)
+        else:
+            print(f"Traj {th} did not converge.")
+        if ctx.verbose and res.converged:
+            print(f"Converged point at theta = {th:6.4f} : E = {res.E_SCF:12.8f}")
+
+    return thetas, np.array(energies, dtype=np.complex128)

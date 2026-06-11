@@ -225,11 +225,6 @@ def initialize_conv_acc(
         return int(1e10), False
 
     acc_requested = conv_type is not None
-    acc_iteration_start = (
-        min(acc_iteration_start + 1, acc_hist_size)
-        if acc_hist_size >= acc_iteration_start
-        else max(acc_iteration_start + 1, acc_hist_size)
-    )
 
     return (acc_iteration_start, acc_requested)
 

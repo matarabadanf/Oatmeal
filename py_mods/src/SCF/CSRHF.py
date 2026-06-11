@@ -125,7 +125,6 @@ def CS_RHF(ctx: CSRHFContext) -> CSRHFResults:
     CSRHFResults
         Results object containing energies, orbitals, and convergence info.
     """
-
     if ctx.theta == 0:
         return _csrhf_kernel(ctx)
 
@@ -133,10 +132,15 @@ def CS_RHF(ctx: CSRHFContext) -> CSRHFResults:
         scaled_context = copy.deepcopy(ctx)
 
         # perform unscaled calculation first
+        if ctx.verbose:
+            print("Converging unscaled case:")
         ctx.theta = 0
         unscaled_rhf = _csrhf_kernel(ctx)
 
         # use results for scaled calculation
+        if ctx.verbose:
+            print("Unscaled energy: ", unscaled_rhf.E_RHF)
+            print("\n\n\nConverging scaled case from unscaled density as reference:")
         scaled_context.p_guess = "INPORB"
         scaled_context.initial_orbitals = unscaled_rhf.P
         return _csrhf_kernel(scaled_context)
@@ -220,69 +224,13 @@ def initialize_rhf_P_and_E(
     rhf_state: CSRHFState,
 ) -> None:
 
-    if ctx.theta != 0.0:
-        P, unscaled_E_RHF = compute_rhf_unscaled_density(ctx, ctx.verbose)
-        E_prev = np.complex128(unscaled_E_RHF)
-
-    else:
-        P = guess_density_RHF(ctx.p_guess, len(ctx.S), ctx.initial_orbitals)
-        E_prev = np.complex128(0.0)
+    P = guess_density_RHF(ctx.p_guess, len(ctx.S), ctx.initial_orbitals)
+    E_prev = np.complex128(0.0)
 
     rhf_state.P = P
     rhf_state.E_prev = E_prev
 
     return
-
-
-def compute_rhf_unscaled_density(
-    ctx: CSRHFContext, verbose: bool
-) -> Tuple[NDArray[np.complex128], np.complex128]:
-    """
-    Compute unscaled density matrix for theta=0.
-
-    Parameters
-    ----------
-    ctx : CSRHFContext
-        Original context with integrals and parameters.
-    verbose : bool
-        If True, print status.
-
-    Returns
-    -------
-    P : NDArray[np.complex128]
-        Unscaled density matrix.
-    E_RHF : np.complex128
-        Unscaled RHF energy.
-    """
-    if verbose:
-        print("Converging unscaled case:")
-    unscaled_ctx = CSRHFContext(
-        S=ctx.S,
-        T=ctx.T,
-        V=ctx.V,
-        eri=ctx.eri,
-        n_electrons=ctx.n_electrons,
-        theta=0.0,
-        occupation=ctx.occupation,
-        max_iter=ctx.max_iter,
-        threshold=ctx.threshold,
-        p_guess=ctx.p_guess,
-        guess_max_iter=ctx.guess_max_iter,
-        initial_orbitals=ctx.initial_orbitals,
-        verbose=ctx.verbose,
-        conv_type=ctx.conv_type,
-        acc_hist_size=ctx.acc_hist_size,
-        acc_iteration_start=10,
-    )
-
-    unscaled_res = CS_RHF(unscaled_ctx)
-
-    if verbose:
-        print("Unscaled energy: ", unscaled_res.E_RHF)
-        print("\n\n\nConverging scaled case from unscaled density as reference:")
-
-    P = unscaled_res.P
-    return P, unscaled_res.E_RHF
 
 
 # -------------------------------------------------------------
@@ -327,6 +275,7 @@ def is_converged(
             converged = True
 
     if converged and ctx.verbose:
+        print( "-" * 133)
         print(f"Convergence achieved after {rhf_state.iteration} iterations.")
 
     return converged
@@ -358,7 +307,7 @@ def print_cycle_data(
     if _convergence_criteria == "norm":
         error = np.linalg.norm(rhf_state.r)
         print(
-            f"  {rhf_state.iteration:5}     {rhf_state.E_RHF:24.6E}     {rhf_state.E_diff:24.6E}     {error:8.4E}"
+            f"| {rhf_state.iteration:^8} | {rhf_state.E_RHF:^45.16f} | {rhf_state.E_diff:^45.16f} | {error:^22.4E} |"
         )
         return
 
@@ -366,8 +315,9 @@ def print_cycle_data(
         error_re, error_im = np.max(np.abs(rhf_state.r.real)), np.max(
             np.abs(rhf_state.r.imag)
         )
+        err_str = f"{error_re:.4E}+{error_im:.4E}j"
         print(
-            f"{rhf_state.iteration:5}     {rhf_state.E_RHF:24.6E}     {rhf_state.E_diff:24.6E}     {error_re:8.4E}     {error_im:8.4E}j"
+            f"| {rhf_state.iteration:^8} | {rhf_state.E_RHF:^45.16f} | {rhf_state.E_diff:^45.16f} | {err_str:^22} |"
         )
         return
 
@@ -380,11 +330,9 @@ def print_table_header():
     -------
     None
     """
-    print("-" * 128)
-    print(
-        "|   Iter     |                   E_iter                      |                   Delta_e                   |      norm(e_i)      |"
-    )
-    print("-" * 128)
+    print("-" * 133)
+    print(f"| {'Iter':^8} | {'E_iter':^45} | {'Delta_e':^45} | {'norm(e_i)':^22} |")
+    print("-" * 133)
 
 
 def conv_acc_criteria_met(
@@ -395,13 +343,14 @@ def conv_acc_criteria_met(
     use_conv_acc = rhf_state.use_conv_acc
     if (
         not use_conv_acc
-        and rhf_state.iteration - 1 >= rhf_ext_ctx.acc_iteration_start
+        and rhf_state.iteration + 1 >= rhf_ext_ctx.acc_iteration_start
         and rhf_ext_ctx.acc_requested
     ):
         use_conv_acc = True
 
         if ctx.verbose:
-            print("-" * 30, f"   STARTED {ctx.conv_type}  ", "-" * 30)
+            msg = f" STARTED {ctx.conv_type} "
+            print(f"|{msg:-^131}|")
     return use_conv_acc
 
 

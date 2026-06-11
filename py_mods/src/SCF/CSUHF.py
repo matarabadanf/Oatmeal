@@ -405,11 +405,9 @@ def print_table_header():
     -------
     None
     """
-    print("-" * 128)
-    print(
-        "|   Iter     |                   E_iter                      |                   Delta_e                   |      norm(e_i)      |"
-    )
-    print("-" * 128)
+    print("-" * 135)
+    print(f"| {'Iter':^8} | {'E_iter':^45} | {'Delta_e':^45} | {'norm(e_i)':^22} |")
+    print("-" * 135)
 
 
 def conv_acc_criteria_met(
@@ -420,13 +418,14 @@ def conv_acc_criteria_met(
     use_conv_acc = uhf_state.use_conv_acc
     if (
         not use_conv_acc
-        and uhf_state.iteration >= ctx.acc_iteration_start
+        and uhf_state.iteration + 1 >= ctx.acc_iteration_start
         and uhf_ext_ctx.acc_requested
     ):  #  and error < conv_thresh and not use_conv:
         use_conv_acc = True
 
         if ctx.verbose:
-            print("-" * 30, f"   STARTED {ctx.conv_type}  ", "-" * 30)
+            msg = f" STARTED {ctx.conv_type} "
+            print(f"|{msg:-^133}|")
 
     return use_conv_acc
 
@@ -487,9 +486,7 @@ def is_converged_uhf(
 
 
 def print_cycle_data(uhf_state: CSUHFState) -> None:
-    print(
-        f"{uhf_state.iteration:5}     {uhf_state.E_UHF:45.16f}     {uhf_state.E_diff:45.16f}     {uhf_state.error:8.4E}"
-    )
+    print(f"| {uhf_state.iteration:^8} | {uhf_state.E_UHF:^45.16f} | {uhf_state.E_diff:^45.16f} | {uhf_state.error:^22.4E} |")
 
     return
 

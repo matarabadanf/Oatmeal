@@ -69,8 +69,8 @@ class CSRHFContext:
     initial_orbitals: Union[NDArray[np.float64], NDArray[np.complex128], None] = None
     verbose: bool = False
     conv_type: Literal[None, "DIIS", "CROP"] = "DIIS"
-    acc_hist_size: int = 10
-    acc_iteration_start: int = 12
+    acc_hist_size: int = 5
+    acc_iteration_start: int = 6
 
     # Internal
     _eigensolver: Literal["eig", "eigh"] = "eigh"

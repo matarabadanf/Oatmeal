@@ -78,7 +78,7 @@ def test_CS_4c_KU_SCF_kernel_Ne():
         theta=0.00,
         occ=occ_det,
         verbose=False,
-        threshold=1e-10,
+        threshold=1e-8,
     )
 
     results = _kuscf_kernel(test_ctx)

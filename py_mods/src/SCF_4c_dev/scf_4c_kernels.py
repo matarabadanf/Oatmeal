@@ -90,3 +90,47 @@ def calculate_P_next_4c(
     P_munu = calc_p_matrix_comp(L_munu, C_munu, det)
 
     return P_munu, e_values, C_munu, C_prime
+
+
+def guess_density_4c(
+    p_guess: Literal["core", "ones", "INPORB"],
+    dim: int,
+    INPORB: Union[NDArray[np.complex128], NDArray[np.float64], None],
+) -> NDArray[np.complex128]:
+    """
+    Generate initial guess density (complex) for 4c calculations.
+
+    Parameters
+    ----------
+    p_guess : {'core', 'ones', 'INPORB'}
+        Guess method.
+    dim : int
+        Basis dimension.
+    INPORB : {NDArray[np.complex128], NDArray[np.float64], None}
+        Imported guess orbitals.
+
+    Returns
+    -------
+    P_guess : NDArray[np.complex128]
+        Guess density matrix.
+    """
+    if p_guess == "INPORB":
+        assert INPORB is not None, "Empty INPORB for guess"
+
+        assert isinstance(INPORB, np.ndarray) and INPORB.shape == (
+            dim,
+            dim,
+        ), f"Wrong type ({type(INPORB)}) or dimensions ({INPORB.shape}) of import guess orbitals. Dimension expected is {(dim, dim)}"
+
+        return np.copy(INPORB.astype(np.complex128))
+
+    elif p_guess == "core":
+        return np.zeros((dim, dim), dtype=np.complex128)
+
+    elif p_guess == "ones":
+        return np.ones((dim, dim), dtype=np.complex128)
+
+    else:
+        raise ValueError(
+            f"Invalid method. Choose 'core', 'ones' or 'INPORB' (inputed {p_guess})."
+        )
