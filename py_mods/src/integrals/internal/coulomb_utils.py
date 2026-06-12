@@ -93,8 +93,7 @@ def V_ab_Z_shell(
                 "t, u, v -> tuv",
                 E_AB_x[i, j, :t_max],
                 E_AB_y[k, l, :u_max],
-                E_AB_z[m, n, :v_max],
-            )
+                E_AB_z[m, n, :v_max])
 
     # Finally, this tensor is accumulated over the auxiliary integral (Helgaker 9.9.32)
     h_ab_tensor = np.einsum(

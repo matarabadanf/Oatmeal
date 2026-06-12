@@ -437,7 +437,11 @@ def build_uncontracted_basis_from_h5(
     return h_basis, nL, nS
 
 
-def full_eri_from_h5(h5filename, kernel: Literal['interest', 'oatmeal']='interest' ,symmetry:Literal[None, 4, 8] = 4) -> NDArray[np.float64]:
+def full_eri_from_h5(
+    h5filename,
+    kernel: Literal["interest", "oatmeal"] = "interest",
+    symmetry: Literal[None, 4, 8] = 4,
+) -> NDArray[np.float64]:
     h_basis, nL, nS = build_uncontracted_basis_from_h5(h5filename)
     eri_tensor = ERIs_Uncontracted(h_basis, kernel=kernel, symm=symmetry)
 
@@ -448,20 +452,21 @@ def generate_primitive_KUSCFContext_from_h5(
     h5_filename: str,
     total_charge: int = 0,
     occupation_det: Optional[NDArray[np.int32]] = None,
+    integral_symmetry: Literal[None, 4, 8] = 4,
     **kwargs,
 ) -> CS_4c_KU_SCF_Context:
 
     S, V, W, T = build_S_V_W_T_from_h5(h5_filename)
-    H_core = V + W + T
+    # H_core = V + W + T
     nuc_charge = get_nuc_charge(h5_filename)
 
     _, nL, nS = build_uncontracted_basis_from_h5(h5_filename)
-    eri = full_eri_from_h5(h5_filename)
+    eri = full_eri_from_h5(h5_filename, symmetry=integral_symmetry)
     eri = eri_classified(eri, nL)
 
     n_elec = nuc_charge + total_charge
 
-    occ_det = occupation_4c(nS, nL, n_elec, occupation_det)
+    # occ_det = occupation_4c(nS, nL, n_elec, occupation_det)
 
     return CS_4c_KU_SCF_Context(
         nL=nL,
@@ -471,8 +476,6 @@ def generate_primitive_KUSCFContext_from_h5(
         V=V,
         W=W,
         eri_classess=eri,
-        n_electrons=nuc_charge,
-        occ=occ_det,
-        verbose=True,
+        n_electrons=nuc_charge, 
         **kwargs
     )

@@ -13,17 +13,13 @@ def plot_map(
     filename: Union[None, str] = None,
     returnable: bool = False,
 ):
-    assert len(matrix) == len(
-        matrix[0]
-    ), "Mismatch of matrix dimensions, must be a square matrix"
-
     if matrix.dtype == np.float64:
         plotObject = _plot_map_real(matrix, plot_range, title)
     elif matrix.dtype == np.complex128:
         plotObject = _plot_map_imag(matrix, plot_range, title)
     else:
         raise TypeError(
-            "Type must be Ndarray of shape (n, n) of types float or complex"
+            "Type must be Ndarray of shape (m, n) of types float or complex"
         )
 
     if filename is not None:

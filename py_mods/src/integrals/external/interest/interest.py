@@ -75,7 +75,7 @@ _buffer1 = np.zeros(_buffer_size)
 def interest_full_tensor(
     gto_list: List[GTO], buffer_1=None, symm: Literal[None, 4, 8] = None
 ) -> NDArray[np.float64]:
-    """Do not use 8-fold. It will not work."""
+    """Computes the full ERI tensor with optional 4-fold or 8-fold symmetry."""
     projections = [len(primitive.l_projections) for primitive in gto_list]
     shell_start = [sum(projections[0:i]) for i in range(len(projections))]
     tensor_size = sum(projections)
@@ -97,9 +97,9 @@ def interest_full_tensor(
                 for I, I_gto in enumerate(gto_list):  # i
                     I_size, I_start, I_end, I_consts = _unpack_primitive(projections, shell_start, I, I_gto)
 
-                    if symm in [4,8]:
+                    if symm in [4, 8]:
                         if symm == 4:
-                            if I<J or K<L:
+                            if I < J or K < L:
                                 continue
                             else:
                                 block = _compute_block(L_gto, L_size, L_consts, K_gto, K_size, K_consts, J_gto, J_size, J_consts, I_gto, I_size, I_consts)
@@ -108,23 +108,19 @@ def interest_full_tensor(
                                 eri_tensor[I_start:I_end, J_start:J_end, L_start:L_end, K_start:K_end] = block.transpose(0, 1, 3, 2)
                                 eri_tensor[J_start:J_end, I_start:I_end, L_start:L_end, K_start:K_end] = block.transpose(1, 0, 3, 2)
 
-                            # if symm == 8:
-                            #     if I<J or K<L:
-
-                            #     else:
-                            #         block = _compute_block(L_gto, L_size, L_consts, K_gto, K_size, K_consts, J_gto, J_size, J_consts, I_gto, I_size, I_consts)
-                            #         eri_tensor[
-                            #             I_start:I_end, J_start:J_end, K_start:K_end, L_start:L_end
-                            #         ] = block
-
-                            #         eri_tensor[I_start:I_end, J_start:J_end, K_start:K_end, L_start:L_end] = block
-                            #         eri_tensor[J_start:J_end, I_start:I_end, K_start:K_end, L_start:L_end] = block.transpose(1, 0, 2, 3)
-                            #         eri_tensor[I_start:I_end, J_start:J_end, L_start:L_end, K_start:K_end] = block.transpose(0, 1, 3, 2)
-                            #         eri_tensor[J_start:J_end, I_start:I_end, L_start:L_end, K_start:K_end] = block.transpose(1, 0, 3, 2)
-                            #         eri_tensor[K_start:K_end, L_start:L_end, I_start:I_end, J_start:J_end] = block.transpose(2, 3, 0, 1)
-                            #         eri_tensor[L_start:L_end, K_start:K_end, I_start:I_end, J_start:J_end] = block.transpose(3, 2, 0, 1)
-                            #         eri_tensor[K_start:K_end, L_start:L_end, J_start:J_end, I_start:I_end] = block.transpose(2, 3, 1, 0)
-                            #         eri_tensor[L_start:L_end, K_start:K_end, J_start:J_end, I_start:I_end] = block.transpose(3, 2, 1, 0)
+                        elif symm == 8:
+                            if I < J or K < L or I < K or (I == K and J < L):
+                                continue
+                            else:
+                                block = _compute_block(L_gto, L_size, L_consts, K_gto, K_size, K_consts, J_gto, J_size, J_consts, I_gto, I_size, I_consts)
+                                eri_tensor[I_start:I_end, J_start:J_end, K_start:K_end, L_start:L_end] = block
+                                eri_tensor[J_start:J_end, I_start:I_end, K_start:K_end, L_start:L_end] = block.transpose(1, 0, 2, 3)
+                                eri_tensor[I_start:I_end, J_start:J_end, L_start:L_end, K_start:K_end] = block.transpose(0, 1, 3, 2)
+                                eri_tensor[J_start:J_end, I_start:I_end, L_start:L_end, K_start:K_end] = block.transpose(1, 0, 3, 2)
+                                eri_tensor[K_start:K_end, L_start:L_end, I_start:I_end, J_start:J_end] = block.transpose(2, 3, 0, 1)
+                                eri_tensor[L_start:L_end, K_start:K_end, I_start:I_end, J_start:J_end] = block.transpose(3, 2, 0, 1)
+                                eri_tensor[K_start:K_end, L_start:L_end, J_start:J_end, I_start:I_end] = block.transpose(2, 3, 1, 0)
+                                eri_tensor[L_start:L_end, K_start:K_end, J_start:J_end, I_start:I_end] = block.transpose(3, 2, 1, 0)
 
                     # And fill the block
                     else: 

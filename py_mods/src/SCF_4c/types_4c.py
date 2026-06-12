@@ -79,10 +79,12 @@ class CS_4c_KU_SCF_Context:
     p_guess: Literal["core", "ones", "INPORB"] = "core"
     guess_max_iter: Union[int, None] = None
     initial_orbitals: Union[NDArray[np.float64], NDArray[np.complex128], None] = None
-    verbose: bool = False
+    verbose: bool = True
     conv_type: Literal[None, "DIIS", "CROP"] = "DIIS"
     acc_hist_size: int = 5
     acc_iteration_start: int = 6
+    remove_lindep: bool = True
+    lindep_thres: float = 1e-6
 
     # Internal
     _eigensolver: Literal["eig", "eigh"] = "eigh"

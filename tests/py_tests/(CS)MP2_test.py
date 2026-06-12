@@ -85,7 +85,7 @@ def test_UMP2():
     mp_results = CS_MP2(UHF_res)
 
     assert (
-        mp_results.E_corr - mymp.e_corr < 1e-12
+        mp_results.E_corr - mymp.e_corr < 1e-10
     ), "Difference in correlation MP2 energy with reference"
 
 

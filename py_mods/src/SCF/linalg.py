@@ -11,7 +11,7 @@ def transformation_matrix(
     S: Union[NDArray[np.complex128], NDArray[np.float64]],
     method: Literal["canonical", "symmetric"] = "symmetric",
     verbose: bool = False,
-    remove_lindep: bool = False,
+    remove_lindep: bool = True,
     lindep_threshold: float = 1e-6,
 ) -> NDArray[np.float64]:
     """

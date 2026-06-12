@@ -144,20 +144,55 @@ def initialize_CS_4c_KU_SCF_extended_context(
     """
 
     ext_ctx.dim = len(ctx.S)
-    ext_ctx.X = transformation_matrix(ctx.S.astype(np.complex128)).astype(np.complex128)
+    ext_ctx.X = transformation_matrix(
+        ctx.S.astype(np.complex128), remove_lindep=ctx.remove_lindep
+    ).astype(np.complex128)
 
     n_lindep = np.abs(
         ext_ctx.X.shape[0] - ext_ctx.X.shape[1]
     )  # The difference between row and column size is the number of lindeps
 
+    if n_lindep > 0: 
+        H_core = ctx.V + ctx.T + ctx.W
+        F_0 = ext_ctx.X.conj().T @ H_core.astype(np.complex128) @ ext_ctx.X
+        e_0 = np.linalg.eigvals(F_0)
+        n_pos_ener_eigvals = sum([1 for ev in e_0 if ev > -2000])
+        n_neg_ener_eigvals = sum([1 for ev in e_0 if ev <= -2000])
+        old_nL = ctx.nL
+        old_nS = ctx.nS
+
+        if ctx.verbose:
+            print(
+                f"Linear dependencies removed: LC = {ctx.nL *2- n_pos_ener_eigvals}. SC = {ctx.nS*2 - n_neg_ener_eigvals}"
+            )
+            print(f"Basis resize: LC = {ctx.nL*2} -> {n_pos_ener_eigvals}, SC = {ctx.nS*2} -> {n_neg_ener_eigvals}. Total size: {ctx.nL*2 + ctx.nS*2} -> {n_pos_ener_eigvals + n_neg_ener_eigvals}.")
+
+        ctx.nL = n_pos_ener_eigvals // 2
+        ctx.nS = n_neg_ener_eigvals // 2
+
+        if isinstance(ctx.occ, np.ndarray):
+            # if ctx.verbose:
+            #     print("Original occupation:\n", ctx.occ, len(ctx.occ))
+            
+            if len(ctx.occ) == 2 * (old_nL + old_nS):
+                old_lc_occ = ctx.occ[2 * old_nS :]
+            else:
+                old_lc_occ = ctx.occ
+                
+            lc_occ = old_lc_occ[:n_pos_ener_eigvals]
+            new_occ = np.zeros(2 * (ctx.nL + ctx.nS), dtype=np.int32)
+            length = min(len(lc_occ), 2 * ctx.nL)
+            new_occ[2 * ctx.nS : 2 * ctx.nS + length] = lc_occ[:length]
+            ctx.occ = new_occ
+            
+            # if ctx.verbose:
+            #     print("Modified occupation after linear dependency removal:\n", ctx.occ, len(ctx.occ))
+
+
     # validate occupation
     ext_ctx.det, _ = validate_4c_determinant(ctx.nS, ctx.nL, ctx.n_electrons, ctx.occ)
 
-    if n_lindep > 0:
-        assert (
-            np.sum(ext_ctx.det[-n_lindep:]) == 0
-        ), "Linear dependency removal encountered occupied linearly dependent electronic states"
-        ext_ctx.det = ext_ctx.det[:-n_lindep]
+
 
     # rescaling the integrals
     T_scaled, V_scaled, W_scaled, ext_ctx.eri_scaled = scale_4c_integrals(
